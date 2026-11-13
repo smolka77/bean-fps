@@ -33,5 +33,5 @@ npm install
 npm run build
 ```
 
-Źródło: artefakt gry na claude.ai, wersja z 13.11.2026. Zawiera zmiany ze wszystkich czatów:
+Źródło: artefakt gry na claude.ai, wersja z 13.11.2026 (Strzelnica w kolorystyce lobby: wersja 52). Zawiera zmiany ze wszystkich czatów:
 mapy Oaza (poprawki kolizji i okien), Magazyn, Baza i Strzelnica, mecz 1v1, nowe lobby i choreografie oglądania broni.

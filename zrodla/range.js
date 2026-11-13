@@ -29,7 +29,48 @@ export function createRange(g) {
   const stats = {};
   let enabled = true, spots = [], panel = null, t = 0, nextSpawn = 0, hover = -2, dirty = true, frozen = false, lastPress = 0;
   const recent = [];
-  let fogKeep = null;
+
+  // ------------------------------------------------------------- niebo, mgła i światło jak w lobby (zachód słońca)
+  // Wejście w Strzelnicę zmienia tylko scenę gry, a wyjście przywraca poprzednie wartości (mapy 1v1 zostają jak były).
+  const SUNSET = {
+    sky: [[0, '#2b2f6b'], [0.27, '#5a4580'], [0.4, '#c8657c'], [0.5, '#f4a46e'], [0.56, '#d4875a'], [1, '#5a4a30']],   // zenit → róż → bursztyn przy horyzoncie
+    horizon: 0xf4a46e, fog: [90, 290],                       // plac ma 70 m głębokości, wzgórza bledną w bursztynowej mgle
+    hemi: [0xffc2a6, 0x3d3324, 1.2], sun: [0xffb070, 2.7],   // ciepłe światło zza pleców strzelca
+  };
+  let env = null, skyTex = null;
+  function makeSky() {
+    const cv = document.createElement('canvas');
+    cv.width = 4; cv.height = 512;
+    const c = cv.getContext('2d'), gr = c.createLinearGradient(0, 0, 0, 512);
+    for (const [p, col] of SUNSET.sky) gr.addColorStop(p, col);
+    c.fillStyle = gr; c.fillRect(0, 0, 4, 512);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace; tex.mapping = THREE.EquirectangularReflectionMapping;
+    return tex;
+  }
+  function applyEnv() {
+    if (env) return;
+    const hemi = scene.children.find((o) => o.isHemisphereLight), sun = scene.children.find((o) => o.isDirectionalLight && o.castShadow);
+    env = {
+      bg: scene.background, hemi, sun,
+      fog: scene.fog ? [scene.fog.color.getHex(), scene.fog.near, scene.fog.far] : null,
+      hemiV: hemi ? [hemi.color.getHex(), hemi.groundColor.getHex(), hemi.intensity] : null,
+      sunV: sun ? [sun.color.getHex(), sun.intensity] : null,
+    };
+    skyTex = skyTex || makeSky();
+    scene.background = skyTex;
+    if (scene.fog) { scene.fog.color.setHex(SUNSET.horizon); scene.fog.near = SUNSET.fog[0]; scene.fog.far = SUNSET.fog[1]; }
+    if (hemi) { hemi.color.setHex(SUNSET.hemi[0]); hemi.groundColor.setHex(SUNSET.hemi[1]); hemi.intensity = SUNSET.hemi[2]; }
+    if (sun) { sun.color.setHex(SUNSET.sun[0]); sun.intensity = SUNSET.sun[1]; }
+  }
+  function restoreEnv() {
+    if (!env) return;
+    scene.background = env.bg;
+    if (env.fog && scene.fog) { scene.fog.color.setHex(env.fog[0]); scene.fog.near = env.fog[1]; scene.fog.far = env.fog[2]; }
+    if (env.hemi && env.hemiV) { env.hemi.color.setHex(env.hemiV[0]); env.hemi.groundColor.setHex(env.hemiV[1]); env.hemi.intensity = env.hemiV[2]; }
+    if (env.sun && env.sunV) { env.sun.color.setHex(env.sunV[0]); env.sun.intensity = env.sunV[1]; }
+    env = null;
+  }
 
   // ------------------------------------------------------------- statystyki
   function resetStats() {
@@ -256,7 +297,7 @@ export function createRange(g) {
     spots = map.targets || [];
     if (!panel && map.panel) panel = makePanel(map.panel);
     if (panel) panel.mesh.visible = true;
-    if (!fogKeep && scene.fog) { fogKeep = [scene.fog.near, scene.fog.far]; scene.fog.near = 90; scene.fog.far = 290; }   // plac ma 70 m głębokości
+    applyEnv();
     enabled = true; t = 0; nextSpawn = 0.6; recent.length = 0; hover = -2;
     for (const e of enemies) { e.rg = null; e.off = true; e.dead = 0; e.root.visible = false; e.root.scale.setScalar(1); }
     resetStats();
@@ -264,8 +305,7 @@ export function createRange(g) {
   api.leave = () => {
     api.active = false;
     if (panel) panel.mesh.visible = false;
-    if (fogKeep && scene.fog) { scene.fog.near = fogKeep[0]; scene.fog.far = fogKeep[1]; }
-    fogKeep = null;
+    restoreEnv();
     for (const e of enemies) { e.rg = null; e.root.scale.setScalar(1); e.mats.skin.emissive.setScalar(0); }
   };
   api.update = (dt, playing) => {
