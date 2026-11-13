@@ -1244,7 +1244,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
     moved = Math.max(moved, Math.hypot(e.clientX - downX, e.clientY - downY));
     const dx = e.clientX - lastX; lastX = e.clientX; rotVel = dx * .012; rotY += rotVel;
   });
-  addEventListener('pointerup', e => { if (dragging && active && moved < 6 && e.target === canvas && overBean(e)) { openSkins(); hopT = 0; } dragging = false; });
+  addEventListener('pointerup', e => { if (dragging && active && moved < 6 && e.target === canvas && overBean(e)) { if (!(window.__fasolkaGate && window.__fasolkaGate())) openSkins(); hopT = 0; } dragging = false; });
   canvas.style.cursor = '';
   const syncCursor = () => { canvas.style.cursor = active && beanHover ? 'pointer' : ''; };
 

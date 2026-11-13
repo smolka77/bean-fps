@@ -2,6 +2,14 @@
   "name": "bean-fps-build",
   "private": true,
   "type": "module",
-  "scripts": { "build": "node build_game.mjs ../zrodla ../index.html" },
-  "devDependencies": { "esbuild": "0.24.0", "three": "0.170.0" }
+  "scripts": {
+    "build": "node build_game.mjs ../zrodla ../index.html"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.0",
+    "three": "0.170.0"
+  },
+  "dependencies": {
+    "qrcode-generator": "^1.4.4"
+  }
 }

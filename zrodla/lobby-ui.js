@@ -3,6 +3,8 @@
 // Konta i salda: baza danych artefaktu (claude.use("db")), a poza claude.ai – localStorage.
 
 import { createSfx } from './sfx.js';
+import { createWallet } from './wallet.js';
+import { walletApi } from './wallet-config.js';
 
 // ---------------- tłumaczenia ----------------
 const DICT = {
@@ -14,7 +16,7 @@ const DICT = {
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Pojedynek · do 3 wygranych rund · Oaza / Magazyn / Baza',
     'tag.range': 'SOLO', 'tag.1v1': '1 NA 1', 'soon': 'WKRÓTCE',
     'cur.tag': 'USD · płatność w SOL', 'cur.in': 'w SOL', 'stake.label': 'Stawka', 'stake.custom': 'Własna', 'stake.win': 'Możliwa wygrana', 'stake.free': 'Trening – bez stawki', 'stake.range': 'Kwota $1–$1000', 'stake.invalid': 'Podaj stawkę od $1 do $1000',
-    'play': 'GRAJ', 'picker.title': 'Wybierz tryb', 'done': 'Gotowe', 'skins.title': 'Skiny', 'close': 'Zamknij',
+    'play': 'GRAJ', 'play.login': 'ZALOGUJ SIĘ', 'picker.title': 'Wybierz tryb', 'done': 'Gotowe', 'skins.title': 'Skiny', 'close': 'Zamknij',
     'set.title': 'Ustawienia', 'set.general': 'Ogólne', 'set.audio': 'Dźwięk', 'set.controls': 'Sterowanie', 'set.lang': 'Język', 'set.volume': 'Głośność', 'set.fov': 'Pole widzenia (FOV)',
     'set.bindHint': 'Kliknij akcję (albo klawisz na klawiaturze) i naciśnij nowy klawisz. Esc anuluje.', 'set.press': 'Naciśnij klawisz…', 'set.reset': 'Przywróć domyślne', 'set.mouse': 'Strzał: lewy przycisk myszy · Celowanie: prawy',
     'act.fwd': 'Do przodu', 'act.back': 'Do tyłu', 'act.left': 'W lewo', 'act.right': 'W prawo', 'act.sprint': 'Bieg', 'act.jump': 'Skok', 'act.crouch': 'Kucanie / slide',
@@ -42,7 +44,7 @@ const DICT = {
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Duel · first to 3 rounds · Oasis / Warehouse / Base',
     'tag.range': 'SOLO', 'tag.1v1': '1 VS 1', 'soon': 'SOON',
     'cur.tag': 'USD · paid in SOL', 'cur.in': 'in SOL', 'stake.label': 'Stake', 'stake.custom': 'Custom', 'stake.win': 'Potential win', 'stake.free': 'Practice – no stake', 'stake.range': 'Amount $1–$1000', 'stake.invalid': 'Enter a stake between $1 and $1000',
-    'play': 'PLAY', 'picker.title': 'Choose mode', 'done': 'Done', 'skins.title': 'Skins', 'close': 'Close',
+    'play': 'PLAY', 'play.login': 'LOG IN', 'picker.title': 'Choose mode', 'done': 'Done', 'skins.title': 'Skins', 'close': 'Close',
     'set.title': 'Settings', 'set.general': 'General', 'set.audio': 'Audio', 'set.controls': 'Controls', 'set.lang': 'Language', 'set.volume': 'Volume', 'set.fov': 'Field of view (FOV)',
     'set.bindHint': 'Click an action (or a key on the keyboard) and press a new key. Esc cancels.', 'set.press': 'Press a key…', 'set.reset': 'Restore defaults', 'set.mouse': 'Fire: left mouse button · Aim: right',
     'act.fwd': 'Forward', 'act.back': 'Back', 'act.left': 'Left', 'act.right': 'Right', 'act.sprint': 'Sprint', 'act.jump': 'Jump', 'act.crouch': 'Crouch / slide',
@@ -70,7 +72,7 @@ const DICT = {
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Дуэль · до 3 выигранных раундов · Оазис / Склад / База',
     'tag.range': 'СОЛО', 'tag.1v1': '1 НА 1', 'soon': 'СКОРО',
     'cur.tag': 'USD · оплата в SOL', 'cur.in': 'в SOL', 'stake.label': 'Ставка', 'stake.custom': 'Своя', 'stake.win': 'Возможный выигрыш', 'stake.free': 'Тренировка – без ставки', 'stake.range': 'Сумма $1–$1000', 'stake.invalid': 'Введите ставку от $1 до $1000',
-    'play': 'ИГРАТЬ', 'picker.title': 'Выбери режим', 'done': 'Готово', 'skins.title': 'Скины', 'close': 'Закрыть',
+    'play': 'ИГРАТЬ', 'play.login': 'ВОЙТИ', 'picker.title': 'Выбери режим', 'done': 'Готово', 'skins.title': 'Скины', 'close': 'Закрыть',
     'set.title': 'Настройки', 'set.general': 'Общие', 'set.audio': 'Звук', 'set.controls': 'Управление', 'set.lang': 'Язык', 'set.volume': 'Громкость', 'set.fov': 'Поле зрения (FOV)',
     'set.bindHint': 'Нажми на действие (или клавишу на схеме) и выбери новую клавишу. Esc – отмена.', 'set.press': 'Нажми клавишу…', 'set.reset': 'Сбросить', 'set.mouse': 'Выстрел: левая кнопка мыши · Прицел: правая',
     'act.fwd': 'Вперёд', 'act.back': 'Назад', 'act.left': 'Влево', 'act.right': 'Вправо', 'act.sprint': 'Бег', 'act.jump': 'Прыжок', 'act.crouch': 'Присед / подкат',
@@ -98,7 +100,7 @@ const DICT = {
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Duelo · a 3 rondas ganadas · Oasis / Almacén / Base',
     'tag.range': 'SOLO', 'tag.1v1': '1 VS 1', 'soon': 'PRONTO',
     'cur.tag': 'USD · pago en SOL', 'cur.in': 'en SOL', 'stake.label': 'Apuesta', 'stake.custom': 'Otra', 'stake.win': 'Ganancia posible', 'stake.free': 'Práctica – sin apuesta', 'stake.range': 'Importe $1–$1000', 'stake.invalid': 'Introduce una apuesta entre $1 y $1000',
-    'play': 'JUGAR', 'picker.title': 'Elige modo', 'done': 'Listo', 'skins.title': 'Skins', 'close': 'Cerrar',
+    'play': 'JUGAR', 'play.login': 'ACCEDER', 'picker.title': 'Elige modo', 'done': 'Listo', 'skins.title': 'Skins', 'close': 'Cerrar',
     'set.title': 'Ajustes', 'set.general': 'General', 'set.audio': 'Sonido', 'set.controls': 'Controles', 'set.lang': 'Idioma', 'set.volume': 'Volumen', 'set.fov': 'Campo de visión (FOV)',
     'set.bindHint': 'Haz clic en una acción (o en una tecla del teclado) y pulsa una tecla nueva. Esc cancela.', 'set.press': 'Pulsa una tecla…', 'set.reset': 'Restablecer', 'set.mouse': 'Disparo: botón izquierdo · Apuntar: derecho',
     'act.fwd': 'Adelante', 'act.back': 'Atrás', 'act.left': 'Izquierda', 'act.right': 'Derecha', 'act.sprint': 'Correr', 'act.jump': 'Saltar', 'act.crouch': 'Agacharse / deslizar',
@@ -427,12 +429,18 @@ export function initLobbyUI(ctx) {
 
   // ---- konto ----
   let acct = null, acctId = null;
+  // serwer portfeli (serwer/ w repo): gdy ustawiony, konta, saldo, wpłaty, wypłaty i stawki idą przez niego (prawdziwe SOL w sieci Solana)
+  const API = walletApi();
+  const W = API ? createWallet({ api: API, root: ui, getLang: () => LANG, toast, onChange: a => { acct = a; acctId = a ? a.username.toLowerCase() : null; renderAll(); } }) : null;
+  let activeMatch = null;
   const saveAcct = async () => { if (acct) await accSet(acctId, acct); };
   const setErr = (id, msg) => { const el = $(id); el.textContent = msg || ''; el.hidden = !msg; };
   $('lb-login-form').addEventListener('submit', async e => { e.preventDefault(); setErr('lb-login-err');
     const u = $('lb-l-user').value.trim(), p = $('lb-l-pass').value, id = u.toLowerCase();
     if (!/^[a-z0-9_]{3,16}$/.test(id) || p.length < 6) return setErr('lb-login-err', t('auth.errCreds'));
     const btn = e.submitter || e.target.querySelector('[type=submit]'); btn.disabled = true;
+    if (W) { try { const a = await W.login(u, p); $('lb-l-pass').value = ''; closeAll(); toast(t('auth.welcome', { u: a.username }), 'ok'); }
+      catch (err) { setErr('lb-login-err', err.status === 401 ? t('auth.errCreds') : err.message || t('auth.errDb')); } finally { btn.disabled = false; } return; }
     try { const a = await accGet(id); if (!a) throw 'creds'; const h = await hashPw(p, a.salt); if (h.hash !== a.hash) throw 'creds';
       acct = a; acctId = id; ensureStats(acct); ls.set('fasolka-session', id); $('lb-l-pass').value = ''; closeAll(); toast(t('auth.welcome', { u: a.username }), 'ok'); renderAll(); }
     catch (err) { setErr('lb-login-err', err === 'creds' ? t('auth.errCreds') : t('auth.errDb')); } finally { btn.disabled = false; } });
@@ -442,12 +450,14 @@ export function initLobbyUI(ctx) {
     if (p.length < 6) return setErr('lb-reg-err', t('auth.errPass'));
     if (p !== p2) return setErr('lb-reg-err', t('auth.errMatch'));
     const btn = e.submitter || e.target.querySelector('[type=submit]'); btn.disabled = true;
+    if (W) { try { await W.register(u, p); ['lb-r-pass', 'lb-r-pass2'].forEach(k => $(k).value = ''); closeAll(); toast(t('auth.created', { u }), 'ok'); }
+      catch (err) { setErr('lb-reg-err', err.code === 'exists' ? t('auth.errExists') : err.message || t('auth.errDb')); } finally { btn.disabled = false; } return; }
     try { if (await accGet(id)) throw 'exists'; const h = await hashPw(p);
       const a = { username: u, salt: h.salt, hash: h.hash, kdf: 'pbkdf2-sha256-150k', createdAt: new Date().toISOString(), balance: 0, wallet: '', history: [] };
       await accSet(id, a); acct = a; acctId = id; ls.set('fasolka-session', id); ['lb-r-pass', 'lb-r-pass2'].forEach(k => $(k).value = ''); closeAll(); toast(t('auth.created', { u }), 'ok'); renderAll(); }
     catch (err) { setErr('lb-reg-err', err === 'exists' ? t('auth.errExists') : t('auth.errDb')); } finally { btn.disabled = false; } });
   $('lb-logout').addEventListener('click', () => logout());
-  function logout() { acct = null; acctId = null; ls.del('fasolka-session'); closeAll(); renderAll(); }
+  function logout() { if (W) W.logout(); acct = null; acctId = null; ls.del('fasolka-session'); closeAll(); renderAll(); }
   function renderAuth() {
     const inBox = $('lb-auth-in'), outBox = $('lb-auth-out');
     inBox.hidden = !acct; outBox.hidden = !!acct;
@@ -470,6 +480,7 @@ export function initLobbyUI(ctx) {
   addEventListener('fasolka:shot', e => { if (acct && e.detail && e.detail.mode === '1v1') pend.shots++; });
   addEventListener('fasolka:hit', e => { const d = e.detail || {}; if (!acct || d.mode !== '1v1') return; pend.hits++; if (d.head) pend.heads++; if (d.kill) pend.kills++; });
   addEventListener('fasolka:death', e => { if (acct && (!e.detail || e.detail.mode === '1v1')) pend.deaths++; });
+  function sendStats() { if (!W) return; const o = { ...pend }; for (const k in pend) pend[k] = 0; if (Object.values(o).some(v => v)) W.stats(o); }
   function flushCombat() { if (!acct) return false; const st = ensureStats(acct); let ch = false;
     for (const k in pend) if (pend[k]) { st[k] += pend[k]; pend[k] = 0; ch = true; } return ch; }
   // każdy mecz o stawkę trafia do wspólnej listy (panel admina: wykresy, ostatnie mecze)
@@ -479,7 +490,7 @@ export function initLobbyUI(ctx) {
     if (db) { try { await db.collection('matches').add(rec); return; } catch {} }
     try { const a = JSON.parse(ls.get('fasolka-matches') || '[]'); a.unshift(rec); ls.set('fasolka-matches', JSON.stringify(a.slice(0, 500))); } catch {}
   }
-  function openWallet(tab = 'deposit') { if (!acct) { toast(t('w.loginFirst')); openModal('lb-auth'); showTab('lb-auth', 'login'); return; } openModal('lb-wallet'); showTab('lb-wallet', tab); }
+  function openWallet(tab = 'deposit') { if (!acct) { toast(t('w.loginFirst')); openModal('lb-auth'); showTab('lb-auth', 'login'); return; } if (W) { closeAll(); W.open(tab); return; } openModal('lb-wallet'); showTab('lb-wallet', tab); }
   $('lb-dep-form').addEventListener('submit', async e => { e.preventDefault(); const a = Math.round(+$('lb-dep-amt').value * 100) / 100;
     if (!(a >= 1 && a <= 10000)) return toast(t('w.errAmount'), 'err'); await addTx(a, 'deposit'); $('lb-dep-amt').value = ''; toast(t('w.depOk', { a: money(a) }), 'ok'); });
   $('lb-dep-form').querySelectorAll('[data-q]').forEach(b => b.addEventListener('click', () => { $('lb-dep-amt').value = b.dataset.q; }));
@@ -534,7 +545,8 @@ export function initLobbyUI(ctx) {
     $('lb-stake-win').textContent = duel ? (ok ? usd(payout(s)) : '—') : '';
     $('lb-stake-fee').textContent = duel && ok ? '−' + usd(feeOf(s)) : '—';
     $('lb-stake-winrow').hidden = !duel; $('lb-stake-feerow').hidden = !duel;
-    $('lb-play-sub').textContent = duel ? (ok ? usd(s) : t('stake.range')) : t('stake.free');
+    $('lb-play-sub').textContent = ''; $('lb-play-sub').hidden = true;   // sam duży napis – stawka jest opisana wyżej
+    $('lb-play').querySelector('.lb-pl').textContent = acct ? t('play') : t('play.login');   // bez konta: LOG IN
   }
 
   // ---- losowanie mapy ----
@@ -570,6 +582,10 @@ export function initLobbyUI(ctx) {
     if (!(s >= 1 && s <= 1000)) return toast(t('stake.invalid'), 'err');
     if (!acct) { toast(t('err.loginToPlay')); openModal('lb-auth'); showTab('lb-auth', 'login'); return; }
     if (acct.balance < s) { toast(t('err.funds'), 'err'); openWallet('deposit'); return; }
+    if (W) { busy = true;   // stawka pobierana z salda na serwerze (w SOL po bieżącym kursie)
+      try { activeMatch = await W.startMatch(s); activeStake = lastStake = s; }
+      catch (er) { busy = false; if (er.code === 'funds') { toast(t('err.funds'), 'err'); openWallet('deposit'); } else toast(er.message || t('auth.errDb'), 'err'); return; }
+      SFX.play(); busy = false; ctx.play(m, { stake: s }); return; }
     busy = true;
     try { await addTx(-s, 'stake'); activeStake = lastStake = s; } catch { busy = false; return toast(t('auth.errDb'), 'err'); }
     SFX.play(); busy = false; ctx.play(m, { stake: s });   // najpierw szukanie przeciwnika, losowanie mapy dopiero potem (match.js: search → found → draw → load)
@@ -577,18 +593,30 @@ export function initLobbyUI(ctx) {
   addEventListener('fasolka:match', async e => {
     if (!activeStake || !acct) return; const s = activeStake; activeStake = 0;
     const won = !!(e.detail && e.detail.won);
+    if (W) { const id = activeMatch; activeMatch = null; sendStats(); W.endMatch(id, won, false, lastMap).catch(er => toast(er.message, 'err')); return; }
     if (won) await addTx(payout(s), 'win', '', { fee: feeOf(s) }); else await addTx(0, 'loss', usd(s));
     logMatch({ stake: s, won, payout: won ? payout(s) : 0, fee: won ? feeOf(s) : 0 });   // panel admina: lista meczów
   });
   addEventListener('fasolka:rematch', e => {
     if (!lastStake) return;
     if (!acct || acct.balance < lastStake) { e.detail.ok = false; toast(t('err.rematchFunds'), 'err'); lastStake = 0; return; }
+    if (W) { activeStake = lastStake; W.startMatch(lastStake).then(id => { activeMatch = id; }).catch(er => { activeStake = 0; toast(er.message, 'err'); }); return; }
     activeStake = lastStake; addTx(-lastStake, 'stake');
   });
 
   function renderAll() { renderTop(); renderStake(); renderAuth(); renderWallet(); }
+  // ---- bez konta: każda interakcja w lobby (poza wyborem języka) otwiera logowanie ----
+  const askLogin = () => { closeAll(); openModal('lb-auth'); showTab('lb-auth', 'login'); };
+  const GATED = 'button,a,input,select,textarea,label,[role=button],[role=menuitem],[data-act],.lb-tile,.lb-skin,.lb-key';
+  ui.addEventListener('click', e => {
+    if (acct || e.target.closest('.lb-lang,#lb-auth,.lb-toast,#bl-w')) return;
+    if (!e.target.closest(GATED)) return;
+    e.preventDefault(); e.stopImmediatePropagation(); askLogin();
+  }, true);
+  window.__fasolkaGate = () => { if (acct) return false; askLogin(); return true; };   // klik w fasolkę (scena 3D) – lobby.js
   // przywrócenie sesji
-  const sid = ls.get('fasolka-session');
+  const sid = W ? null : ls.get('fasolka-session');
+  if (W) W.restore();
   if (sid) accGet(sid).then(a => { if (a) { acct = a; acctId = sid; ensureStats(acct); renderAll(); } }).catch(() => {});
 
   // ---- panel admina: osobny link (#admin na końcu adresu gry) albo ukryty skrót Ctrl+Shift+A w lobby; nie ma go w menu ----
@@ -615,6 +643,7 @@ export function initLobbyUI(ctx) {
   return {
     requestPlay, closeAll, renderStake,
     onShow() {
+      if (W && activeStake && acct) { const id = activeMatch; activeMatch = null; sendStats(); W.endMatch(id, false, true, lastMap).catch(() => {}); activeStake = 0; lastStake = 0; renderAll(); return; }   // wyjście z meczu = przegrana walkowerem
       if (activeStake && acct) { const s = activeStake; addTx(0, 'loss', usd(s)).catch(() => {}); logMatch({ stake: s, won: false, payout: 0, fee: 0, forfeit: true }); }   // wyjście z meczu o stawkę = przegrana
       else if (acct && flushCombat()) saveAcct().catch(() => {});
       activeStake = 0; lastStake = 0; renderAll();

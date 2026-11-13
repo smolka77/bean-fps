@@ -4,6 +4,10 @@
 // Dostęp ma tylko właściciel artefaktu. Dane: baza artefaktu (accounts/*, matches/*, config/lobby);
 // poza claude.ai – konta z pamięci tej przeglądarki (tryb lokalny).
 import { LOBBY_MAPS, BUILTIN_SKINS, SKINS } from './lobby.js';
+import { walletApi } from './wallet-config.js';
+// serwer portfeli (gdy ustawiony): prawdziwe konta, adresy depozytów i salda SOL wszystkich graczy
+const SRV = walletApi();
+const srvToken = () => { try { return localStorage.getItem('bl-token'); } catch { return null; } };
 
 const CSS = `
 #fa-admin{--bg:#0a0e17;--card:rgba(255,255,255,.035);--card2:rgba(255,255,255,.06);--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.15);
@@ -127,6 +131,7 @@ const CSS = `
 
 const STAT0 = { matches: 0, wins: 0, losses: 0, staked: 0, won: 0, fees: 0, deposits: 0, withdrawn: 0, shots: 0, hits: 0, heads: 0, kills: 0, deaths: 0, lastActive: 0 };
 const r2 = v => Math.round(v * 100) / 100;
+const usd = v => '$' + fmtMoney(v);   // kwoty w dolarach, płatność w SOL (jak w lobby)
 const fmtMoney = v => (Math.round(v * 100) / 100).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtInt = v => Math.round(v).toLocaleString('pl-PL');
 const pct = (a, b) => b > 0 ? Math.round(a / b * 100) + '%' : '—';
@@ -154,7 +159,7 @@ function playerStats(a) {
   }
   const created = toMs(a.createdAt), last = Math.max(created, s.lastActive || 0, ...h.slice(0, 3).map(x => x.t || 0));
   return {
-    id: a.id, name: a.username || a.id, created, last, balance: +a.balance || 0, wallet: a.wallet || '', history: h, ...s,
+    id: a.id, name: a.username || a.id, created, last, balance: +a.balance || 0, wallet: a.wallet || '', sol: +a.sol || 0, history: h, ...s,
     net: r2(s.won - s.staked), wr: s.wins + s.losses ? s.wins / (s.wins + s.losses) : -1,
     acc: s.shots ? s.hits / s.shots : -1, hs: s.hits ? s.heads / s.hits : -1, kd: s.deaths ? s.kills / s.deaths : s.kills ? s.kills : -1,
   };
@@ -169,10 +174,17 @@ export async function openAdmin({ onClose } = {}) {
   const close = () => { cleanup.forEach(f => { try { f(); } catch {} }); cleanup = []; root.remove(); root = null; if (onClose) onClose(); };
   const onKey = e => { if (e.key !== 'Escape' || !root) return; const d = root.querySelector('.fa-drw'); if (d && !d.hidden) d.hidden = true; else close(); };
   addEventListener('keydown', onKey); cleanup.push(() => removeEventListener('keydown', onKey));
-  root.innerHTML = `<div class="fa-wrap"><div class="fa-head"><div class="fa-brand"><b>BEAN<i>FPS</i></b><span>Panel admina</span></div><div class="fa-sp"></div>
+  root.innerHTML = `<div class="fa-wrap"><div class="fa-head"><div class="fa-brand"><b>BEEN<i>LADEN</i></b><span>Panel admina</span></div><div class="fa-sp"></div>
     <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div><p class="fa-empty">Ładowanie danych…</p></div>`;
   root.querySelector('[data-close]').addEventListener('click', close);
 
+  if (SRV) {
+    const deny = msg => { root.innerHTML = `<div class="fa-wrap"><div class="fa-deny"><h2>Brak dostępu</h2><p>${esc(msg)}</p><button class="fa-btn pri" type="button" data-close>Wróć do gry</button></div></div>`; root.querySelector('[data-close]').addEventListener('click', close); };
+    if (!srvToken()) return deny('Zaloguj się w grze kontem admina (lista ADMIN_USERS na serwerze portfeli), potem otwórz panel ponownie.');
+    try { const r = await fetch(SRV + '/api/admin/overview', { headers: { Authorization: 'Bearer ' + srvToken() } }); if (!r.ok) { const j = await r.json().catch(() => ({})); return deny(j.message || 'Serwer portfeli odmówił dostępu.'); } }
+    catch { return deny('Serwer portfeli nie odpowiada (' + SRV + ').'); }
+    if (!root) return; buildDashboard(null, close); return;
+  }
   const use = n => (window.claude && typeof window.claude.use === 'function') ? window.claude.use(n).catch(() => null) : Promise.resolve(null);
   const [db, user] = await Promise.all([use('db'), use('user')]);
   if (!root) return;
@@ -188,13 +200,13 @@ export async function openAdmin({ onClose } = {}) {
 
 function buildDashboard(db, close) {
   root.innerHTML = `<div class="fa-wrap">
-    <div class="fa-head"><div class="fa-brand"><b>BEAN<i>FPS</i></b><span>Panel admina</span></div><span class="fa-live" id="fa-live">Łączenie…</span><div class="fa-sp"></div>
+    <div class="fa-head"><div class="fa-brand"><b>BEEN<i>LADEN</i></b><span>Panel admina</span></div><span class="fa-live" id="fa-live">Łączenie…</span><div class="fa-sp"></div>
       <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div>
     <p class="fa-note" id="fa-note" hidden></p>
     <section class="fa-kpis" id="fa-kpis" aria-label="Liczby ogólne"></section>
     <section class="fa-grid2">
       <div class="fa-card"><div class="fa-ch"><h3>Mecze dziennie</h3><small id="fa-ch-m-sum">ostatnie 14 dni</small></div><div class="fa-chart" id="fa-ch-m"></div></div>
-      <div class="fa-card"><div class="fa-ch"><h3>Prowizja dziennie</h3><small id="fa-ch-f-sum">USDT · ostatnie 14 dni</small></div><div class="fa-chart" id="fa-ch-f"></div></div>
+      <div class="fa-card"><div class="fa-ch"><h3>Prowizja dziennie</h3><small id="fa-ch-f-sum">USD (płatne w SOL) · ostatnie 14 dni</small></div><div class="fa-chart" id="fa-ch-f"></div></div>
     </section>
     <section class="fa-card"><div class="fa-ch"><h3>Gracze</h3><input class="fa-q" id="fa-q" type="search" placeholder="Szukaj gracza…" aria-label="Szukaj gracza"></div>
       <div class="fa-tw"><table><thead><tr id="fa-th"></tr></thead><tbody id="fa-tb"></tbody></table></div><p class="fa-empty" id="fa-tb-empty" hidden>Brak graczy.</p></section>
@@ -224,7 +236,17 @@ function buildDashboard(db, close) {
   const schedule = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; render(); }); };
 
   // ---------- dane ----------
-  if (db) {
+  let srv = null;
+  if (SRV) {
+    live.textContent = 'Łączenie…';
+    const pull = async () => {
+      try { const r = await fetch(SRV + '/api/admin/overview', { headers: { Authorization: 'Bearer ' + srvToken() } }); if (!r.ok) throw 0;
+        srv = await r.json(); accounts = srv.accounts; matches = srv.matches; gotA = gotM = true; note.hidden = true;
+        live.classList.add('on'); live.textContent = 'Na żywo · ' + srv.cluster; schedule(); }
+      catch { live.classList.remove('on'); live.textContent = 'Rozłączono'; note.hidden = false; note.textContent = 'Serwer portfeli nie odpowiada – ponawiam…'; }
+    };
+    pull(); const iv = setInterval(pull, 10000); cleanup.push(() => clearInterval(iv));
+  } else if (db) {
     const timer = setTimeout(() => { if (!gotA) { note.hidden = false; note.textContent = 'Baza danych jeszcze nie odpowiada – dane mogą być niepełne.'; } }, 10000);
     cleanup.push(() => clearTimeout(timer));
     const err = e => { note.hidden = false; note.textContent = 'Błąd bazy danych: ' + (e && e.code || 'nieznany') + '. Odśwież panel.'; live.classList.remove('on'); live.textContent = 'Rozłączono'; };
@@ -342,7 +364,8 @@ function buildDashboard(db, close) {
     ['won', 'Wygrane', r => fmtMoney(r.won)],
     ['net', 'Wynik', r => `<span class="${r.net > 0 ? 'pos' : r.net < 0 ? 'neg' : 'mut'}">${r.net > 0 ? '+' : r.net < 0 ? '−' : ''}${fmtMoney(Math.abs(r.net))}</span>`],
     ['fees', 'Prowizja', r => fmtMoney(r.fees)],
-    ['balance', 'Saldo', r => fmtMoney(r.balance)],
+    ['balance', 'Saldo', r => SRV ? `${usd(r.balance)}<small class="mut" style="display:block">${r.sol.toLocaleString('pl-PL', { maximumFractionDigits: 4 })} SOL</small>` : fmtMoney(r.balance)],
+    ...(SRV ? [['wallet', 'Adres depozytu', r => r.wallet ? `<code title="${esc(r.wallet)}">${esc(r.wallet.slice(0, 4) + '…' + r.wallet.slice(-4))}</code>` : '—']] : []),
     ['acc', 'Celność', r => r.acc < 0 ? '<span class="mut">—</span>' : Math.round(r.acc * 100) + '%'],
     ['hs', 'HS%', r => r.hs < 0 ? '<span class="mut">—</span>' : Math.round(r.hs * 100) + '%'],
     ['kd', 'K/D', r => r.kd < 0 ? '<span class="mut">—</span>' : r.kd.toFixed(2)],
@@ -359,13 +382,13 @@ function buildDashboard(db, close) {
   function openPlayer(id) {
     const r = rows.find(x => x.id === id); if (!r) return;
     const tx = { deposit: 'Wpłata (test)', withdraw: 'Wypłata (test)', stake: 'Stawka 1v1', win: 'Wygrana 1v1', loss: 'Przegrana 1v1' };
-    const meta = [['Saldo', fmtMoney(r.balance) + ' USDT'], ['Mecze', fmtInt(r.matches)], ['Wygrane – przegrane', `${r.wins} – ${r.losses}`], ['% wygranych', r.wr < 0 ? '—' : Math.round(r.wr * 100) + '%'],
-      ['Postawione', fmtMoney(r.staked) + ' USDT'], ['Wygrane (wypłaty)', fmtMoney(r.won) + ' USDT'], ['Wynik z gier', (r.net >= 0 ? '+' : '−') + fmtMoney(Math.abs(r.net)) + ' USDT'], ['Prowizja od gracza', fmtMoney(r.fees) + ' USDT'],
-      ['Wpłaty (test)', fmtMoney(r.deposits) + ' USDT'], ['Wypłaty (test)', fmtMoney(r.withdrawn) + ' USDT'], ['Strzały', fmtInt(r.shots)], ['Trafienia', fmtInt(r.hits) + (r.acc >= 0 ? ' · ' + Math.round(r.acc * 100) + '%' : '')],
+    const meta = [['Saldo', usd(r.balance)], ['Mecze', fmtInt(r.matches)], ['Wygrane – przegrane', `${r.wins} – ${r.losses}`], ['% wygranych', r.wr < 0 ? '—' : Math.round(r.wr * 100) + '%'],
+      ['Postawione', usd(r.staked)], ['Wygrane (wypłaty)', usd(r.won)], ['Wynik z gier', (r.net >= 0 ? '+' : '−') + usd(Math.abs(r.net))], ['Prowizja od gracza', usd(r.fees)],
+      ['Wpłaty (test)', usd(r.deposits)], ['Wypłaty (test)', usd(r.withdrawn)], ['Strzały', fmtInt(r.shots)], ['Trafienia', fmtInt(r.hits) + (r.acc >= 0 ? ' · ' + Math.round(r.acc * 100) + '%' : '')],
       ['W głowę', fmtInt(r.heads) + (r.hs >= 0 ? ' · ' + Math.round(r.hs * 100) + '%' : '')], ['Zabójstwa', fmtInt(r.kills)], ['Śmierci', fmtInt(r.deaths)], ['K/D', r.kd < 0 ? '—' : r.kd.toFixed(2)]];
     $('fa-drw-in').innerHTML = `<div class="fa-dh"><span class="fa-av">${esc((r.name[0] || '?').toUpperCase())}</span><div><h3>${esc(r.name)}</h3>
       <small>Dołączył ${r.created ? new Date(r.created).toLocaleString('pl-PL') : '—'} · ostatnio ${esc(ago(r.last))}</small></div><button class="fa-x" type="button" data-x aria-label="Zamknij">×</button></div>
-      ${r.wallet ? `<p class="fa-msg">Portfel Solana: <code>${esc(r.wallet)}</code></p>` : ''}
+      ${r.wallet ? `<p class="fa-msg">${SRV ? 'Adres depozytu w grze' : 'Portfel Solana'}: <code>${esc(r.wallet)}</code>${SRV ? ` · <a href="https://explorer.solana.com/address/${esc(r.wallet)}${srv && srv.cluster !== 'mainnet-beta' ? '?cluster=' + esc(srv.cluster) : ''}" target="_blank" rel="noopener">eksplorator ↗</a> · saldo ${r.sol.toLocaleString('pl-PL', { maximumFractionDigits: 6 })} SOL` : ''}</p>` : ''}
       <div class="fa-meta">${meta.map(([k, v]) => `<div><small>${k}</small><b>${esc(v)}</b></div>`).join('')}</div>
       <h4>Ostatnie operacje (do 40)</h4>
       <ul class="fa-list">${r.history.length ? r.history.map(h => `<li><div><b>${esc(tx[h.type] || h.type)}${h.fee ? ' · prowizja ' + fmtMoney(h.fee) : h.note ? ' · ' + esc(h.note) : ''}</b><small>${h.t ? new Date(h.t).toLocaleString('pl-PL') : ''}</small></div>
@@ -408,11 +431,13 @@ function buildDashboard(db, close) {
       kpi('Gracze', fmtInt(rows.length), `+${new7} ${pl(new7, 'nowy', 'nowych', 'nowych')} w 7 dni`),
       kpi('Aktywni (7 dni)', fmtInt(active7), rows.length ? pct(active7, rows.length) + ' wszystkich' : '—'),
       kpi('Mecze 1v1', fmtInt(T.matches), `W ${fmtInt(T.wins)} · P ${fmtInt(T.losses)} · dziś ${fmtInt(today$.length)}`),
-      kpi('Łączne stawki', fmtMoney(T.staked), T.matches ? 'średnio ' + fmtMoney(T.staked / T.matches) + ' USDT' : '—', 'USDT'),
-      kpi('Łączne wygrane graczy', fmtMoney(T.won), `${fmtInt(T.wins)} ${pl(T.wins, 'wygrany mecz', 'wygrane mecze', 'wygranych meczów')} (po prowizji)`, 'USDT'),
-      kpi('Zarobek – prowizja 10%', fmtMoney(T.fees), '10% puli każdej wygranej', 'USDT', true),
-      kpi('Wynik domu', (T.staked - T.won >= 0 ? '+' : '−') + fmtMoney(Math.abs(T.staked - T.won)), 'stawki − wypłaty (dom gra jako bot)', 'USDT'),
-      kpi('Saldo graczy', fmtMoney(T.balance), `wpłaty ${fmtMoney(T.deposits)} · wypłaty ${fmtMoney(T.withdrawn)} (test)`, 'USDT'),
+      kpi('Łączne stawki', usd(T.staked), T.matches ? 'średnio ' + usd(T.staked / T.matches) : '—', 'w SOL'),
+      kpi('Łączne wygrane graczy', usd(T.won), `${fmtInt(T.wins)} ${pl(T.wins, 'wygrany mecz', 'wygrane mecze', 'wygranych meczów')} (po prowizji)`, 'w SOL'),
+      kpi('Zarobek – prowizja 10%', usd(T.fees), '10% puli każdej wygranej', 'w SOL', true),
+      kpi('Wynik domu', (T.staked - T.won >= 0 ? '+' : '−') + usd(Math.abs(T.staked - T.won)), 'stawki − wypłaty (dom gra jako bot)', 'w SOL'),
+      kpi('Saldo graczy', usd(T.balance), `wpłaty ${usd(T.deposits)} · wypłaty ${usd(T.withdrawn)}${SRV ? '' : ' (test)'}`, 'w SOL'),
+      ...(SRV && srv ? [kpi('Skarbiec (on-chain)', usd(srv.treasury.usd), `${(srv.treasury.lamports / 1e9).toLocaleString('pl-PL', { maximumFractionDigits: 4 })} SOL · pokrycie sald ${srv.ledger.lamports ? Math.round(srv.treasury.lamports / srv.ledger.lamports * 100) + '%' : '—'}${srv.pendingSweep ? ' · w drodze ' + (srv.pendingSweep / 1e9).toLocaleString('pl-PL', { maximumFractionDigits: 4 }) + ' SOL' : ''}`, 'w SOL', srv.treasury.lamports < srv.ledger.lamports),
+        kpi('Kurs SOL', usd(srv.price), `sieć ${esc(srv.cluster)} · <code title="${esc(srv.treasury.address)}">${esc(srv.treasury.address.slice(0, 4) + '…' + srv.treasury.address.slice(-4))}</code>`)] : []),
     ].join('');
 
     // wykresy: z listy meczów; gdy jej jeszcze nie ma – z historii kont
@@ -422,10 +447,10 @@ function buildDashboard(db, close) {
     for (const m of matches) { const i = idx[dayKey(m.t)]; if (i !== undefined) { mc[i]++; fc[i] += m.fee || 0; } }
     for (const r of rows) if (!inLog.has(r.id)) for (const h of r.history) { const i = idx[dayKey(h.t)]; if (i === undefined) continue; if (h.type === 'stake') mc[i]++; if (h.type === 'win') fc[i] += h.fee || 0; }
     const sumM = mc.reduce((a, b) => a + b, 0), sumF = fc.reduce((a, b) => a + b, 0);
-    $('fa-ch-m').dataset.label = `Mecze dziennie w ostatnich 14 dniach, razem ${sumM}`; $('fa-ch-f').dataset.label = `Prowizja dziennie w ostatnich 14 dniach, razem ${fmtMoney(sumF)} USDT`;
+    $('fa-ch-m').dataset.label = `Mecze dziennie w ostatnich 14 dniach, razem ${sumM}`; $('fa-ch-f').dataset.label = `Prowizja dziennie w ostatnich 14 dniach, razem ${usd(sumF)}`;
     bars($('fa-ch-m'), days, mc, (v, tip) => tip ? fmtInt(v) + ' ' + pl(v, 'mecz', 'mecze', 'meczów') : fmtInt(v));
     bars($('fa-ch-f'), days, fc.map(r2), (v, tip) => tip ? fmtMoney(v) : (v >= 100 ? fmtInt(v) : (Math.round(v * 10) / 10).toLocaleString('pl-PL')), '');
-    $('fa-ch-m-sum').textContent = `ostatnie 14 dni · razem ${fmtInt(sumM)}`; $('fa-ch-f-sum').textContent = `USDT · ostatnie 14 dni · razem ${fmtMoney(sumF)}`;
+    $('fa-ch-m-sum').textContent = `ostatnie 14 dni · razem ${fmtInt(sumM)}`; $('fa-ch-f-sum').textContent = `USD (płatne w SOL) · ostatnie 14 dni · razem ${usd(sumF)}`;
 
     // tabela
     const col = COLS.find(c => c[0] === sort.key) || COLS[2], keyOf = col[3] || (r => r[sort.key]);
@@ -438,7 +463,7 @@ function buildDashboard(db, close) {
     const rc = matches.slice(0, 25);
     $('fa-rc-sum').textContent = matches.length ? `${fmtInt(matches.length)} w zapisie` : '';
     $('fa-recent').innerHTML = rc.length ? rc.map(m => `<li><div><b>${esc(m.name || m.u)}${m.forfeit ? '<span class="fa-tag f">PODDANY</span>' : m.won ? '<span class="fa-tag w">WYGRANA</span>' : '<span class="fa-tag l">PRZEGRANA</span>'}</b>
-      <small>${new Date(m.t).toLocaleString('pl-PL')}${m.map ? ' · ' + esc(m.map) : ''} · stawka ${fmtMoney(m.stake || 0)} USDT</small></div>
+      <small>${new Date(m.t).toLocaleString('pl-PL')}${m.map ? ' · ' + esc(m.map) : ''} · stawka ${usd(m.stake || 0)}</small></div>
       <span class="r">${m.won ? `<span class="pos">+${fmtMoney(m.payout || 0)}</span><small>prowizja ${fmtMoney(m.fee || 0)}</small>` : `<span class="neg">−${fmtMoney(m.stake || 0)}</span>`}</span></li>`).join('')
       : `<li class="fa-empty">${gotM ? 'Brak zapisanych meczów. Mecze o stawkę zapisują się od tej wersji gry.' : 'Ładowanie…'}</li>`;
 
