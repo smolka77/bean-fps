@@ -1,6 +1,8 @@
 # Bean FPS
 
-Strzelanka FPS z fasolką (three.js). Cała gra jest w **jednym pliku: [`index.html`](index.html)**.
+Strzelanka FPS z fasolką (three.js). **Zagraj w przeglądarce: https://smolka77.github.io/bean-fps/**
+
+Cała gra jest w **jednym pliku: [`index.html`](index.html)**.
 Pobierz go i otwórz dwuklikiem w Chrome, Edge albo Firefoksie. Działa bez serwera i bez internetu.
 
 ## Co jest w środku
