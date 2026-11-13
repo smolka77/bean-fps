@@ -374,9 +374,45 @@ function serveGame(p, res) {
   if (f.endsWith('index.html')) { const s = b.toString('utf8'), i = s.indexOf('<head>'); b = Buffer.from(i >= 0 ? s.slice(0, i + 6) + '<script>window.BEANLADEN_API=location.origin</script>' + s.slice(i + 6) : s); }
   res.writeHead(200, { 'Content-Type': f.endsWith('.json') ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(b);
 }
+// ---------------- bramka: czarny ekran z kotem i hasłem (jak na cryptostrike.pl) ----------------
+// Ustawione COVER_PASSWORD = cała strona i API dopiero po wpisaniu hasła na ekranie z serwer/cover.html.
+// Dobre hasło -> ciasteczko bl_cover (HttpOnly, 30 dni) podpisane kluczem z DATA_DIR/cover.key; zmiana hasła unieważnia stare wejścia.
+const COVER_PW = (env.COVER_PASSWORD || '').trim();
+const COVER_KEY = COVER_PW ? (() => { const f = path.join(DATA_DIR, 'cover.key'); if (!fs.existsSync(f)) fs.writeFileSync(f, crypto.randomBytes(32).toString('hex'), { mode: 0o600 }); return fs.readFileSync(f, 'utf8').trim(); })() : '';
+const coverToken = () => crypto.createHmac('sha256', COVER_KEY).update('ok|' + COVER_PW).digest('base64url');
+function coverOk(req) {
+  if (!COVER_PW) return true;
+  const m = /(?:^|;\s*)bl_cover=([\w-]+)/.exec(req.headers.cookie || ''); if (!m) return false;
+  const a = Buffer.from(m[1]), b = Buffer.from(coverToken()); return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+const coverTries = new Map();                                   // ip -> czasy prób (najwyżej 10 na minutę)
+async function coverLogin(req, res) {
+  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress, now = Date.now();
+  const t = (coverTries.get(ip) || []).filter(x => now - x < 60000); t.push(now); coverTries.set(ip, t);
+  if (coverTries.size > 5000) coverTries.clear();
+  if (t.length > 10) { res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }); return res.end('Za dużo prób'); }
+  let body = {}; try { body = await readBody(req); } catch {}
+  const a = crypto.createHash('sha256').update(String(body.p || '')).digest(), b = crypto.createHash('sha256').update(COVER_PW).digest();
+  if (!crypto.timingSafeEqual(a, b)) { res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }); return res.end('nope'); }
+  const secure = req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : '';
+  res.writeHead(204, { 'Set-Cookie': `bl_cover=${coverToken()}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}${secure}`, 'Cache-Control': 'no-store' }); res.end();
+}
+function serveCover(res) {
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' });
+  res.end(fs.readFileSync(new URL('./cover.html', import.meta.url)));
+}
 http.createServer(async (req, res) => {
   const origin = req.headers.origin;
   if (req.method === 'OPTIONS') { res.writeHead(204, cors(origin)); return res.end(); }
+  if (COVER_PW) {                                               // bramka z hasłem (lock screen)
+    const p0 = new URL(req.url, 'http://x').pathname;
+    if (req.method === 'POST' && p0 === '/__cover') return coverLogin(req, res);
+    if (!coverOk(req)) {
+      if (req.method === 'GET' && !p0.startsWith('/api/')) return serveCover(res);
+      res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...cors(origin) });
+      return res.end(JSON.stringify({ error: 'locked', message: 'Strona jest zablokowana hasłem' }));
+    }
+  }
   const url = new URL(req.url, 'http://x'), key = req.method + ' ' + url.pathname, h = routes[key];
   if (!h && req.method === 'GET' && !url.pathname.startsWith('/api/')) return serveGame(url.pathname, res);
   if (!h) return send(res, 404, { error: 'not_found', message: 'Nie ma takiej ścieżki' }, origin);

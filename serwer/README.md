@@ -44,6 +44,7 @@ Testowe SOL na devnecie: <https://faucet.solana.com> (wklej adres z zakładki **
 | `HOUSE_FEE` | `0.10` | prowizja od puli |
 | `MIN_WITHDRAW_SOL` | `0.001` | minimalna wypłata |
 | `GOOGLE_CLIENT_ID` | — | identyfikator klienta OAuth Google (logowanie „Kontynuuj z Google”) |
+| `COVER_PASSWORD` | — | hasło bramki: czarny ekran z kotem (`cover.html`, jak na cryptostrike.pl) przed całą stroną i API; puste = bez bramki |
 
 Wymagany Node.js 22.5 lub nowszy (wbudowany `node:sqlite`).
 
