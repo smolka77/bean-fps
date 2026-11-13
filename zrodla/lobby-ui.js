@@ -2,6 +2,8 @@
 // portfel na Solanie: kwoty w USD, płatność w SOL (TRYB TESTOWY – bez prawdziwych transakcji), stawki meczu i losowanie mapy.
 // Konta i salda: baza danych artefaktu (claude.use("db")), a poza claude.ai – localStorage.
 
+import { createSfx } from './sfx.js';
+
 // ---------------- tłumaczenia ----------------
 const DICT = {
   pl: {
@@ -169,6 +171,19 @@ async function hashPw(pw, saltB64) {
   return { salt: b64e(salt), hash: b64e(new Uint8Array(bits)) };
 }
 const usd = v => '$' + money(v);   // kwoty w dolarach, płatność w SOL
+const STAT_KEYS = ['matches', 'wins', 'losses', 'staked', 'won', 'fees', 'deposits', 'withdrawn', 'shots', 'hits', 'heads', 'kills', 'deaths', 'lastActive'];
+// statystyki konta; starsze konta bez statystyk dostają je wyliczone z historii
+export function ensureStats(a) {
+  if (a.stats && typeof a.stats === 'object') { for (const k of STAT_KEYS) if (typeof a.stats[k] !== 'number') a.stats[k] = 0; return a.stats; }
+  const st = Object.fromEntries(STAT_KEYS.map(k => [k, 0]));
+  for (const h of a.history || []) {
+    if (h.type === 'stake') { st.matches++; st.staked += -h.amount; } else if (h.type === 'win') { st.wins++; st.won += h.amount; st.fees += h.fee || 0; }
+    else if (h.type === 'loss') st.losses++; else if (h.type === 'deposit') st.deposits += h.amount; else if (h.type === 'withdraw') st.withdrawn += -h.amount;
+    st.lastActive = Math.max(st.lastActive, h.t || 0);
+  }
+  for (const k of ['staked', 'won', 'fees', 'deposits', 'withdrawn']) st[k] = Math.round(st[k] * 100) / 100;
+  return (a.stats = st);
+}
 const money = v => (Math.round(v * 100) / 100).toLocaleString(LANG === 'en' ? 'en-US' : LANG === 'ru' ? 'ru-RU' : LANG === 'es' ? 'es-ES' : 'pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // ---------------- grafiki map do losowania ----------------
@@ -239,16 +254,11 @@ export function initLobbyUI(ctx) {
     v.gain.setValueAtTime(0, t0); v.gain.linearRampToValueAtTime(g, t0 + .004); v.gain.exponentialRampToValueAtTime(.0001, t0 + d);
     o.connect(v).connect(out || uiGain); o.start(t0); o.stop(t0 + d + .03);
   }
-  function noiseHit(vol) {                            // podgląd „dźwięku w grze”: krótki wystrzał
+  let gSfx = null, gGain = null;
+  function gamePreview(vol) {                          // podgląd „dźwięków w grze”: prawdziwy strzał z AK i trafienie w głowę
     const ac = audio(); if (!ac || vol <= 0) return;
-    const t0 = ac.currentTime, len = Math.floor(ac.sampleRate * .3), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
-    const src = ac.createBufferSource(), lp = ac.createBiquadFilter(), g = ac.createGain();
-    src.buffer = buf; lp.type = 'lowpass'; lp.frequency.setValueAtTime(5000, t0); lp.frequency.exponentialRampToValueAtTime(400, t0 + .25);
-    g.gain.setValueAtTime(.9 * vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + .28);
-    src.connect(lp).connect(g).connect(ac.destination); src.start(t0);
-    const o = ac.createOscillator(), og = ac.createGain(); o.frequency.setValueAtTime(140, t0); o.frequency.exponentialRampToValueAtTime(40, t0 + .15);
-    og.gain.setValueAtTime(.8 * vol, t0); og.gain.exponentialRampToValueAtTime(.001, t0 + .18); o.connect(og).connect(ac.destination); o.start(t0); o.stop(t0 + .2);
+    if (!gSfx) { gGain = ac.createGain(); gGain.connect(ac.destination); try { gSfx = createSfx(ac, gGain); } catch { return; } }
+    gGain.gain.value = vol; gSfx.shot('ak'); setTimeout(() => gSfx && gSfx.hit(false, true), 170);
   }
   const SFX = {
     hover: () => tone({ f: 1500, d: .025, g: .035, type: 'triangle' }),
@@ -299,7 +309,7 @@ export function initLobbyUI(ctx) {
   burger.addEventListener('click', e => { e.stopPropagation(); openMenu(menu.hidden); });
   addEventListener('pointerdown', e => { if (!menu.hidden && !menu.contains(e.target) && e.target !== burger && !burger.contains(e.target)) openMenu(false); });
   menu.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (!b) return; openMenu(false);
-    ({ settings: () => openModal('lb-set'), wallet: () => openWallet(), auth: () => openModal('lb-auth'), logout: () => logout(), admin: () => ctx.openAdmin() })[b.dataset.act](); });
+    ({ settings: () => openModal('lb-set'), wallet: () => openWallet(), auth: () => openModal('lb-auth'), logout: () => logout() })[b.dataset.act](); });
 
   // ---- okna dialogowe ----
   const modals = ['lb-set', 'lb-auth', 'lb-wallet'].map($);
@@ -330,7 +340,7 @@ export function initLobbyUI(ctx) {
   document.addEventListener('pointerdown', e => { if (!langMenu.hidden && !e.target.closest('.lb-lang')) openLang(false); });
   addEventListener('keydown', e => { if (e.key === 'Escape' && !langMenu.hidden) { openLang(false); e.stopPropagation(); } }, true);
   const fillRange = r => r.style.setProperty('--p', ((r.value - r.min) / (r.max - r.min) * 100) + '%');
-  const preview = k => k === 'vGame' ? noiseHit((S.volume / 100) * (S.vGame / 100)) : k === 'vMenu' ? SFX.reveal() : (tone({ f: 660, d: .12, g: .5, type: 'triangle', out: masterOut() }));
+  const preview = k => k === 'vGame' ? gamePreview((S.volume / 100) * (S.vGame / 100)) : k === 'vMenu' ? SFX.reveal() : (tone({ f: 660, d: .12, g: .5, type: 'triangle', out: masterOut() }));
   const masterOut = () => { const ac = audio(); if (!ac) return null; const g = ac.createGain(); g.gain.value = S.volume / 100 * .3; g.connect(ac.destination); return g; };
   ui.querySelectorAll('.lb-vrow').forEach(row => { const k = row.dataset.k, r = row.querySelector('input'), last = { v: S[k] || 80 };
     r.addEventListener('input', () => { S[k] = +r.value; if (S[k]) last.v = S[k]; renderVol(); pushSettings(); });
@@ -424,7 +434,7 @@ export function initLobbyUI(ctx) {
     if (!/^[a-z0-9_]{3,16}$/.test(id) || p.length < 6) return setErr('lb-login-err', t('auth.errCreds'));
     const btn = e.submitter || e.target.querySelector('[type=submit]'); btn.disabled = true;
     try { const a = await accGet(id); if (!a) throw 'creds'; const h = await hashPw(p, a.salt); if (h.hash !== a.hash) throw 'creds';
-      acct = a; acctId = id; ls.set('fasolka-session', id); $('lb-l-pass').value = ''; closeAll(); toast(t('auth.welcome', { u: a.username }), 'ok'); renderAll(); }
+      acct = a; acctId = id; ensureStats(acct); ls.set('fasolka-session', id); $('lb-l-pass').value = ''; closeAll(); toast(t('auth.welcome', { u: a.username }), 'ok'); renderAll(); }
     catch (err) { setErr('lb-login-err', err === 'creds' ? t('auth.errCreds') : t('auth.errDb')); } finally { btn.disabled = false; } });
   $('lb-reg-form').addEventListener('submit', async e => { e.preventDefault(); setErr('lb-reg-err');
     const u = $('lb-r-user').value.trim(), p = $('lb-r-pass').value, p2 = $('lb-r-pass2').value, id = u.toLowerCase();
@@ -445,8 +455,30 @@ export function initLobbyUI(ctx) {
   }
 
   // ---- portfel (test) ----
-  const addTx = async (amount, type, note = '', extra = {}) => { acct.balance = Math.round((acct.balance + amount) * 100) / 100;
+  // statystyki konta (sumy od początku; historia trzyma tylko 40 ostatnich operacji) – czyta je panel admina
+  const addTx = async (amount, type, note = '', extra = {}) => { acct.balance = r2(acct.balance + amount);
+    const st = ensureStats(acct);
+    if (type === 'deposit') st.deposits = r2(st.deposits + amount);
+    else if (type === 'withdraw') st.withdrawn = r2(st.withdrawn - amount);
+    else if (type === 'stake') { st.matches++; st.staked = r2(st.staked - amount); }
+    else if (type === 'win') { st.wins++; st.won = r2(st.won + amount); st.fees = r2(st.fees + (extra.fee || 0)); }
+    else if (type === 'loss') st.losses++;
+    flushCombat(); st.lastActive = Date.now();
     acct.history = [{ t: Date.now(), type, amount, note, ...extra }, ...(acct.history || [])].slice(0, 40); await saveAcct(); renderAll(); };
+  // statystyki walki w 1v1 (strzały, trafienia, głowy, zabójstwa, śmierci) – zbierane w pamięci, zapisywane razem z rozliczeniem meczu
+  const pend = { shots: 0, hits: 0, heads: 0, kills: 0, deaths: 0 };
+  addEventListener('fasolka:shot', e => { if (acct && e.detail && e.detail.mode === '1v1') pend.shots++; });
+  addEventListener('fasolka:hit', e => { const d = e.detail || {}; if (!acct || d.mode !== '1v1') return; pend.hits++; if (d.head) pend.heads++; if (d.kill) pend.kills++; });
+  addEventListener('fasolka:death', e => { if (acct && (!e.detail || e.detail.mode === '1v1')) pend.deaths++; });
+  function flushCombat() { if (!acct) return false; const st = ensureStats(acct); let ch = false;
+    for (const k in pend) if (pend[k]) { st[k] += pend[k]; pend[k] = 0; ch = true; } return ch; }
+  // każdy mecz o stawkę trafia do wspólnej listy (panel admina: wykresy, ostatnie mecze)
+  async function logMatch(o) {
+    if (!acct) return; const rec = { u: acctId, name: acct.username, t: Date.now(), map: lastMap || null, ...o };
+    const db = await dbP;
+    if (db) { try { await db.collection('matches').add(rec); return; } catch {} }
+    try { const a = JSON.parse(ls.get('fasolka-matches') || '[]'); a.unshift(rec); ls.set('fasolka-matches', JSON.stringify(a.slice(0, 500))); } catch {}
+  }
   function openWallet(tab = 'deposit') { if (!acct) { toast(t('w.loginFirst')); openModal('lb-auth'); showTab('lb-auth', 'login'); return; } openModal('lb-wallet'); showTab('lb-wallet', tab); }
   $('lb-dep-form').addEventListener('submit', async e => { e.preventDefault(); const a = Math.round(+$('lb-dep-amt').value * 100) / 100;
     if (!(a >= 1 && a <= 10000)) return toast(t('w.errAmount'), 'err'); await addTx(a, 'deposit'); $('lb-dep-amt').value = ''; toast(t('w.depOk', { a: money(a) }), 'ok'); });
@@ -481,6 +513,7 @@ export function initLobbyUI(ctx) {
     menu.querySelector('[data-act="auth"] span').textContent = acct ? t('menu.account') : t('menu.login');
     $('lb-acct').hidden = $('lb-acct-hr').hidden = !acct; menu.querySelector('[data-act="auth"]').hidden = !!acct;   // konto w menu: karta po zalogowaniu, „Zaloguj się” bez konta
     menu.querySelector('[data-act="logout"]').hidden = !acct;
+    const hr = menu.querySelector('hr'); if (hr) hr.hidden = !acct;
   }
   $('lb-acct').addEventListener('click', () => { openMenu(false); openModal('lb-auth'); if (!acct) showTab('lb-auth', 'login'); });
   $('lb-walletchip').addEventListener('click', () => openWallet());
@@ -528,7 +561,7 @@ export function initLobbyUI(ctx) {
   }
 
   // ---- start gry ----
-  let activeStake = 0, lastStake = 0, busy = false;
+  let activeStake = 0, lastStake = 0, busy = false, lastMap = null;
   async function requestPlay() {
     if (busy) return;
     const m = ctx.getMode();
@@ -543,7 +576,9 @@ export function initLobbyUI(ctx) {
   }
   addEventListener('fasolka:match', async e => {
     if (!activeStake || !acct) return; const s = activeStake; activeStake = 0;
-    if (e.detail && e.detail.won) await addTx(payout(s), 'win', '', { fee: feeOf(s) }); else await addTx(0, 'loss', usd(s));
+    const won = !!(e.detail && e.detail.won);
+    if (won) await addTx(payout(s), 'win', '', { fee: feeOf(s) }); else await addTx(0, 'loss', usd(s));
+    logMatch({ stake: s, won, payout: won ? payout(s) : 0, fee: won ? feeOf(s) : 0 });   // panel admina: lista meczów
   });
   addEventListener('fasolka:rematch', e => {
     if (!lastStake) return;
@@ -554,12 +589,36 @@ export function initLobbyUI(ctx) {
   function renderAll() { renderTop(); renderStake(); renderAuth(); renderWallet(); }
   // przywrócenie sesji
   const sid = ls.get('fasolka-session');
-  if (sid) accGet(sid).then(a => { if (a) { acct = a; acctId = sid; renderAll(); } }).catch(() => {});
+  if (sid) accGet(sid).then(a => { if (a) { acct = a; acctId = sid; ensureStats(acct); renderAll(); } }).catch(() => {});
+
+  // ---- panel admina: osobny link (#admin na końcu adresu gry) albo ukryty skrót Ctrl+Shift+A w lobby; nie ma go w menu ----
+  const wantsAdmin = () => /(^|[#?&])admin\b/i.test(location.hash + '&' + location.search);
+  let adminLoading = false;
+  function openAdminPanel() {
+    if (adminLoading) return; adminLoading = true; closeAll();
+    import('./admin.js').then(m => m.openAdmin({ onClose: () => { try { if (/admin/i.test(location.hash)) history.replaceState(null, '', location.pathname + location.search); } catch {} } }))
+      .catch(() => toast('Nie udało się otworzyć panelu admina', 'err')).finally(() => { adminLoading = false; });
+  }
+  if (wantsAdmin()) setTimeout(openAdminPanel, 0);
+  addEventListener('hashchange', () => { if (wantsAdmin()) openAdminPanel(); });
+  addEventListener('keydown', e => { if (e.ctrlKey && e.shiftKey && e.code === 'KeyA' && !isField(e.target) && (!ctx.isActive || ctx.isActive())) { e.preventDefault(); e.stopImmediatePropagation(); openAdminPanel(); } }, true);
+  // mapa lobby ustawiona w panelu admina (wspólna dla wszystkich graczy): jeśli inna niż w tej przeglądarce – zapisz i przeładuj raz
+  dbP.then(db => db && db.doc('config/lobby').get()).then(sn => {
+    const m = sn && sn.exists && sn.data().map;
+    if (!m || !ctx.lobbyMaps || !ctx.lobbyMaps.includes(m) || m === ctx.lobbyMap || wantsAdmin()) return;
+    ls.set('fasolka-lobby-map', m);
+    let done = false; try { done = sessionStorage.getItem('fasolka-lobby-sync') === m; sessionStorage.setItem('fasolka-lobby-sync', m); } catch {}
+    if (!done && (!ctx.isActive || ctx.isActive())) location.reload();
+  }).catch(() => {});
   applyI18n();
 
   return {
     requestPlay, closeAll, renderStake,
-    onShow() { if (activeStake && acct) addTx(0, 'loss', usd(activeStake)).catch(() => {}); activeStake = 0; lastStake = 0; renderAll(); },   // wyjście z meczu o stawkę = przegrana
+    onShow() {
+      if (activeStake && acct) { const s = activeStake; addTx(0, 'loss', usd(s)).catch(() => {}); logMatch({ stake: s, won: false, payout: 0, fee: 0, forfeit: true }); }   // wyjście z meczu o stawkę = przegrana
+      else if (acct && flushCombat()) saveAcct().catch(() => {});
+      activeStake = 0; lastStake = 0; renderAll();
+    },
     get open() { return anyOpen() || !draw.hidden; },
   };
 }

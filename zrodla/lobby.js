@@ -325,11 +325,11 @@ const CSS = `
 #lb-ui .lb-dsub{font:700 12px/1 Inter,sans-serif;letter-spacing:.42em;text-transform:uppercase;color:var(--mut);padding-left:.42em}
 #lb-ui .lb-dtitle{margin:-12px 0 0;font:400 clamp(34px,5vw,54px)/1 Anton,Oswald,Impact,sans-serif;letter-spacing:.06em;transform:skewX(-6deg)}
 #lb-ui .lb-dtitle b{color:var(--acc);font-weight:400}
-#lb-ui .lb-reelwin{position:relative;width:min(1240px,100%);height:280px;overflow:hidden;
+#lb-ui .lb-reelwin{position:relative;width:min(1240px,100%);height:360px;overflow:hidden;
   -webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
 #lb-ui .lb-reelwin::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:3px;margin-left:-1.5px;background:var(--acc);z-index:2;box-shadow:0 0 14px var(--acc),0 0 30px rgba(255,198,41,.6)}
 #lb-ui .lb-reelwin::after{content:"";position:absolute;left:50%;top:0;margin-left:-11px;border:11px solid transparent;border-top-color:var(--acc);z-index:2;filter:drop-shadow(0 0 6px var(--acc))}
-#lb-ui .lb-reel{display:flex;gap:16px;padding:20px 0;will-change:transform}
+#lb-ui .lb-reel{display:flex;gap:16px;padding:60px 0;will-change:transform}
 #lb-ui .lb-mcard{position:relative;flex:none;width:384px;height:240px;border-radius:16px;overflow:hidden;background:#1a2030;
   box-shadow:0 0 0 1px rgba(255,255,255,.2),0 16px 34px rgba(0,0,0,.5);transition:transform .3s ease,box-shadow .3s ease,opacity .3s ease,filter .3s ease}
 #lb-ui .lb-mcard svg,#lb-ui .lb-mcard img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover}
@@ -388,33 +388,6 @@ const CSS = `
 #lb-ui .lb-skin span{font:600 12.5px/1.1 Inter,sans-serif;text-align:center}
 #lb-ui .lb-skin small{font:700 8.5px/1 Inter,sans-serif;letter-spacing:.12em;color:var(--acc);min-height:9px}
 #lb-ui .lb-skins .lb-btn{align-self:flex-start;margin-top:auto}
-/* ---- panel admina ---- */
-#lb-ui .lb-adm [data-apane=lobby] label{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border:1px solid var(--line);border-radius:11px;margin-bottom:8px;cursor:pointer}
-#lb-ui .lb-adm [data-apane=lobby] label:hover{background:rgba(255,255,255,.04)}
-#lb-ui .lb-adm [data-apane=lobby] label:has(input:checked){border-color:var(--acc);background:rgba(255,198,41,.07)}
-#lb-ui .lb-adm [data-apane=lobby] input{margin-top:3px;accent-color:var(--acc)}
-#lb-ui .lb-adm [data-apane=lobby] label b{display:block;font-weight:600}
-#lb-ui .lb-adm [data-apane=lobby] label small{color:var(--mut);font-size:12px}
-#lb-ui .lb-adm h4{margin:0 0 8px;font:700 11px Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
-#lb-ui .lb-adm .row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
-#lb-ui .lb-adm .row .lb-btn{width:auto;padding:0 16px}
-#lb-ui .lb-askins{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow-y:auto;margin-bottom:10px;padding-right:2px}
-#lb-ui .lb-askin{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.03)}
-#lb-ui .lb-askin img{width:36px;height:48px;object-fit:contain;flex:none}
-#lb-ui .lb-askin .nm{flex:1;min-width:0}
-#lb-ui .lb-askin .nm b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#lb-ui .lb-askin .nm small{color:var(--mut);font-size:11.5px}
-#lb-ui .lb-askin input{width:96px;height:32px;border-radius:8px;border:1px solid var(--line2);background:rgba(0,0,0,.28);color:#fff;padding:0 8px;font:600 11px Inter,sans-serif;text-transform:uppercase}
-#lb-ui .lb-askin button{height:32px;min-width:32px;padding:0 10px;border-radius:8px;border:1px solid var(--line2);background:rgba(255,255,255,.05);color:#fff;cursor:pointer;font:600 12px Inter,sans-serif}
-#lb-ui .lb-askin button:hover{background:rgba(255,255,255,.12)}
-#lb-ui .lb-askin button.del{color:#ff8a8a}
-#lb-ui .lb-askin button:disabled{opacity:.3;cursor:default}
-#lb-ui .lb-agh{margin:12px 0 4px;border:1px solid var(--line);border-radius:11px;padding:10px 12px}
-#lb-ui .lb-agh summary{cursor:pointer;font:600 12.5px Inter,sans-serif;color:var(--mut)}
-#lb-ui .lb-agh .lb-field{margin:10px 0 0}
-#lb-ui #lb-askin-status{min-height:18px;margin:8px 0 0}
-#lb-kreator{position:fixed;inset:0;z-index:2147483000;background:#1b1e25}
-#lb-kreator iframe{width:100%;height:100%;border:0;display:block}
 @media (max-width:640px){
   #lb-ui .lb-dock{left:12px;right:12px;width:auto;bottom:max(12px,env(safe-area-inset-bottom))}
   #lb-ui .lb-card{padding:10px}
@@ -439,7 +412,8 @@ const CSS = `
   #lb-ui .lb-msvg{width:40px;height:62px}
   #lb-ui .lb-kbfoot{flex-direction:column;align-items:stretch}
   #lb-ui .lb-dlg{padding:16px}
-  #lb-ui .lb-reelwin{height:196px}
+  #lb-ui .lb-reelwin{height:260px}
+  #lb-ui .lb-reel{padding:50px 0}
   #lb-ui .lb-mcard{width:256px;height:160px;border-radius:12px}
   #lb-ui .lb-mcard span{font-size:22px;left:12px;bottom:10px}
   #lb-ui .lb-phantom{position:static;margin-top:12px}
@@ -485,7 +459,6 @@ const HTML = `
   <button type="button" role="menuitem" data-act="wallet">${IC.wallet}<span data-i18n="menu.wallet"></span></button>
   <button type="button" role="menuitem" data-act="auth">${IC.user}<span></span></button>
   <hr>
-  <button type="button" role="menuitem" data-act="admin">${IC.shield}<span data-i18n="menu.admin"></span></button>
   <button type="button" role="menuitem" data-act="logout" class="danger">${IC.logout}<span data-i18n="menu.logout"></span></button>
 </nav>
 <div class="lb-plate" id="lb-plate"><span id="lb-plate-name"></span><small data-i18n="plate.ready"></small><em data-i18n="plate.skin"></em></div>
@@ -598,27 +571,6 @@ const HTML = `
     <button class="lb-btn pri" type="submit" data-i18n="w.doWithdraw"></button>
   </form>
   <div data-pane="history" hidden><ul class="lb-hist" id="lb-hist"></ul></div>
-</div></div>
-<div class="lb-modal" id="lb-admin" hidden><div class="lb-dlg lb-adm lb-wide" role="dialog" aria-modal="true">
-  <div class="lb-dh"><h3>Panel admina</h3>${X_BTN}</div>
-  <div class="lb-tabs"><button type="button" data-atab="lobby" class="on">Lobby</button><button type="button" data-atab="skins">Skiny</button></div>
-  <div data-apane="lobby">
-    <p class="lb-note" style="margin:-4px 0 14px">Ustawienia zapisują się w tej przeglądarce.</p>
-    <h4>Mapa lobby</h4><div id="lb-admin-maps"></div>
-    <div class="row"><button class="lb-btn" id="lb-admin-cancel" type="button">Anuluj</button><button class="lb-btn pri" id="lb-admin-save" type="button">Zapisz i przeładuj lobby</button></div>
-  </div>
-  <div data-apane="skins" hidden>
-    <p class="lb-note" style="margin:-4px 0 12px">Skiny z kreatora. Zmiany widać od razu u Ciebie. „Opublikuj w grze” zapisuje je w repozytorium, więc po odświeżeniu strony zobaczą je wszyscy gracze.</p>
-    <div class="lb-askins" id="lb-askins"></div>
-    <button class="lb-btn" id="lb-askin-new" type="button" style="width:auto;padding:0 16px">+ Nowy skin</button>
-    <details class="lb-agh" id="lb-agh"><summary>Publikowanie na GitHubie</summary>
-      <label class="lb-field"><span>Repozytorium</span><input id="lb-gh-repo" spellcheck="false" autocapitalize="off" placeholder="użytkownik/repo"></label>
-      <label class="lb-field"><span>Token GitHub (dostęp Contents: zapis do tego repo)</span><input id="lb-gh-token" type="password" autocomplete="off" spellcheck="false"></label>
-      <p class="lb-note" style="margin:8px 0 0">Token zostaje tylko w tej przeglądarce.</p>
-    </details>
-    <p class="lb-note" id="lb-askin-status"></p>
-    <div class="row"><button class="lb-btn" id="lb-askin-dl" type="button">Pobierz skins.json</button><button class="lb-btn pri" id="lb-askin-pub" type="button">Opublikuj w grze</button></div>
-  </div>
 </div></div>
 <div class="lb-draw" id="lb-draw" hidden>
   <small class="lb-dsub">1 v 1</small>
@@ -1253,99 +1205,14 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   };
   fetch('./skins.json?v=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.json() : null)
     .then(list => { if (Array.isArray(list)) setCustomSkins(list); }).catch(() => {});
+  addEventListener('fasolka:skins', e => { if (Array.isArray(e.detail)) setCustomSkins(e.detail); });   // panel admina: podgląd zmian na żywo
   const openSkins = () => { skinPanel.hidden = false; picker.hidden = true; };
   const closeSkins = () => { skinPanel.hidden = true; };
   $('lb-skin-close').addEventListener('click', closeSkins);
   addEventListener('keydown', e => { if (e.key === 'Escape' && !skinPanel.hidden) { closeSkins(); e.stopPropagation(); } }, true);
   let hopT = -1;
-  setSkin(skin, true);
-  // panel admina: wybór mapy lobby (zmiana wymaga przeładowania strony)
-  const admin = $('lb-admin'), adminMaps = $('lb-admin-maps');
-  LOBBY_MAPS.forEach(m => { const l = document.createElement('label'); l.innerHTML = '<input type="radio" name="lb-lmap"><div><b></b><small></small></div>';
-    const inp = l.querySelector('input'); inp.value = m.id; inp.checked = m.id === LOBBY_MAP; l.querySelector('b').textContent = m.name; l.querySelector('small').textContent = m.desc; adminMaps.appendChild(l); });
-  const showATab = id => { admin.querySelectorAll('[data-atab]').forEach(b => b.classList.toggle('on', b.dataset.atab === id));
-    admin.querySelectorAll('[data-apane]').forEach(p => p.hidden = p.dataset.apane !== id); if (id === 'skins') openASkins(); };
-  admin.querySelectorAll('[data-atab]').forEach(b => b.addEventListener('click', () => showATab(b.dataset.atab)));
-  const openAdmin = () => { adminMaps.querySelectorAll('input').forEach(i => i.checked = i.value === LOBBY_MAP); admin.hidden = false;
-    if (!admin.querySelector('[data-apane=skins]').hidden) openASkins(); };
-
-  // ---------- panel admina: skiny z kreatora (lista, dodawanie, edycja w kreatorze, usuwanie, publikacja) ----------
-  const aList = $('lb-askins'), aStat = $('lb-askin-status'), ghRepo = $('lb-gh-repo'), ghTok = $('lb-gh-token');
-  let draft = null, dirty = false;
-  const ghCfg = (() => { try { return JSON.parse(localStorage.getItem('fasolka-gh')) || {}; } catch { return {}; } })();
-  ghRepo.value = ghCfg.repo || 'smolka77/bean-fps'; ghTok.value = ghCfg.token || '';
-  const saveGh = () => { try { localStorage.setItem('fasolka-gh', JSON.stringify({ repo: ghRepo.value.trim(), token: ghTok.value.trim() })); } catch {} };
-  ghRepo.addEventListener('change', saveGh); ghTok.addEventListener('change', saveGh);
-  const setStat = (t, bad) => { aStat.textContent = t; aStat.style.color = bad ? '#ff8a8a' : ''; };
-  function openASkins() { if (!draft || !dirty) draft = skins.filter(k => !BUILTIN_IDS.has(k.id)).map(k => ({ ...k })); renderASkins(); }
-  function renderASkins() {
-    aList.innerHTML = '';
-    if (!draft.length) { const p = document.createElement('p'); p.className = 'lb-note'; p.textContent = 'Nie ma jeszcze skinów z kreatora. Kliknij „+ Nowy skin”.'; aList.appendChild(p); }
-    draft.forEach((k, i) => {
-      const row = document.createElement('div'); row.className = 'lb-askin';
-      row.innerHTML = '<img alt=""><div class="nm"><b></b><small></small></div><input title="Napis pod nazwą (tag)" maxlength="12">'
-        + '<button type="button" data-a="up" title="W górę">↑</button><button type="button" data-a="down" title="W dół">↓</button>'
-        + '<button type="button" data-a="edit">Edytuj</button><button type="button" data-a="del" class="del">Usuń</button>';
-      if (k.icon) row.querySelector('img').src = k.icon; else row.querySelector('img').remove();
-      row.querySelector('b').textContent = k.name; row.querySelector('small').textContent = k.id + (k.tex ? '' : ' · bez rysunku');
-      const tag = row.querySelector('input'); tag.value = k.tag || '';
-      tag.addEventListener('change', () => { k.tag = tag.value.trim().toUpperCase(); changed(); });
-      row.querySelector('[data-a=up]').disabled = i === 0; row.querySelector('[data-a=down]').disabled = i === draft.length - 1;
-      row.addEventListener('click', e => { const a = e.target.closest('button')?.dataset.a; if (!a) return;
-        if (a === 'up' || a === 'down') { const j = a === 'up' ? i - 1 : i + 1; [draft[i], draft[j]] = [draft[j], draft[i]]; changed(); }
-        else if (a === 'del') { if (confirm('Usunąć skin „' + k.name + '”?')) { draft.splice(i, 1); changed(); } }
-        else if (a === 'edit') openKreator(k, d => { draft[i] = fromKreator(d, k); changed(); }); });
-      aList.appendChild(row);
-    });
-  }
-  function changed() { dirty = true; setCustomSkins(draft); renderASkins(); setStat('Masz nieopublikowane zmiany. Kliknij „Opublikuj w grze”.'); }
-  const uniqueId = base => { base = base || 'skin'; let id = base, n = 2; const used = new Set([...BUILTIN_IDS, ...draft.map(k => k.id)]); while (used.has(id)) id = base + '-' + n++; return id; };
-  function fromKreator(d, prev) {
-    return { id: prev ? prev.id : uniqueId(d.id), name: d.name || 'Skin', c: d.c || '#ffffff', eyes: d.eyes === true, tag: prev ? prev.tag : 'WŁASNY',
-      ...(d.tex ? { tex: d.tex, proj: d.proj } : {}), ...(d.icon ? { icon: d.icon } : {}) };
-  }
-  // kreator skinów w nakładce (ten sam plik co samodzielny kreator, w trybie ?embed)
-  function openKreator(k, done) {
-    let ov = document.getElementById('lb-kreator');
-    if (!ov) { ov = document.createElement('div'); ov.id = 'lb-kreator'; document.body.appendChild(ov); }
-    ov.innerHTML = ''; const fr = document.createElement('iframe'); fr.src = './kreator-skinow.html?embed=1'; fr.title = 'Kreator skinów'; ov.appendChild(fr); ov.hidden = false;
-    const close = () => { removeEventListener('message', onMsg); ov.hidden = true; ov.innerHTML = ''; };
-    const onMsg = e => {
-      if (e.source !== fr.contentWindow) return; const m = e.data || {};
-      if (m.type === 'fasolka-kreator-ready') fr.contentWindow.postMessage({ type: 'fasolka-skin-load',
-        skin: k ? { format: 'fasolka-skin', version: 1, id: k.id, name: k.name, c: k.c, eyes: k.eyes, tex: k.tex || null, proj: k.proj } : null }, '*');
-      else if (m.type === 'fasolka-skin-save' && m.skin && m.skin.format === 'fasolka-skin') { close(); done(m.skin); }
-      else if (m.type === 'fasolka-kreator-close') close();
-    };
-    addEventListener('message', onMsg);
-  }
-  $('lb-askin-new').addEventListener('click', () => openKreator(null, d => { draft.push(fromKreator(d)); changed(); }));
-  const skinsJson = () => '[\n' + draft.map(k => JSON.stringify(k)).join(',\n') + '\n]\n';
-  $('lb-askin-dl').addEventListener('click', () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([skinsJson()], { type: 'application/json' }));
-    a.download = 'skins.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); });
-  $('lb-askin-pub').addEventListener('click', async () => {
-    saveGh(); const repo = ghRepo.value.trim(), token = ghTok.value.trim();
-    if (!/^[\w.-]+\/[\w.-]+$/.test(repo) || !token) { $('lb-agh').open = true; return setStat('Wpisz repozytorium i token GitHub w sekcji „Publikowanie na GitHubie”.', true); }
-    const btn = $('lb-askin-pub'); btn.disabled = true; setStat('Publikuję…');
-    try {
-      const url = 'https://api.github.com/repos/' + repo + '/contents/skins.json', H = { Authorization: 'Bearer ' + token, 'X-GitHub-Api-Version': '2022-11-28' };
-      const g = await fetch(url + '?ref=main', { headers: { ...H, Accept: 'application/vnd.github.object' }, cache: 'no-store' });
-      if (!g.ok && g.status !== 404) throw new Error('GitHub ' + g.status + (g.status === 401 ? ' (zły token)' : ''));
-      const sha = g.ok ? (await g.json()).sha : undefined;
-      const bytes = new TextEncoder().encode(skinsJson()); let bin = ''; for (let i = 0; i < bytes.length; i += 32768) bin += String.fromCharCode(...bytes.subarray(i, i + 32768));
-      const p = await fetch(url, { method: 'PUT', headers: { ...H, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'Skiny: zmiany z panelu admina (' + draft.length + ')', content: btoa(bin), branch: 'main', ...(sha ? { sha } : {}) }) });
-      if (!p.ok) { let msg = ''; try { msg = (await p.json()).message; } catch {} throw new Error('GitHub ' + p.status + (msg ? ': ' + msg : '')); }
-      dirty = false; setStat('Opublikowano. Gracze zobaczą zmiany po odświeżeniu strony (GitHub Pages potrzebuje 1–2 minut).');
-    } catch (err) { setStat('Nie udało się opublikować: ' + (err && err.message || err), true); }
-    btn.disabled = false;
-  });
-  $('lb-admin-cancel').addEventListener('click', () => admin.hidden = true);
-  admin.addEventListener('click', e => { if (e.target === admin) admin.hidden = true; });
-  admin.querySelector('.lb-x').addEventListener('click', () => admin.hidden = true);
-  $('lb-admin-save').addEventListener('click', () => { const v = adminMaps.querySelector('input:checked').value; store.set('fasolka-lobby-map', v); if (v !== LOBBY_MAP) location.reload(); else admin.hidden = true; });
-  addEventListener('keydown', e => { if (!active) return; if (e.ctrlKey && e.shiftKey && e.code === 'KeyA') { e.preventDefault(); admin.hidden ? openAdmin() : (admin.hidden = true); }
-    if (e.key === 'Escape' && !admin.hidden) { admin.hidden = true; e.stopPropagation(); } }, true);
+  setSkin(skin);
+  // panel admina (wybór mapy lobby, statystyki) jest teraz osobny: admin.js, link z #admin – patrz lobby-ui.js
   bean.rotation.y = Math.PI;                 // model patrzy w -Z, kamera stoi na +Z
   bean.traverse(o => { if (o.isMesh) o.castShadow = true; });
 
@@ -1386,7 +1253,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
 
   // ---------- interfejs: menu, ustawienia, konto, portfel, stawki, losowanie mapy ----------
   uiApi = initLobbyUI({
-    ui, $, openAdmin,
+    ui, $, lobbyMap: LOBBY_MAP, lobbyMaps: LOBBY_MAPS.map(m => m.id), isActive: () => active,
     getMode: () => mode.id,
     setName: n => { plateName.textContent = n; },
     play: (id, opts) => { if (active) onPlay(id, opts); },
@@ -1423,7 +1290,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   }
 
   function show() { active = true; ui.classList.remove('lb-hidden'); uiApi.onShow(); }
-  function hide() { active = false; dragging = false; beanHover = false; picker.hidden = true; skinPanel.hidden = true; admin.hidden = true; uiApi.closeAll(); canvas.style.cursor = ''; ui.classList.add('lb-hidden'); }
+  function hide() { active = false; dragging = false; beanHover = false; picker.hidden = true; skinPanel.hidden = true; uiApi.closeAll(); canvas.style.cursor = ''; ui.classList.add('lb-hidden'); }
 
   return { scene, camera, update, show, hide, get active() { return active; }, get mode() { return mode.id; }, get skin() { return skin; }, ui };
 }
