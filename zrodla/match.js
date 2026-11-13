@@ -177,9 +177,9 @@ body canvas{transition:filter .4s ease}
 }
 `;
 
-// moneta USDT jak w portfelu lobby
-const COIN = '<svg class="mt-coin" viewBox="0 0 20 20" aria-hidden="true"><defs><linearGradient id="mtusdt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3ad8a6"/><stop offset="1" stop-color="#1b9e78"/></linearGradient></defs>'
-  + '<circle cx="10" cy="10" r="9.2" fill="url(#mtusdt)"/><text x="10" y="14.3" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="11.5" fill="#fff">₮</text></svg>';
+// moneta Solany (płatność w SOL, kwoty w USD) jak w portfelu lobby
+const COIN = '<svg class="mt-coin" viewBox="0 0 20 20" aria-hidden="true"><defs><linearGradient id="mtusdt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9945ff"/><stop offset="1" stop-color="#14f195"/></linearGradient></defs>'
+  + '<circle cx="10" cy="10" r="9.2" fill="url(#mtusdt)"/><text x="10" y="14.3" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="11.5" fill="#fff">◎</text></svg>';
 const BEAN = visor => `<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="13" y="4" width="22" height="40" rx="11" fill="#fff6dc"/>`
   + `<rect x="17" y="13" width="14" height="7.5" rx="3.75" fill="${visor}"/><ellipse cx="19" cy="10.5" rx="2.4" ry="3.6" fill="#fff" opacity=".7"/></svg>`;
 
@@ -224,7 +224,7 @@ function mapFallback(name) {
 
 /**
  * Haki gry (g):
- *  money(v)         – zapis kwoty, np. "10,00 USDT" (stawka przychodzi z lobby w start({map, stake}))
+ *  money(v)         – zapis kwoty, np. "$10,00" (stawka przychodzi z lobby w start({map, stake}))
  *  prize(stake)     – wypłata za wygrany mecz (pula minus prowizja lobby)
  *  matchEnd(won)    – koniec meczu: lobby rozlicza stawkę (zdarzenie fasolka:match)
  *  again()          – „GRAJ DALEJ”: powrót do lobby i GRAJ (nowa stawka, losowanie mapy w lobby)

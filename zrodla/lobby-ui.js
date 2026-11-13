@@ -1,5 +1,5 @@
 // Interfejs lobby: menu (☰), ustawienia (głośność, FOV, sterowanie, język), konto (logowanie / rejestracja),
-// portfel USDT na Solanie (TRYB TESTOWY – bez prawdziwych transakcji), stawki meczu i losowanie mapy.
+// portfel na Solanie: kwoty w USD, płatność w SOL (TRYB TESTOWY – bez prawdziwych transakcji), stawki meczu i losowanie mapy.
 // Konta i salda: baza danych artefaktu (claude.use("db")), a poza claude.ai – localStorage.
 
 // ---------------- tłumaczenia ----------------
@@ -11,7 +11,7 @@ const DICT = {
     'mode.label': 'Tryb gry', 'mode.change': 'Zmień', 'mode.range.name': 'Strzelnica', 'mode.range.desc': 'Trening solo – zestrzel czerwone fasolki',
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Pojedynek · do 3 wygranych rund · Oaza / Magazyn / Baza',
     'tag.range': 'SOLO', 'tag.1v1': '1 NA 1', 'soon': 'WKRÓTCE',
-    'stake.label': 'Stawka', 'stake.custom': 'Własna', 'stake.win': 'Możliwa wygrana', 'stake.free': 'Trening – bez stawki', 'stake.range': 'Kwota 1–1000 USDT', 'stake.invalid': 'Podaj stawkę od 1 do 1000 USDT',
+    'cur.tag': 'USD · płatność w SOL', 'cur.in': 'w SOL', 'stake.label': 'Stawka', 'stake.custom': 'Własna', 'stake.win': 'Możliwa wygrana', 'stake.free': 'Trening – bez stawki', 'stake.range': 'Kwota $1–$1000', 'stake.invalid': 'Podaj stawkę od $1 do $1000',
     'play': 'GRAJ', 'picker.title': 'Wybierz tryb', 'done': 'Gotowe', 'skins.title': 'Skiny', 'close': 'Zamknij',
     'set.title': 'Ustawienia', 'set.general': 'Ogólne', 'set.audio': 'Dźwięk', 'set.controls': 'Sterowanie', 'set.lang': 'Język', 'set.volume': 'Głośność', 'set.fov': 'Pole widzenia (FOV)',
     'set.bindHint': 'Kliknij akcję (albo klawisz na klawiaturze) i naciśnij nowy klawisz. Esc anuluje.', 'set.press': 'Naciśnij klawisz…', 'set.reset': 'Przywróć domyślne', 'set.mouse': 'Strzał: lewy przycisk myszy · Celowanie: prawy',
@@ -22,11 +22,11 @@ const DICT = {
     'auth.errUser': 'Nazwa: 3–16 znaków (litery, cyfry, _)', 'auth.errPass': 'Hasło musi mieć minimum 6 znaków', 'auth.errMatch': 'Hasła się różnią', 'auth.errExists': 'Ta nazwa jest już zajęta',
     'auth.errCreds': 'Nieprawidłowa nazwa lub hasło', 'auth.errDb': 'Baza danych jest niedostępna – spróbuj ponownie', 'auth.welcome': 'Zalogowano jako {u}', 'auth.created': 'Konto utworzone – witaj, {u}!',
     'auth.loggedAs': 'Zalogowano jako', 'auth.since': 'Konto od', 'auth.logout': 'Wyloguj się', 'auth.note': 'Wersja testowa: bez weryfikacji e-mail. Hasło jest haszowane (PBKDF2).',
-    'w.title': 'Portfel', 'w.balance': 'Saldo', 'w.test': 'TRYB TESTOWY – środki są wirtualne, nie są wysyłane żadne prawdziwe transakcje.', 'w.network': 'Sieć Solana · token USDT (SPL)',
-    'w.deposit': 'Wpłata', 'w.withdraw': 'Wypłata', 'w.history': 'Historia', 'w.amount': 'Kwota (USDT)', 'w.address': 'Adres portfela Solana', 'w.doDeposit': 'Dodaj testowe USDT', 'w.doWithdraw': 'Wypłać (test)',
+    'w.title': 'Portfel', 'w.balance': 'Saldo', 'w.test': 'TRYB TESTOWY – środki są wirtualne, nie są wysyłane żadne prawdziwe transakcje.', 'w.network': 'Sieć Solana · kwoty w dolarach (USD), płatność w SOL po bieżącym kursie',
+    'w.deposit': 'Wpłata', 'w.withdraw': 'Wypłata', 'w.history': 'Historia', 'w.amount': 'Kwota (USD)', 'w.address': 'Adres portfela Solana', 'w.doDeposit': 'Dodaj testowe środki', 'w.doWithdraw': 'Wypłać (test)',
     'w.depHint': 'W wersji docelowej tu pojawi się adres depozytu po podłączeniu backendu.', 'w.connect': 'Połącz Phantom', 'w.connected': 'Portfel', 'w.noPhantom': 'Nie wykryto portfela Phantom w tej przeglądarce',
-    'w.rejected': 'Połączenie odrzucone', 'w.empty': 'Brak operacji', 'w.loginFirst': 'Zaloguj się, aby korzystać z portfela', 'w.errAmount': 'Podaj kwotę od 1 do 10 000 USDT', 'w.errFunds': 'Za mało środków',
-    'w.errAddr': 'Nieprawidłowy adres Solana', 'w.depOk': 'Dodano {a} USDT (test)', 'w.wdOk': 'Wypłata {a} USDT zlecona (test)',
+    'w.rejected': 'Połączenie odrzucone', 'w.empty': 'Brak operacji', 'w.loginFirst': 'Zaloguj się, aby korzystać z portfela', 'w.errAmount': 'Podaj kwotę od $1 do $10 000', 'w.errFunds': 'Za mało środków',
+    'w.errAddr': 'Nieprawidłowy adres Solana', 'w.depOk': 'Dodano ${a} (test)', 'w.wdOk': 'Wypłata ${a} zlecona (test)',
     'tx.deposit': 'Wpłata (test)', 'tx.withdraw': 'Wypłata (test)', 'tx.stake': 'Stawka 1v1', 'tx.win': 'Wygrana 1v1', 'tx.loss': 'Przegrana 1v1',
     'err.loginToPlay': 'Zaloguj się, aby grać o stawkę', 'err.funds': 'Za mało środków na stawkę – doładuj portfel', 'err.rematchFunds': 'Za mało środków na kolejny mecz',
     'draw.title': 'Losowanie mapy', 'draw.map': 'Mapa',
@@ -39,7 +39,7 @@ const DICT = {
     'mode.label': 'Game mode', 'mode.change': 'Change', 'mode.range.name': 'Shooting range', 'mode.range.desc': 'Solo practice – shoot the red beans',
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Duel · first to 3 rounds · Oasis / Warehouse / Base',
     'tag.range': 'SOLO', 'tag.1v1': '1 VS 1', 'soon': 'SOON',
-    'stake.label': 'Stake', 'stake.custom': 'Custom', 'stake.win': 'Potential win', 'stake.free': 'Practice – no stake', 'stake.range': 'Amount 1–1000 USDT', 'stake.invalid': 'Enter a stake between 1 and 1000 USDT',
+    'cur.tag': 'USD · paid in SOL', 'cur.in': 'in SOL', 'stake.label': 'Stake', 'stake.custom': 'Custom', 'stake.win': 'Potential win', 'stake.free': 'Practice – no stake', 'stake.range': 'Amount $1–$1000', 'stake.invalid': 'Enter a stake between $1 and $1000',
     'play': 'PLAY', 'picker.title': 'Choose mode', 'done': 'Done', 'skins.title': 'Skins', 'close': 'Close',
     'set.title': 'Settings', 'set.general': 'General', 'set.audio': 'Audio', 'set.controls': 'Controls', 'set.lang': 'Language', 'set.volume': 'Volume', 'set.fov': 'Field of view (FOV)',
     'set.bindHint': 'Click an action (or a key on the keyboard) and press a new key. Esc cancels.', 'set.press': 'Press a key…', 'set.reset': 'Restore defaults', 'set.mouse': 'Fire: left mouse button · Aim: right',
@@ -50,11 +50,11 @@ const DICT = {
     'auth.errUser': 'Username: 3–16 characters (letters, digits, _)', 'auth.errPass': 'Password must be at least 6 characters', 'auth.errMatch': 'Passwords do not match', 'auth.errExists': 'This username is taken',
     'auth.errCreds': 'Wrong username or password', 'auth.errDb': 'Database unavailable – try again', 'auth.welcome': 'Logged in as {u}', 'auth.created': 'Account created – welcome, {u}!',
     'auth.loggedAs': 'Logged in as', 'auth.since': 'Member since', 'auth.logout': 'Log out', 'auth.note': 'Test version: no e-mail verification. Passwords are hashed (PBKDF2).',
-    'w.title': 'Wallet', 'w.balance': 'Balance', 'w.test': 'TEST MODE – funds are virtual, no real transactions are sent.', 'w.network': 'Solana network · USDT (SPL) token',
-    'w.deposit': 'Deposit', 'w.withdraw': 'Withdraw', 'w.history': 'History', 'w.amount': 'Amount (USDT)', 'w.address': 'Solana wallet address', 'w.doDeposit': 'Add test USDT', 'w.doWithdraw': 'Withdraw (test)',
+    'w.title': 'Wallet', 'w.balance': 'Balance', 'w.test': 'TEST MODE – funds are virtual, no real transactions are sent.', 'w.network': 'Solana network · amounts in US dollars (USD), paid in SOL at the current rate',
+    'w.deposit': 'Deposit', 'w.withdraw': 'Withdraw', 'w.history': 'History', 'w.amount': 'Amount (USD)', 'w.address': 'Solana wallet address', 'w.doDeposit': 'Add test funds', 'w.doWithdraw': 'Withdraw (test)',
     'w.depHint': 'In production a deposit address will appear here once the backend is connected.', 'w.connect': 'Connect Phantom', 'w.connected': 'Wallet', 'w.noPhantom': 'Phantom wallet not detected in this browser',
-    'w.rejected': 'Connection rejected', 'w.empty': 'No transactions', 'w.loginFirst': 'Log in to use the wallet', 'w.errAmount': 'Enter an amount between 1 and 10,000 USDT', 'w.errFunds': 'Insufficient funds',
-    'w.errAddr': 'Invalid Solana address', 'w.depOk': 'Added {a} USDT (test)', 'w.wdOk': 'Withdrawal of {a} USDT requested (test)',
+    'w.rejected': 'Connection rejected', 'w.empty': 'No transactions', 'w.loginFirst': 'Log in to use the wallet', 'w.errAmount': 'Enter an amount between $1 and $10,000', 'w.errFunds': 'Insufficient funds',
+    'w.errAddr': 'Invalid Solana address', 'w.depOk': 'Added ${a} (test)', 'w.wdOk': 'Withdrawal of ${a} requested (test)',
     'tx.deposit': 'Deposit (test)', 'tx.withdraw': 'Withdrawal (test)', 'tx.stake': '1v1 stake', 'tx.win': '1v1 win', 'tx.loss': '1v1 loss',
     'err.loginToPlay': 'Log in to play for a stake', 'err.funds': 'Not enough funds for this stake – top up your wallet', 'err.rematchFunds': 'Not enough funds for another match',
     'draw.title': 'Map draw', 'draw.map': 'Map',
@@ -67,7 +67,7 @@ const DICT = {
     'mode.label': 'Режим игры', 'mode.change': 'Сменить', 'mode.range.name': 'Стрельбище', 'mode.range.desc': 'Соло-тренировка – сбей красные фасолины',
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Дуэль · до 3 выигранных раундов · Оазис / Склад / База',
     'tag.range': 'СОЛО', 'tag.1v1': '1 НА 1', 'soon': 'СКОРО',
-    'stake.label': 'Ставка', 'stake.custom': 'Своя', 'stake.win': 'Возможный выигрыш', 'stake.free': 'Тренировка – без ставки', 'stake.range': 'Сумма 1–1000 USDT', 'stake.invalid': 'Введите ставку от 1 до 1000 USDT',
+    'cur.tag': 'USD · оплата в SOL', 'cur.in': 'в SOL', 'stake.label': 'Ставка', 'stake.custom': 'Своя', 'stake.win': 'Возможный выигрыш', 'stake.free': 'Тренировка – без ставки', 'stake.range': 'Сумма $1–$1000', 'stake.invalid': 'Введите ставку от $1 до $1000',
     'play': 'ИГРАТЬ', 'picker.title': 'Выбери режим', 'done': 'Готово', 'skins.title': 'Скины', 'close': 'Закрыть',
     'set.title': 'Настройки', 'set.general': 'Общие', 'set.audio': 'Звук', 'set.controls': 'Управление', 'set.lang': 'Язык', 'set.volume': 'Громкость', 'set.fov': 'Поле зрения (FOV)',
     'set.bindHint': 'Нажми на действие (или клавишу на схеме) и выбери новую клавишу. Esc – отмена.', 'set.press': 'Нажми клавишу…', 'set.reset': 'Сбросить', 'set.mouse': 'Выстрел: левая кнопка мыши · Прицел: правая',
@@ -78,11 +78,11 @@ const DICT = {
     'auth.errUser': 'Имя: 3–16 символов (буквы, цифры, _)', 'auth.errPass': 'Пароль – минимум 6 символов', 'auth.errMatch': 'Пароли не совпадают', 'auth.errExists': 'Это имя уже занято',
     'auth.errCreds': 'Неверное имя или пароль', 'auth.errDb': 'База данных недоступна – попробуй ещё раз', 'auth.welcome': 'Вход выполнен: {u}', 'auth.created': 'Аккаунт создан – привет, {u}!',
     'auth.loggedAs': 'Вы вошли как', 'auth.since': 'Аккаунт с', 'auth.logout': 'Выйти', 'auth.note': 'Тестовая версия: без подтверждения e-mail. Пароль хешируется (PBKDF2).',
-    'w.title': 'Кошелёк', 'w.balance': 'Баланс', 'w.test': 'ТЕСТОВЫЙ РЕЖИМ – средства виртуальные, реальные транзакции не отправляются.', 'w.network': 'Сеть Solana · токен USDT (SPL)',
-    'w.deposit': 'Пополнение', 'w.withdraw': 'Вывод', 'w.history': 'История', 'w.amount': 'Сумма (USDT)', 'w.address': 'Адрес кошелька Solana', 'w.doDeposit': 'Добавить тестовые USDT', 'w.doWithdraw': 'Вывести (тест)',
+    'w.title': 'Кошелёк', 'w.balance': 'Баланс', 'w.test': 'ТЕСТОВЫЙ РЕЖИМ – средства виртуальные, реальные транзакции не отправляются.', 'w.network': 'Сеть Solana · суммы в долларах (USD), оплата в SOL по текущему курсу',
+    'w.deposit': 'Пополнение', 'w.withdraw': 'Вывод', 'w.history': 'История', 'w.amount': 'Сумма (USD)', 'w.address': 'Адрес кошелька Solana', 'w.doDeposit': 'Добавить тестовые средства', 'w.doWithdraw': 'Вывести (тест)',
     'w.depHint': 'В рабочей версии здесь появится адрес для пополнения после подключения бэкенда.', 'w.connect': 'Подключить Phantom', 'w.connected': 'Кошелёк', 'w.noPhantom': 'Кошелёк Phantom не найден в этом браузере',
-    'w.rejected': 'Подключение отклонено', 'w.empty': 'Операций нет', 'w.loginFirst': 'Войди, чтобы пользоваться кошельком', 'w.errAmount': 'Введите сумму от 1 до 10 000 USDT', 'w.errFunds': 'Недостаточно средств',
-    'w.errAddr': 'Неверный адрес Solana', 'w.depOk': 'Добавлено {a} USDT (тест)', 'w.wdOk': 'Вывод {a} USDT оформлен (тест)',
+    'w.rejected': 'Подключение отклонено', 'w.empty': 'Операций нет', 'w.loginFirst': 'Войди, чтобы пользоваться кошельком', 'w.errAmount': 'Введите сумму от $1 до $10 000', 'w.errFunds': 'Недостаточно средств',
+    'w.errAddr': 'Неверный адрес Solana', 'w.depOk': 'Добавлено ${a} (тест)', 'w.wdOk': 'Вывод ${a} оформлен (тест)',
     'tx.deposit': 'Пополнение (тест)', 'tx.withdraw': 'Вывод (тест)', 'tx.stake': 'Ставка 1v1', 'tx.win': 'Победа 1v1', 'tx.loss': 'Поражение 1v1',
     'err.loginToPlay': 'Войди, чтобы играть на ставку', 'err.funds': 'Недостаточно средств для ставки – пополни кошелёк', 'err.rematchFunds': 'Недостаточно средств для следующего матча',
     'draw.title': 'Выбор карты', 'draw.map': 'Карта',
@@ -95,7 +95,7 @@ const DICT = {
     'mode.label': 'Modo de juego', 'mode.change': 'Cambiar', 'mode.range.name': 'Campo de tiro', 'mode.range.desc': 'Práctica en solitario – dispara a las judías rojas',
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Duelo · a 3 rondas ganadas · Oasis / Almacén / Base',
     'tag.range': 'SOLO', 'tag.1v1': '1 VS 1', 'soon': 'PRONTO',
-    'stake.label': 'Apuesta', 'stake.custom': 'Otra', 'stake.win': 'Ganancia posible', 'stake.free': 'Práctica – sin apuesta', 'stake.range': 'Importe 1–1000 USDT', 'stake.invalid': 'Introduce una apuesta entre 1 y 1000 USDT',
+    'cur.tag': 'USD · pago en SOL', 'cur.in': 'en SOL', 'stake.label': 'Apuesta', 'stake.custom': 'Otra', 'stake.win': 'Ganancia posible', 'stake.free': 'Práctica – sin apuesta', 'stake.range': 'Importe $1–$1000', 'stake.invalid': 'Introduce una apuesta entre $1 y $1000',
     'play': 'JUGAR', 'picker.title': 'Elige modo', 'done': 'Listo', 'skins.title': 'Skins', 'close': 'Cerrar',
     'set.title': 'Ajustes', 'set.general': 'General', 'set.audio': 'Sonido', 'set.controls': 'Controles', 'set.lang': 'Idioma', 'set.volume': 'Volumen', 'set.fov': 'Campo de visión (FOV)',
     'set.bindHint': 'Haz clic en una acción (o en una tecla del teclado) y pulsa una tecla nueva. Esc cancela.', 'set.press': 'Pulsa una tecla…', 'set.reset': 'Restablecer', 'set.mouse': 'Disparo: botón izquierdo · Apuntar: derecho',
@@ -106,11 +106,11 @@ const DICT = {
     'auth.errUser': 'Nombre: 3–16 caracteres (letras, números, _)', 'auth.errPass': 'La contraseña debe tener al menos 6 caracteres', 'auth.errMatch': 'Las contraseñas no coinciden', 'auth.errExists': 'Ese nombre ya está en uso',
     'auth.errCreds': 'Usuario o contraseña incorrectos', 'auth.errDb': 'Base de datos no disponible – inténtalo de nuevo', 'auth.welcome': 'Sesión iniciada como {u}', 'auth.created': 'Cuenta creada – ¡bienvenido, {u}!',
     'auth.loggedAs': 'Sesión iniciada como', 'auth.since': 'Miembro desde', 'auth.logout': 'Cerrar sesión', 'auth.note': 'Versión de prueba: sin verificación de e-mail. La contraseña se guarda con hash (PBKDF2).',
-    'w.title': 'Cartera', 'w.balance': 'Saldo', 'w.test': 'MODO DE PRUEBA – los fondos son virtuales, no se envían transacciones reales.', 'w.network': 'Red Solana · token USDT (SPL)',
-    'w.deposit': 'Depósito', 'w.withdraw': 'Retiro', 'w.history': 'Historial', 'w.amount': 'Importe (USDT)', 'w.address': 'Dirección de cartera Solana', 'w.doDeposit': 'Añadir USDT de prueba', 'w.doWithdraw': 'Retirar (prueba)',
+    'w.title': 'Cartera', 'w.balance': 'Saldo', 'w.test': 'MODO DE PRUEBA – los fondos son virtuales, no se envían transacciones reales.', 'w.network': 'Red Solana · importes en dólares (USD), pago en SOL al cambio actual',
+    'w.deposit': 'Depósito', 'w.withdraw': 'Retiro', 'w.history': 'Historial', 'w.amount': 'Importe (USD)', 'w.address': 'Dirección de cartera Solana', 'w.doDeposit': 'Añadir fondos de prueba', 'w.doWithdraw': 'Retirar (prueba)',
     'w.depHint': 'En la versión final aquí aparecerá la dirección de depósito al conectar el backend.', 'w.connect': 'Conectar Phantom', 'w.connected': 'Cartera', 'w.noPhantom': 'No se detectó Phantom en este navegador',
-    'w.rejected': 'Conexión rechazada', 'w.empty': 'Sin operaciones', 'w.loginFirst': 'Inicia sesión para usar la cartera', 'w.errAmount': 'Introduce un importe entre 1 y 10 000 USDT', 'w.errFunds': 'Fondos insuficientes',
-    'w.errAddr': 'Dirección de Solana no válida', 'w.depOk': 'Añadidos {a} USDT (prueba)', 'w.wdOk': 'Retiro de {a} USDT solicitado (prueba)',
+    'w.rejected': 'Conexión rechazada', 'w.empty': 'Sin operaciones', 'w.loginFirst': 'Inicia sesión para usar la cartera', 'w.errAmount': 'Introduce un importe entre $1 y $10 000', 'w.errFunds': 'Fondos insuficientes',
+    'w.errAddr': 'Dirección de Solana no válida', 'w.depOk': 'Añadidos ${a} (prueba)', 'w.wdOk': 'Retiro de ${a} solicitado (prueba)',
     'tx.deposit': 'Depósito (prueba)', 'tx.withdraw': 'Retiro (prueba)', 'tx.stake': 'Apuesta 1v1', 'tx.win': 'Victoria 1v1', 'tx.loss': 'Derrota 1v1',
     'err.loginToPlay': 'Inicia sesión para jugar con apuesta', 'err.funds': 'Fondos insuficientes para la apuesta – recarga la cartera', 'err.rematchFunds': 'Fondos insuficientes para otra partida',
     'draw.title': 'Sorteo del mapa', 'draw.map': 'Mapa',
@@ -129,7 +129,7 @@ const FLAGS = {
   ru: '<svg viewBox="0 0 30 20"><rect width="30" height="7" fill="#fff"/><rect y="6.67" width="30" height="6.67" fill="#0039a6"/><rect y="13.33" width="30" height="6.67" fill="#d52b1e"/></svg>',
   es: '<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#aa151b"/><rect y="5" width="30" height="10" fill="#f1bf00"/><rect x="7" y="7.2" width="3.4" height="5.6" rx=".9" fill="#aa151b" opacity=".85"/></svg>',
 };
-let LANG = 'pl';
+let LANG = 'en';
 export function t(key, vars) { let s = (DICT[LANG] && DICT[LANG][key]) ?? DICT.pl[key] ?? key; if (vars) for (const k in vars) s = s.replace('{' + k + '}', vars[k]); return s; }
 export function skinName(sk) { return (SKIN_NAMES[LANG] && SKIN_NAMES[LANG][sk.id]) || sk.name; }
 
@@ -168,6 +168,7 @@ async function hashPw(pw, saltB64) {
   const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 150000, hash: 'SHA-256' }, key, 256);
   return { salt: b64e(salt), hash: b64e(new Uint8Array(bits)) };
 }
+const usd = v => '$' + money(v);   // kwoty w dolarach, płatność w SOL
 const money = v => (Math.round(v * 100) / 100).toLocaleString(LANG === 'en' ? 'en-US' : LANG === 'ru' ? 'ru-RU' : LANG === 'es' ? 'es-ES' : 'pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // ---------------- grafiki map do losowania ----------------
@@ -207,9 +208,9 @@ export function initLobbyUI(ctx) {
 
   // ---- ustawienia ----
   const defBinds = Object.fromEntries(ACTIONS);
-  let S = { lang: 'pl', volume: 80, vMenu: 70, vGame: 100, fov: 78, binds: { ...defBinds } };
+  let S = { lang: 'en', volume: 80, vMenu: 70, vGame: 100, fov: 78, binds: { ...defBinds } };
   try { const v = JSON.parse(ls.get('fasolka-settings') || 'null'); if (v) S = { ...S, ...v, binds: { ...defBinds, ...(v.binds || {}) } }; } catch {}
-  if (!DICT[S.lang]) S.lang = 'pl';
+  if (!S.langPicked || !DICT[S.lang]) S.lang = 'en';   // domyślnie angielski, dopóki gracz sam nie wybierze języka
   LANG = S.lang;
   let pushT = 0;
   const pushSettings = () => { ls.set('fasolka-settings', JSON.stringify(S)); clearTimeout(pushT);
@@ -217,6 +218,8 @@ export function initLobbyUI(ctx) {
   // gra dostaje głośność = ogólna × dźwięki w grze; dźwięki menu gra lobby (ogólna × menu)
   const sendSettings = () => dispatchEvent(new CustomEvent('fasolka:settings', { detail: { volume: (S.volume / 100) * (S.vGame / 100), fov: S.fov } }));
   setTimeout(sendSettings, 0);
+  // zmiany z menu pauzy w grze trafiają do tego samego stanu (lobby nie nadpisze ich starą wartością)
+  addEventListener('fasolka:settings-set', e => { S = { ...S, ...(e.detail || {}) }; pushSettings(); try { renderSettings(); } catch {} });
 
   // ---- dźwięki menu (WebAudio, bez plików) ----
   let AC = null, uiGain = null, gestured = false;
@@ -313,7 +316,19 @@ export function initLobbyUI(ctx) {
   // ---- ustawienia: renderowanie ----
   const langBox = $('lb-langs'), fovR = $('lb-fov'), bindBox = $('lb-binds');
   LANGS.forEach(l => { const b = document.createElement('button'); b.type = 'button'; b.className = 'lb-seg'; b.dataset.lang = l.id; b.innerHTML = `<i class="lb-flag">${FLAGS[l.id]}</i><span></span><b>${l.id.toUpperCase()}</b>`;
-    b.querySelector('span').textContent = l.name; b.addEventListener('click', () => { S.lang = l.id; LANG = l.id; pushSettings(); applyI18n(); }); langBox.appendChild(b); });
+    b.querySelector('span').textContent = l.name; b.addEventListener('click', () => setLang(l.id)); langBox.appendChild(b); });
+  function setLang(id) { S.lang = id; S.langPicked = true; LANG = id; pushSettings(); applyI18n(); }
+  // ---- flaga języka w pasku ----
+  const langBtn = $('lb-langbtn'), langMenu = $('lb-langmenu');
+  const openLang = v => { langMenu.hidden = !v; langBtn.setAttribute('aria-expanded', String(v)); };
+  LANGS.forEach(l => { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'menuitem'); b.dataset.lang = l.id;
+    b.innerHTML = `<i class="lb-flag">${FLAGS[l.id]}</i><span></span><small>${l.id.toUpperCase()}</small>`; b.querySelector('span').textContent = l.name;
+    b.addEventListener('click', () => { openLang(false); if (l.id !== S.lang) setLang(l.id); }); langMenu.appendChild(b); });
+  const renderLangPick = () => { $('lb-langflag').innerHTML = FLAGS[S.lang]; $('lb-langcode').textContent = S.lang.toUpperCase();
+    langMenu.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.lang === S.lang)); };
+  langBtn.addEventListener('click', e => { e.stopPropagation(); openLang(langMenu.hidden); });
+  document.addEventListener('pointerdown', e => { if (!langMenu.hidden && !e.target.closest('.lb-lang')) openLang(false); });
+  addEventListener('keydown', e => { if (e.key === 'Escape' && !langMenu.hidden) { openLang(false); e.stopPropagation(); } }, true);
   const fillRange = r => r.style.setProperty('--p', ((r.value - r.min) / (r.max - r.min) * 100) + '%');
   const preview = k => k === 'vGame' ? noiseHit((S.volume / 100) * (S.vGame / 100)) : k === 'vMenu' ? SFX.reveal() : (tone({ f: 660, d: .12, g: .5, type: 'triangle', out: masterOut() }));
   const masterOut = () => { const ac = audio(); if (!ac) return null; const g = ac.createGain(); g.gain.value = S.volume / 100 * .3; g.connect(ac.destination); return g; };
@@ -386,6 +401,7 @@ export function initLobbyUI(ctx) {
     const a = keyActs(code)[0]; if (a && a.id && !a.alt) { rebinding = a.id; renderSettings(); } });
 
   function renderSettings() {
+    renderLangPick();
     langBox.querySelectorAll('.lb-seg').forEach(b => b.classList.toggle('on', b.dataset.lang === S.lang));
     renderVol(); renderFov();
     bindBox.innerHTML = '';
@@ -443,7 +459,7 @@ export function initLobbyUI(ctx) {
     if (!p || !p.isPhantom) return toast(t('w.noPhantom'), 'err');
     try { const r = await p.connect(); acct.wallet = r.publicKey.toString(); await saveAcct(); renderAll(); } catch { toast(t('w.rejected'), 'err'); } });
   function renderWallet() {
-    const bal = acct ? money(acct.balance) : '—';
+    const bal = acct ? usd(acct.balance) : '—';
     $('lb-w-bal').textContent = bal; $('lb-wd-addr').value = $('lb-wd-addr').value || (acct && acct.wallet) || '';
     $('lb-w-addr').textContent = acct && acct.wallet ? acct.wallet.slice(0, 6) + '…' + acct.wallet.slice(-6) : '';
     $('lb-phantom').classList.toggle('on', !!(acct && acct.wallet));
@@ -451,8 +467,8 @@ export function initLobbyUI(ctx) {
     const hist = (acct && acct.history) || [];
     if (!hist.length) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = t('w.empty'); list.appendChild(li); }
     for (const h of hist) { const li = document.createElement('li'); li.innerHTML = '<div><b></b><small></small></div><span></span>';
-      const note = h.fee ? t('tx.fee', { a: money(h.fee) }) : h.note; li.querySelector('b').textContent = t('tx.' + h.type) + (note ? ' · ' + note : ''); li.querySelector('small').textContent = new Date(h.t).toLocaleString(LANG);
-      const sp = li.querySelector('span'); sp.textContent = h.amount ? (h.amount > 0 ? '+' : '−') + money(Math.abs(h.amount)) + ' USDT' : ''; sp.className = h.amount > 0 ? 'pos' : h.amount < 0 ? 'neg' : '';
+      const note = h.fee ? t('tx.fee', { a: usd(h.fee) }) : h.note; li.querySelector('b').textContent = t('tx.' + h.type) + (note ? ' · ' + note : ''); li.querySelector('small').textContent = new Date(h.t).toLocaleString(LANG);
+      const sp = li.querySelector('span'); sp.textContent = h.amount ? (h.amount > 0 ? '+' : '−') + usd(Math.abs(h.amount)) : ''; sp.className = h.amount > 0 ? 'pos' : h.amount < 0 ? 'neg' : '';
       list.appendChild(li); }
   }
 
@@ -460,12 +476,13 @@ export function initLobbyUI(ctx) {
   function renderTop() {
     $('lb-acct-name').textContent = acct ? acct.username : t('top.signin');
     $('lb-acct-av').textContent = acct ? acct.username[0].toUpperCase() : '?';
-    $('lb-bal').textContent = acct ? money(acct.balance) : '—';
+    $('lb-bal').textContent = acct ? usd(acct.balance) : '—';
     ctx.setName(acct ? acct.username : t('top.guest'));
     menu.querySelector('[data-act="auth"] span').textContent = acct ? t('menu.account') : t('menu.login');
+    $('lb-acct').hidden = $('lb-acct-hr').hidden = !acct; menu.querySelector('[data-act="auth"]').hidden = !!acct;   // konto w menu: karta po zalogowaniu, „Zaloguj się” bez konta
     menu.querySelector('[data-act="logout"]').hidden = !acct;
   }
-  $('lb-acct').addEventListener('click', () => { openModal('lb-auth'); if (!acct) showTab('lb-auth', 'login'); });
+  $('lb-acct').addEventListener('click', () => { openMenu(false); openModal('lb-auth'); if (!acct) showTab('lb-auth', 'login'); });
   $('lb-walletchip').addEventListener('click', () => openWallet());
 
   // ---- stawka ----
@@ -481,10 +498,10 @@ export function initLobbyUI(ctx) {
     stakeBox.querySelectorAll('[data-stake]').forEach(b => b.classList.toggle('on', b.dataset.stake === stakeSel));
     $('lb-stake-custom').hidden = stakeSel !== 'custom'; if (!keepInput) customIn.value = stakeCustom || '';
     const s = getStake(), ok = s >= 1 && s <= 1000;
-    $('lb-stake-win').textContent = duel ? (ok ? money(payout(s)) + ' USDT' : '—') : '';
-    $('lb-stake-fee').textContent = duel && ok ? '−' + money(feeOf(s)) + ' USDT' : '—';
+    $('lb-stake-win').textContent = duel ? (ok ? usd(payout(s)) : '—') : '';
+    $('lb-stake-fee').textContent = duel && ok ? '−' + usd(feeOf(s)) : '—';
     $('lb-stake-winrow').hidden = !duel; $('lb-stake-feerow').hidden = !duel;
-    $('lb-play-sub').textContent = duel ? (ok ? money(s) + ' USDT' : t('stake.range')) : t('stake.free');
+    $('lb-play-sub').textContent = duel ? (ok ? usd(s) : t('stake.range')) : t('stake.free');
   }
 
   // ---- losowanie mapy ----
@@ -494,7 +511,7 @@ export function initLobbyUI(ctx) {
     const seq = Array.from({ length: N }, (_, i) => i === win ? pick : DUEL_MAPS[(i + Math.floor(Math.random() * 2)) % DUEL_MAPS.length]);
     reel.innerHTML = seq.map((m, i) => `<div class="lb-mcard" data-i="${i}">${MAP_ART[m](i)}<img src="${MAP_IMG[m]}" alt="" draggable="false" onerror="this.remove()"><span><i>1v1</i>${m.toUpperCase()}</span></div>`).join('');
     $('lb-draw-res').textContent = ''; draw.classList.remove('done'); draw.hidden = false;
-    $('lb-draw-stake').innerHTML = `${t('stake.label')}: <b>${money(stake)} USDT</b> · ${t('stake.win')}: <b>${money(payout(stake))} USDT</b>`;
+    $('lb-draw-stake').innerHTML = `${t('stake.label')}: <b>${usd(stake)}</b> · ${t('stake.win')}: <b>${usd(payout(stake))}</b>`;
     reel.style.transition = 'none'; reel.style.transform = 'translateX(0)';
     const c0 = reel.firstElementChild, cw = c0.offsetWidth, cardW = cw + (parseFloat(getComputedStyle(reel).columnGap) || 16), view = reel.parentElement.clientWidth;
     const stop = win * cardW - (view / 2 - cw / 2), target = stop + (Math.random() - .5) * cw * .6;
@@ -522,11 +539,11 @@ export function initLobbyUI(ctx) {
     if (acct.balance < s) { toast(t('err.funds'), 'err'); openWallet('deposit'); return; }
     busy = true;
     try { await addTx(-s, 'stake'); activeStake = lastStake = s; } catch { busy = false; return toast(t('auth.errDb'), 'err'); }
-    SFX.play(); runDraw(s, map => { busy = false; ctx.play(m, { map, stake: s }); });
+    SFX.play(); busy = false; ctx.play(m, { stake: s });   // najpierw szukanie przeciwnika, losowanie mapy dopiero potem (match.js: search → found → draw → load)
   }
   addEventListener('fasolka:match', async e => {
     if (!activeStake || !acct) return; const s = activeStake; activeStake = 0;
-    if (e.detail && e.detail.won) await addTx(payout(s), 'win', '', { fee: feeOf(s) }); else await addTx(0, 'loss', money(s) + ' USDT');
+    if (e.detail && e.detail.won) await addTx(payout(s), 'win', '', { fee: feeOf(s) }); else await addTx(0, 'loss', usd(s));
   });
   addEventListener('fasolka:rematch', e => {
     if (!lastStake) return;
@@ -542,7 +559,7 @@ export function initLobbyUI(ctx) {
 
   return {
     requestPlay, closeAll, renderStake,
-    onShow() { if (activeStake && acct) addTx(0, 'loss', money(activeStake) + ' USDT').catch(() => {}); activeStake = 0; lastStake = 0; renderAll(); },   // wyjście z meczu o stawkę = przegrana
+    onShow() { if (activeStake && acct) addTx(0, 'loss', usd(activeStake)).catch(() => {}); activeStake = 0; lastStake = 0; renderAll(); },   // wyjście z meczu o stawkę = przegrana
     get open() { return anyOpen() || !draw.hidden; },
   };
 }

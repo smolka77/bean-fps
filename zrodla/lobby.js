@@ -31,12 +31,27 @@ const CSS = `
 #lb-ui .lb-beta{font:700 10px/1 Inter,sans-serif;font-style:normal;letter-spacing:.14em;color:var(--acc);border:1px solid rgba(255,198,41,.45);
   border-radius:5px;padding:4px 6px;margin-left:2px;align-self:center;background:rgba(10,14,24,.4)}
 #lb-ui .lb-sp{flex:1}
+/* wybór języka flagą w pasku */
+#lb-ui .lb-lang{position:relative;pointer-events:auto}
+#lb-ui .lb-chip.lb-lchip{padding:0 12px;gap:8px}
+#lb-ui .lb-lchip .lb-flag{width:27px;height:18px}
+#lb-ui .lb-lchip b{font:700 13px/1 Inter,sans-serif;letter-spacing:.08em}
+#lb-ui .lb-caret{width:12px;height:12px;color:var(--mut);transition:transform .15s}
+#lb-ui .lb-lchip[aria-expanded="true"] .lb-caret{transform:rotate(180deg)}
+#lb-ui .lb-langmenu{position:absolute;top:calc(100% + 8px);right:0;width:190px;padding:6px;background:rgba(12,17,30,.96);border:1px solid var(--line2);border-radius:var(--r);
+  box-shadow:0 18px 40px rgba(0,0,0,.45);z-index:5}
+#lb-ui .lb-langmenu[hidden]{display:none}
+#lb-ui .lb-langmenu button{display:flex;align-items:center;gap:12px;width:100%;padding:10px 10px;border:0;border-radius:9px;background:none;cursor:pointer;color:inherit;font:600 14px/1 Inter,sans-serif;text-align:left}
+#lb-ui .lb-langmenu button:hover,#lb-ui .lb-langmenu button:focus-visible{background:rgba(255,255,255,.07);outline:none}
+#lb-ui .lb-langmenu button span{flex:1}
+#lb-ui .lb-langmenu button small{font:700 11px/1 Inter,sans-serif;letter-spacing:.1em;color:var(--mut)}
+#lb-ui .lb-langmenu button.on{background:rgba(255,198,41,.12)}#lb-ui .lb-langmenu button.on small{color:var(--acc)}
 #lb-ui .lb-chip{pointer-events:auto;height:44px;display:flex;align-items:center;gap:10px;padding:0 14px 0 6px;cursor:pointer;
   background:var(--bg);border:1px solid var(--line2);border-radius:var(--r);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
   transition:border-color .15s,background .15s}
 #lb-ui .lb-chip:hover{border-color:rgba(255,198,41,.55);background:rgba(16,22,38,.82)}
 #lb-ui .lb-chip:focus-visible,#lb-ui .lb-burger:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-#lb-ui .lb-coin{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;background:linear-gradient(150deg,#3ad8a6,#1b9e78);
+#lb-ui .lb-coin{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;background:linear-gradient(150deg,#9945ff,#14f195);
   color:#fff;font:800 16px/1 Inter,sans-serif;box-shadow:inset 0 -2px 0 rgba(0,0,0,.2)}
 #lb-ui .lb-wbal{display:flex;align-items:baseline;gap:5px}
 #lb-ui .lb-wbal b{font:700 19px/1 Rajdhani,Oswald,sans-serif;letter-spacing:.02em}
@@ -61,6 +76,7 @@ const CSS = `
 #lb-ui .lb-menu button:hover,#lb-ui .lb-menu button:focus-visible{background:rgba(255,255,255,.07);outline:none}
 #lb-ui .lb-menu svg{width:18px;height:18px;flex:none;color:var(--mut)}
 #lb-ui .lb-menu button:hover svg{color:var(--acc)}
+#lb-ui .lb-menu .lb-macct{padding:8px 10px;font:600 15px/1 Inter,sans-serif}#lb-ui .lb-menu .lb-macct .lb-aname{display:block;max-width:170px}   /* konto: tylko w menu pod hamburgerem */
 #lb-ui .lb-menu hr{border:0;border-top:1px solid var(--line);margin:6px 4px}
 #lb-ui .lb-menu .danger{color:#ff8a8a}
 #lb-ui .lb-menu .danger svg{color:#ff8a8a}
@@ -455,13 +471,16 @@ const X_BTN = `<button class="lb-x" type="button" aria-label="Zamknij">${IC.x}</
 const HTML = `
 <div class="lb-shade"></div>
 <header class="lb-top">
-  <div class="lb-logo">FASOL<b>KA</b></div><i class="lb-beta">BETA</i>
+  <div class="lb-logo">BEEN<b>LADEN</b></div>
   <div class="lb-sp"></div>
-  <button class="lb-chip lb-wchip" id="lb-walletchip" type="button" aria-label="Portfel"><span class="lb-coin">₮</span><span class="lb-wbal"><b id="lb-bal">—</b><small>USDT</small></span><span class="lb-plus">+</span></button>
-  <button class="lb-chip lb-achip" id="lb-acct" type="button"><span class="lb-av" id="lb-acct-av">?</span><span class="lb-aname" id="lb-acct-name"></span></button>
-  <button class="lb-burger" id="lb-burger" type="button" aria-label="Menu" aria-haspopup="menu" aria-expanded="false"><span></span><span></span><span></span></button>
+  <div class="lb-lang"><button class="lb-chip lb-lchip" id="lb-langbtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Language"><i class="lb-flag" id="lb-langflag"></i><b id="lb-langcode">EN</b><svg class="lb-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4.5 6 8.5 10 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+    <div class="lb-langmenu" id="lb-langmenu" role="menu" hidden></div></div>
+  <button class="lb-chip lb-wchip" id="lb-walletchip" type="button" aria-label="Portfel"><span class="lb-coin">◎</span><span class="lb-wbal"><b id="lb-bal">—</b><small data-i18n="cur.in">in SOL</small></span><span class="lb-plus">+</span></button>
+    <button class="lb-burger" id="lb-burger" type="button" aria-label="Menu" aria-haspopup="menu" aria-expanded="false"><span></span><span></span><span></span></button>
 </header>
 <nav class="lb-menu" id="lb-menu" role="menu" hidden>
+  <button class="lb-macct" id="lb-acct" type="button" role="menuitem"><span class="lb-av" id="lb-acct-av">?</span><span class="lb-aname" id="lb-acct-name"></span></button>
+  <hr id="lb-acct-hr">
   <button type="button" role="menuitem" data-act="settings">${IC.gear}<span data-i18n="menu.settings"></span></button>
   <button type="button" role="menuitem" data-act="wallet">${IC.wallet}<span data-i18n="menu.wallet"></span></button>
   <button type="button" role="menuitem" data-act="auth">${IC.user}<span></span></button>
@@ -475,12 +494,12 @@ const HTML = `
     <button class="lb-mode" id="lb-mode" type="button" aria-haspopup="dialog"><div class="lb-thumb" id="lb-mode-ic"></div>
       <div class="lb-mtxt"><small data-i18n="mode.label"></small><span id="lb-mode-name"></span><em id="lb-mode-desc"></em></div><i class="lb-chev"><span data-i18n="mode.change"></span> ›</i></button>
     <div class="lb-stakewrap" id="lb-stake-wrap">
-      <div class="lb-lbl"><span data-i18n="stake.label"></span><span class="lb-usdt">USDT · Solana</span></div>
+      <div class="lb-lbl"><span data-i18n="stake.label"></span><span class="lb-usdt" data-i18n="cur.tag">USD · paid in SOL</span></div>
       <div class="lb-stake" id="lb-stake">
-        <button type="button" data-stake="5"><b>5</b><small>USDT</small></button><button type="button" data-stake="10"><b>10</b><small>USDT</small></button>
-        <button type="button" data-stake="20"><b>20</b><small>USDT</small></button><button type="button" data-stake="custom"><b data-i18n="stake.custom"></b><small>1–1000</small></button>
+        <button type="button" data-stake="5"><b>$5</b><small data-i18n="cur.in">in SOL</small></button><button type="button" data-stake="10"><b>$10</b><small data-i18n="cur.in">in SOL</small></button>
+        <button type="button" data-stake="20"><b>$20</b><small data-i18n="cur.in">in SOL</small></button><button type="button" data-stake="custom"><b data-i18n="stake.custom"></b><small>$1–1000</small></button>
       </div>
-      <div class="lb-custom" id="lb-stake-custom" hidden><input id="lb-stake-in" type="number" min="1" max="1000" step="1" inputmode="numeric" data-i18n-ph="stake.range" aria-label="USDT"><span>USDT</span></div>
+      <div class="lb-custom" id="lb-stake-custom" hidden><input id="lb-stake-in" type="number" min="1" max="1000" step="1" inputmode="numeric" data-i18n-ph="stake.range" aria-label="USD"><span>USD</span></div>
       <div class="lb-free" id="lb-stake-free" hidden>${IC.info}<span data-i18n="stake.free"></span></div>
       <div class="lb-win lb-fee" id="lb-stake-feerow"><span data-i18n="stake.fee"></span><b id="lb-stake-fee"></b></div>
       <div class="lb-win" id="lb-stake-winrow"><span data-i18n="stake.win"></span><b id="lb-stake-win"></b></div>
@@ -561,7 +580,7 @@ const HTML = `
   <div class="lb-dh"><h3 data-i18n="w.title"></h3>${X_BTN}</div>
   <div class="lb-balcard">
     <small data-i18n="w.balance"></small>
-    <div class="lb-big"><b id="lb-w-bal">—</b><span>USDT</span></div>
+    <div class="lb-big"><b id="lb-w-bal">—</b><span data-i18n="cur.in">in SOL</span></div>
     <div class="lb-net">${IC.sol}<span data-i18n="w.network"></span></div>
     <button class="lb-phantom" type="button" id="lb-phantom">${IC.ghost}<span data-i18n="w.connect"></span><code id="lb-w-addr"></code></button>
   </div>

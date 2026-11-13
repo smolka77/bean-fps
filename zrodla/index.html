@@ -7,14 +7,8 @@
   html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:dark}
   canvas{display:block;width:100%;height:100%;outline:none;cursor:none}
   .hud{position:fixed;pointer-events:none;font-variant-numeric:tabular-nums}
-  #ammo{right:max(24px,env(safe-area-inset-right,0px));bottom:24px;text-align:right;background:var(--panel);border:1px solid var(--line);padding:8px 16px;border-radius:8px}
-  #ammo b{font-size:34px;font-weight:700;letter-spacing:.02em}
-  #ammo span{color:var(--dim);font-size:18px}
-  #ammo small{display:block;color:var(--accent);font-size:12px;letter-spacing:.08em;text-transform:uppercase;min-height:16px}
   #score{right:max(24px,env(safe-area-inset-right,0px));top:16px;background:var(--panel);border:1px solid var(--line);padding:6px 14px;border-radius:8px;text-align:right}
   #score b{font-size:20px;color:var(--accent)}
-  #keys{left:max(16px,env(safe-area-inset-left,0px));bottom:20px;color:var(--dim);font-size:12px;line-height:1.7;background:var(--panel);border:1px solid var(--line);padding:8px 12px;border-radius:8px}
-  #keys kbd{color:var(--fg);font:600 11px/1 system-ui;border:1px solid var(--line);border-radius:4px;padding:2px 5px;background:rgba(255,255,255,.07)}
   #cross{left:50%;top:50%;width:0;height:0}
   #cross i{position:absolute;background:#fff;box-shadow:0 0 2px #000;transition:background .08s}
   #cross .h{width:9px;height:2px;top:-1px}#cross .v{width:2px;height:9px;left:-1px}
@@ -22,54 +16,141 @@
   #cross.ads{opacity:.0}
   #marker{left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;opacity:0;transition:opacity .15s}
   #marker svg{width:100%;height:100%;display:block}
-  #overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,12,17,.78);z-index:5;padding:16px;text-align:center;cursor:pointer}
-  #overlay .card{max-width:440px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px 28px}
-  #overlay h1{margin:0 0 6px;font-size:26px;letter-spacing:.01em}
-  #overlay p{margin:6px 0;color:var(--dim)}
-  #overlay .go{display:inline-block;margin-top:14px;padding:10px 22px;border-radius:8px;background:var(--accent);color:#1a1405;font-weight:700}
   #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:9}
   #vlabel{left:50%;transform:translateX(-50%);top:16px;color:var(--dim);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
   .mute{font:600 12px/1 system-ui,sans-serif;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
   .mute:hover{border-color:var(--accent)}.mute:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   #muteHud{position:fixed;left:max(16px,env(safe-area-inset-left,0px));top:16px;z-index:3}
-  #overlay .mute{margin-top:12px}
   body.in-lobby .hud,body.in-lobby #overlay,body.in-lobby #muteHud{display:none!important}
   body.in-lobby canvas{cursor:grab}
-  #overlay .lobby{display:inline-block;margin:14px 0 0 10px;padding:10px 18px;border-radius:8px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:var(--fg);font:700 14px system-ui,sans-serif;cursor:pointer}
-  #overlay .lobby:hover{background:rgba(255,255,255,.16)}
-  #hp{left:50%;bottom:24px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);padding:8px 14px;border-radius:8px}
-  body:not(.duel) #hp{display:none}
-  #hp span{font:700 11px/1 system-ui,sans-serif;letter-spacing:.12em;color:var(--dim)}
-  #hp i{display:block;width:180px;height:10px;border-radius:5px;background:rgba(255,255,255,.12);overflow:hidden}
-  #hp i b{display:block;height:100%;width:100%;background:linear-gradient(90deg,#5ff08a,#2fc463);transition:width .15s}
-  #hp.low i b{background:linear-gradient(90deg,#ff7a5c,#e5432f)}
-  #hp em{font-style:normal;font-weight:700;font-size:18px;min-width:34px;text-align:right}
   #score small{color:var(--dim);font-size:11px;margin-left:4px}
   #banner{left:50%;top:32%;transform:translate(-50%,-50%);font:800 44px/1 system-ui,sans-serif;letter-spacing:.06em;text-shadow:0 3px 14px rgba(0,0,0,.55);opacity:0;white-space:nowrap}
   #banner.show{animation:bn 1.3s ease forwards}
   @keyframes bn{0%{opacity:0;transform:translate(-50%,-50%) scale(.8)}15%{opacity:1;transform:translate(-50%,-50%) scale(1)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1)}}
   #fatigue{left:50%;top:calc(50% + 34px);width:64px;height:4px;margin-left:-32px;border-radius:2px;background:rgba(0,0,0,.35);overflow:hidden;opacity:0;transition:opacity .25s}
   #fatigue i{display:block;height:100%;width:0;background:#ffb347}
-  #slots{left:max(16px,env(safe-area-inset-left,0px));top:60px;display:flex;flex-direction:column;gap:4px;font-size:12px}
-  #slots span{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 9px;color:var(--dim);transition:color .15s,border-color .15s}
-  #slots span b{color:var(--fg);margin-right:4px}#slots span.on{color:var(--fg);border-color:var(--accent)}#slots span.on b{color:var(--accent)}
   #dmg{inset:0;box-shadow:inset 0 0 120px rgba(255,0,0,0);transition:box-shadow .2s}
   body.mt-on #score{display:none}body.mt-on #vlabel{top:78px}
+  /* HUD w stylu gry: granatowe szkło ze skośnymi krawędziami i złoty akcent jak tablica wyniku meczu; liczby krojem Anton */
+  :root{--hud-glass:rgba(10,22,48,.8);--hud-glass2:rgba(6,14,32,.86);--hud-ink:#f4f7ff;--hud-dim:rgba(207,224,255,.62);--hud-line:rgba(207,224,255,.28);
+    --hud-gold:linear-gradient(180deg,#fff7a8,#ffd400 60%,#f5ad00);--hud-goldc:#ffd400;--hud-red:#ff5a48;--hud-redg:linear-gradient(180deg,#ff9a88,#e5432f);
+    --hud-num:Anton,Oswald,Impact,"Arial Narrow",sans-serif;--hud-lbl:Rajdhani,Oswald,"Arial Narrow",sans-serif}
+  #hp,#ammo,#slots{color:var(--hud-ink);text-shadow:0 2px 6px rgba(0,0,0,.45)}
+  /* zdrowie: złoty blok z krzyżem + szklany panel z liczbą i segmentowym paskiem (biały „ślad” pokazuje świeże obrażenia) */
+  #hp{left:max(16px,env(safe-area-inset-left,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));display:flex;align-items:stretch;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35))}
+  #hp .ic{width:54px;display:grid;place-items:center;background:var(--hud-gold);clip-path:polygon(0 0,100% 0,calc(100% - 11px) 100%,0 100%);transition:background .2s}
+  #hp .ic svg{width:26px;height:26px;fill:#2a1c00;margin-right:6px}
+  #hp .col{display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:158px;margin-left:-5px;padding:7px 24px 9px 18px;background:var(--hud-glass);
+    clip-path:polygon(11px 0,100% 0,calc(100% - 13px) 100%,0 100%)}
+  #hp .top{display:flex;align-items:baseline;gap:9px}
+  #hp em{font:400 40px/1 var(--hud-num);font-style:normal;letter-spacing:.02em;min-width:2.1ch}
+  #hp small{font:700 11px/1 var(--hud-lbl);letter-spacing:.24em;color:var(--hud-dim)}
+  #hp i{position:relative;display:block;height:7px;background:rgba(255,255,255,.12);transform:skewX(-20deg);overflow:hidden}
+  #hp i b,#hp i s{position:absolute;left:0;top:0;bottom:0;width:100%}
+  #hp i s{background:rgba(255,255,255,.8);transition:width .5s ease .35s}
+  #hp i b{background:linear-gradient(90deg,#3fd97a,#9dff73);transition:width .12s,background .2s}
+  #hp i::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 2px),var(--hud-glass2) calc(10% - 2px) 10%)}
+  #hp.mid i b{background:linear-gradient(90deg,#ff9d2e,#ffd400)}
+  #hp.low em,#hp.low small{color:var(--hud-red)}#hp.low i b{background:var(--hud-red)}#hp.low .ic{background:var(--hud-redg)}#hp.low .ic svg{fill:#fff}
+  #hp.low .col{animation:hud-pulse 1s ease-in-out infinite}
+  @keyframes hud-pulse{50%{background:rgba(96,12,18,.78)}}
+  /* amunicja: nazwa broni złotem, duży magazynek, pasek pocisków, pasek przeładowania */
+  #ammo{right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:flex-end;gap:5px;
+    min-width:236px;padding:7px 20px 9px 30px;background:var(--hud-glass);clip-path:polygon(13px 0,100% 0,100% 100%,0 100%)}
+  #ammo::before{content:"";position:absolute;left:13px;right:0;top:0;height:2px;background:var(--hud-gold)}
+  #ammo small{display:block;min-height:13px;font:700 12px/13px var(--hud-lbl);letter-spacing:.22em;text-transform:uppercase;color:var(--hud-goldc)}
+  #ammo .row{display:flex;align-items:flex-end;gap:14px}
+  #bullets{display:flex;align-items:flex-end;gap:2px;height:24px;margin-bottom:5px}
+  #bullets i{display:block;width:3px;height:20px;transform:skewX(-14deg);background:var(--hud-ink);transition:background .15s}
+  #bullets i.e{background:rgba(255,255,255,.16)}
+  #ammo b{display:inline-block;font:400 46px/1 var(--hud-num);letter-spacing:.02em}
+  #ammo b.kick{animation:hud-kick .12s ease-out}
+  @keyframes hud-kick{40%{transform:translateY(-3px) scale(1.06)}}
+  #ammo .res{font:400 22px/1 var(--hud-num);color:var(--hud-dim);margin-bottom:4px}
+  #ammo .res::before{content:"/ "}
+  #ammo .rl{display:block;align-self:stretch;height:3px;background:rgba(255,255,255,.12);opacity:0;transition:opacity .15s}
+  #ammo .rl b{display:block;height:100%;width:0;background:var(--hud-gold)}
+  #ammo.reloading .rl{opacity:1}#ammo.reloading .rl b{animation:hud-rl var(--rl,2s) linear forwards}
+  @keyframes hud-rl{to{width:100%}}
+  #ammo.low b,#ammo.low .res{color:var(--hud-red)}#ammo.low #bullets i:not(.e){background:var(--hud-red)}
+  /* lista broni: szklane karty, numer klawisza w ramce; wybrana broń – złoty numer, złota linia i jasna ikona */
+  #slots{right:max(16px,env(safe-area-inset-right,0px));bottom:calc(max(16px,env(safe-area-inset-bottom,0px)) + 104px);display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+  #slots .sl{position:relative;display:flex;align-items:center;justify-content:flex-end;width:172px;height:46px;padding:0 16px 0 40px;background:rgba(10,22,48,.62);
+    clip-path:polygon(11px 0,100% 0,100% 100%,0 100%);transition:width .15s,background .15s}
+  #slots .sl img{height:28px;max-width:116px;object-fit:contain;opacity:.55;filter:brightness(.85);transition:opacity .15s,filter .15s}
+  #slots .sl span{font:700 16px var(--hud-lbl);letter-spacing:.08em;color:var(--hud-dim)}
+  #slots .sl b{position:absolute;left:16px;top:50%;width:18px;height:18px;margin-top:-9px;display:grid;place-items:center;font:700 12px/1 var(--hud-lbl);color:var(--hud-dim);
+    border:1px solid var(--hud-line);text-shadow:none;transition:background .15s,color .15s}
+  #slots .sl::after{content:"";position:absolute;left:11px;right:0;bottom:0;height:2px;background:var(--hud-gold);transform:scaleX(0);transform-origin:right;transition:transform .18s}
+  #slots .sl.on{width:188px;background:var(--hud-glass)}
+  #slots .sl.on::after{transform:scaleX(1)}
+  #slots .sl.on img{opacity:1;filter:drop-shadow(0 0 6px rgba(255,236,160,.35))}
+  #slots .sl.on b{background:var(--hud-gold);color:#2a1c00;border-color:transparent}
+  #slots .sl.on span{color:var(--hud-ink)}
+  @media (prefers-reduced-motion:reduce){#hp.low .col,#ammo b.kick{animation:none}}
+  /* menu pauzy: granatowe szkło, złota linia, krój Anton – jak tablica wyniku i HUD */
+  #overlay{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;padding:16px;cursor:default;
+    background:radial-gradient(ellipse 80% 70% at 50% 45%,rgba(8,18,40,.38),rgba(3,7,18,.8))}
+  #pm{position:relative;width:min(440px,100%);padding:26px 30px 24px;background:rgba(8,18,40,.88);color:var(--hud-ink,#f4f7ff);text-align:left;
+    clip-path:polygon(18px 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%,0 18px);animation:pm-in .22s cubic-bezier(.2,.8,.2,1)}
+  #pm::before{content:"";position:absolute;left:18px;right:0;top:0;height:3px;background:linear-gradient(90deg,#fff7a8,#ffd400 60%,#f5ad00)}
+  @keyframes pm-in{from{opacity:0;transform:translateY(10px) scale(.97)}}
+  #pm small.pm-tag{display:block;font:700 12px/1 Rajdhani,Oswald,sans-serif;letter-spacing:.32em;color:#ffd400;margin-bottom:6px}
+  #pm h1{margin:0;font:400 54px/1 Anton,Oswald,Impact,sans-serif;letter-spacing:.05em;text-transform:uppercase;text-shadow:0 4px 0 #1b4fa8,0 10px 24px rgba(0,0,0,.45)}
+  #pm p{margin:8px 0 18px;font:600 15px/1.4 Rajdhani,Oswald,sans-serif;color:rgba(207,224,255,.7)}
+  .pm-list{display:flex;flex-direction:column;gap:8px}
+  .pm-btn{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;height:52px;padding:0 18px 0 20px;border:0;cursor:pointer;
+    font:700 18px/1 Rajdhani,Oswald,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#f4f7ff;background:rgba(255,255,255,.07);
+    transition:background .14s,transform .14s,color .14s}
+  .pm-btn::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:#ffd400;transform:scaleY(0);transition:transform .14s}   /* linia podświetlenia przy lewej krawędzi */
+  .pm-btn:hover,.pm-btn:focus-visible{background:rgba(255,255,255,.14);transform:translateX(4px);outline:none}
+  .pm-btn:hover::before,.pm-btn:focus-visible::before{transform:scaleY(1)}
+  .pm-btn kbd,.pm-btn .ico{font:700 11px/1 Rajdhani,Oswald,sans-serif;letter-spacing:.12em;color:rgba(207,224,255,.65);padding:4px 7px;border:1px solid rgba(207,224,255,.3)}
+  .pm-btn .ico{border:0;padding:0;width:20px;height:20px;fill:currentColor}
+  .pm-btn.pri{color:#2a1c00;background:linear-gradient(180deg,#fff7a8,#ffd400 60%,#f5ad00)}
+  .pm-btn.pri::before{display:none}.pm-btn.pri kbd{color:#4a3500;border-color:rgba(42,28,0,.35)}
+  .pm-btn.pri:hover,.pm-btn.pri:focus-visible{background:linear-gradient(180deg,#fffbc8,#ffe03a 60%,#ffbe1e)}
+  .pm-btn.danger:hover::before,.pm-btn.danger:focus-visible::before{background:#ff5a48}.pm-btn.danger:hover{color:#ffd6cf}
+  .pm-btn.ghost{height:44px;font-size:15px;background:transparent;justify-content:flex-start}
+  .pm-rows{display:flex;flex-direction:column;gap:14px;margin-bottom:16px}
+  .pm-row{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center}
+  .pm-row label{font:700 13px/1 Rajdhani,Oswald,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:rgba(207,224,255,.78)}
+  .pm-row output{font:400 18px/1 Anton,Oswald,Impact,sans-serif;color:#f4f7ff;min-width:52px;text-align:right}
+  .pm-row input[type=range]{grid-column:1/-1;-webkit-appearance:none;appearance:none;width:100%;height:6px;margin:4px 0;cursor:pointer;transform:skewX(-20deg);
+    background:linear-gradient(90deg,#ffd400 0 var(--p,50%),rgba(255,255,255,.14) var(--p,50%) 100%);outline:none}
+  .pm-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:20px;background:#fff7a8;border:2px solid #2a1c00;cursor:pointer}
+  .pm-row input[type=range]::-moz-range-thumb{width:12px;height:18px;background:#fff7a8;border:2px solid #2a1c00;border-radius:0;cursor:pointer}
+  .pm-row input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid #fff;outline-offset:2px}
+  #pm .mute{grid-column:2;justify-self:end;font:700 12px/1 Rajdhani,Oswald,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#f4f7ff;background:rgba(255,255,255,.08);border:1px solid rgba(207,224,255,.3);border-radius:0;padding:8px 12px;cursor:pointer}
+  #pm .mute[aria-pressed="true"]{color:#ffd6cf;border-color:#ff5a48}
+  /* potwierdzenie wyjścia z meczu: ostrzeżenie o utracie stawki */
+  #pmQuit h2{margin:0;font:400 46px/1 Anton,Oswald,Impact,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:#fff;text-shadow:0 3px 0 #8a1a10,0 0 24px rgba(255,90,72,.35)}
+  .pm-warn{display:flex;gap:14px;align-items:center;margin:14px 0 18px;padding:14px 16px;background:linear-gradient(90deg,rgba(255,72,52,.22),rgba(255,72,52,.06));border-left:3px solid #ff5a48}
+  .pm-warn svg{flex:none;width:30px;height:30px;fill:#ff6a55}
+  #pm .pm-warn p{margin:0;font:600 15px/1.35 Rajdhani,Oswald,sans-serif;color:#ffe2dc}
+  .pm-warn b{color:#fff}
+  .pm-loss{display:flex;align-items:baseline;justify-content:space-between;margin:-6px 0 18px;padding:10px 16px;background:rgba(255,255,255,.05)}
+  .pm-loss[hidden]{display:none}
+  .pm-loss small{font:700 12px/1 Rajdhani,Oswald,sans-serif;letter-spacing:.24em;color:rgba(207,224,255,.65)}
+  .pm-loss b{font:400 28px/1 Anton,Oswald,Impact,sans-serif;letter-spacing:.03em;color:#ff6a55}
+  .pm-btn.quit{background:#d9362a;color:#fff}.pm-btn.quit::before{display:none}
+  .pm-btn.quit:hover,.pm-btn.quit:focus-visible{background:#f0473a;color:#fff}
+  @media (prefers-reduced-motion:reduce){#pm{animation:none}.pm-btn{transition:none}}
+  #lockHint{left:50%;top:58%;transform:translateX(-50%);padding:8px 16px;background:rgba(10,22,48,.8);border-top:2px solid #ffd400;font:700 13px/1 Rajdhani,Oswald,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#f4f7ff}
 </style>
 <div id="loading">Ładowanie…</div>
 <div id="cross" class="hud"><i class="h l"></i><i class="h r"></i><i class="v t"></i><i class="v b"></i></div>
 <div id="marker" class="hud"><svg viewBox="0 0 26 26" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M3 3l6 6M23 3l-6 6M3 23l6-6M23 23l-6-6"/></svg></div>
 <div id="vlabel" class="hud"></div>
-<button id="muteHud" class="mute" type="button" aria-pressed="false">Dźwięk: wł. (M)</button>
 <div id="slots" class="hud"></div>
 <div id="score" class="hud">Trafione fasolki <b id="kills">0</b></div>
-<div id="hp" class="hud"><span>ZDROWIE</span><i><b id="hpbar"></b></i><em id="hpnum">100</em></div>
+<div id="hp" class="hud"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 2h6v7h7v6h-7v7H9v-7H2V9h7z"/></svg></div><div class="col"><div class="top"><em id="hpnum">100</em><small>HP</small></div><i><s id="hpghost"></s><b id="hpbar"></b></i></div></div>
 <div id="dmg" class="hud"></div>
+<div id="lockHint" class="hud" hidden>Kliknij, aby sterować myszą</div>
 <div id="fatigue" class="hud"><i id="fatbar"></i></div>
 <div id="banner" class="hud"></div>
-<div id="ammo" class="hud"><small id="state"></small><b id="mag">30</b> <span>/ <span id="reserve">120</span></span></div>
-<div id="keys" class="hud"><kbd>WASD</kbd> ruch · <kbd>Shift</kbd> bieg · <kbd>Spacja</kbd> skok · <kbd>C</kbd> kucanie (w biegu: slide)<br><kbd>LPM</kbd> strzał · <kbd>PPM</kbd> celowanie · <kbd>R</kbd> przeładuj · <kbd>F</kbd> oglądaj broń · <kbd>1</kbd>–<kbd>4</kbd> / kółko broń · <kbd>Q</kbd> poprzednia<br><kbd>V</kbd> zmiana widoku · <kbd>M</kbd> dźwięk · <kbd>Esc</kbd> pauza</div>
-<div id="overlay"><div class="card"><h1 id="ovTitle">Pauza</h1><p id="ovText">Kliknij, aby wrócić do gry. Mysz obraca kamerę, Esc robi pauzę.</p><span class="go" id="ovGo">WZNÓW</span><button class="lobby" id="toLobby" type="button">Wróć do lobby</button><br><button class="mute" type="button" aria-pressed="false">Dźwięk: wł. (M)</button></div></div>
+<div id="ammo" class="hud"><small id="state"></small><div class="row"><div id="bullets"></div><b id="mag">30</b><span class="res" id="reserve">120</span></div><i class="rl"><b></b></i></div>
+<div id="overlay"><div id="pm" role="dialog" aria-modal="true" aria-labelledby="ovTitle"><small class="pm-tag" id="pmTag">STRZELNICA</small><h1 id="ovTitle">Menu</h1><p id="ovText">Gra toczy się dalej. Naciśnij Esc albo kliknij Wznów, aby wrócić.</p><div class="pm-list" id="pmMenu"><button type="button" class="pm-btn pri" id="pmResume"><span id="ovGo">WZNÓW</span><kbd>ESC</kbd></button><button type="button" class="pm-btn" id="pmOpenSet"><span>Ustawienia</span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.3 7.3 0 0 0-1.7-1L15 3h-4l-.4 2.9a7.3 7.3 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.3 7.3 0 0 0 1.7 1L11 21h4l.4-2.9a7.3 7.3 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg></button><button type="button" class="pm-btn danger" id="toLobby"><span>Wróć do lobby</span></button></div><div id="pmSet" hidden><div class="pm-rows" id="pmRows"></div><button type="button" class="pm-btn ghost" id="pmBack"><span>‹&nbsp; Wróć</span></button></div><div id="pmQuit" hidden><h2>Na pewno?</h2><div class="pm-warn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 1 21h22L12 2zm1 15h-2v-2h2v2zm0-4h-2V9h2v4z"/></svg><p id="pmQuitTxt"></p></div><div class="pm-loss" id="pmLoss"><small>TRACISZ STAWKĘ</small><b id="pmLossAmt"></b></div><div class="pm-list"><button type="button" class="pm-btn pri" id="pmStay"><span>Zostań w meczu</span><kbd>ESC</kbd></button><button type="button" class="pm-btn quit" id="pmQuitYes"><span>Tak, wychodzę</span></button></div></div></div></div>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 <script type="module">
 import * as THREE from 'three';
@@ -507,13 +588,68 @@ function refillAll(){
   for(const w of inv){w.mag=WEAPON_STATS[w.id].mag;w.reserve=WEAPON_STATS[w.id].reserve;w.inst.slideBack=0;w.inst.slideLocked=false;applyParts(w.inst,null,true)}
   gun.reloading=0;gun.autoReload=0;setHud();
 }
+// ---- drużyny w 1v1, losowane po cichu na początku meczu: niebieska (Spawn_A) ma M4A1-S i USP-S, czerwona (Spawn_B) AK-47 i Glocka;
+//      w Strzelnicy bez drużyn – wszystkie cztery bronie ----
+const TEAM={me:null};                                      // 0 = niebieska, 1 = czerwona, null = bez drużyn
+const TEAM_GUNS=[['m4a1s','usps'],['ak47','glock']];
+function slotList(){return TEAM.me==null?inv.map((_,i)=>i):TEAM_GUNS[TEAM.me].map(id=>inv.findIndex(w=>w.id===id)).filter(i=>i>=0)}
+function equipNow(i){                                       // broń od razu w rękach (start meczu), bez animacji wyjmowania
+  cancelInspect(true);gun.switching=0;gun.switchTo=-1;gun.swapped=false;gun.reloading=0;gun.reloadClick=false;gun.autoReload=0;
+  curW=i;rifle=inv[i].inst;attachRifle(player.view);
+}
+function setBotGun(e,id){
+  if(!e||!e.holder||(e.rifle&&e.rifle.id===id))return;
+  if(e.rifle)e.holder.remove(e.rifle.group);
+  const r=createWeapon(id,{fx:false});placeTP(r);e.holder.add(r.group);e.rifle=r;
+}
+function setTeam(t){
+  TEAM.me=t;const sl=slotList();
+  equipNow(sl[0]);prevW=sl.length>1?sl[1]:sl[0];
+  setBotGun(enemies[0],t==null?WEAPON_IDS[0]:TEAM_GUNS[1-t][0]);      // przeciwnik ma karabin drugiej drużyny
+  setHud();
+}
+// ---- HUD jak w CS:GO: ikony broni z modeli 3D (sylwetka z boku, lufa w lewo), pasek pocisków, lista broni ----
+const CSHUD={built:false,slotEls:[],bullets:[],bulletsFor:''};
+function renderWeaponIcons(){
+  const out={};let r=null;
+  try{
+    const W=300,H=110;r=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
+    r.setPixelRatio(1);r.setSize(W,H,false);r.setClearColor(0x000000,0);
+    const sc=new THREE.Scene();sc.overrideMaterial=new THREE.MeshBasicMaterial({color:0xffffff});
+    for(const w of inv){
+      const g=createWeapon(w.id,{fx:false}).group;sc.add(g);g.updateMatrixWorld(true);
+      const box=new THREE.Box3().setFromObject(g),cz=(box.min.z+box.max.z)/2,cy=(box.min.y+box.max.y)/2;
+      const hw=Math.max((box.max.z-box.min.z)/2,(box.max.y-box.min.y)/2*W/H)*1.05,hh=hw*H/W;
+      const cam=new THREE.OrthographicCamera(-hw,hw,hh,-hh,.01,20);cam.position.set(-3,cy,cz);cam.up.set(0,1,0);cam.lookAt(0,cy,cz);
+      r.clear();r.render(sc,cam);out[w.id]=r.domElement.toDataURL('image/png');sc.remove(g);
+    }
+  }catch(e){console.warn('Ikony broni:',e)}
+  finally{if(r){r.dispose();try{r.forceContextLoss()}catch(e){}}}
+  return out;
+}
+function buildHudSlots(){
+  CSHUD.built=true;const icons=renderWeaponIcons(),sl=$('slots');sl.innerHTML='';CSHUD.slotEls=[];
+  inv.forEach((w,i)=>{const d=document.createElement('div');d.className='sl';const ic=icons[w.id],nm=WEAPON_STATS[w.id].name;
+    d.innerHTML=`<b>${i+1}</b>`+(ic?`<img alt="${nm}" src="${ic}">`:`<span>${nm}</span>`);sl.appendChild(d);CSHUD.slotEls.push(d)});
+}
 function setHud(){
-  const st=WEAPON_STATS[inv[curW].id];$('mag').textContent=gun.mag;$('reserve').textContent=gun.reserve;
+  const w=inv[curW],st=WEAPON_STATS[w.id];$('mag').textContent=gun.mag;$('reserve').textContent=gun.reserve;
   $('state').textContent=gun.switching>0?'zmiana broni':gun.reloading>0?'przeładowanie':(gun.mag===0&&gun.reserve===0?'brak amunicji':st.name);
-  const sl=$('slots');if(sl)sl.innerHTML=inv.map((w,i)=>`<span class="${i===(gun.switchTo>=0?gun.switchTo:curW)?'on':''}"><b>${i+1}</b> ${WEAPON_STATS[w.id].name}</span>`).join('');
+  if(!CSHUD.built)buildHudSlots();
+  const sel=gun.switchTo>=0?gun.switchTo:curW,sl=slotList();
+  CSHUD.slotEls.forEach((el,i)=>{const k=sl.indexOf(i);el.style.display=k<0?'none':'';el.querySelector('b').textContent=k+1;el.classList.toggle('on',i===sel)});
+  if(CSHUD.bulletsFor!==w.id){                              // pasek pocisków = pojemność magazynka bieżącej broni
+    CSHUD.bulletsFor=w.id;const bx=$('bullets');bx.innerHTML='';CSHUD.bullets=[];
+    for(let k=0;k<Math.min(30,st.mag);k++){const e=document.createElement('i');bx.appendChild(e);CSHUD.bullets.push(e)}
+  }
+  CSHUD.bullets.forEach((e,k)=>e.classList.toggle('e',k>=gun.mag));
+  const am=$('ammo');am.classList.toggle('low',gun.mag<=Math.ceil(st.mag*.2));
+  if(gun.mag<CSHUD.lastMag&&CSHUD.lastW===w.id){const m=$('mag');m.classList.remove('kick');void m.offsetWidth;m.classList.add('kick')}   // odrzut liczby przy strzale
+  CSHUD.lastMag=gun.mag;CSHUD.lastW=w.id;
+  if(gun.reloading>0){if(!am.classList.contains('reloading')){am.style.setProperty('--rl',Math.max(.1,gun.reloading).toFixed(2)+'s');am.classList.add('reloading')}}else am.classList.remove('reloading');
 }
 function selectWeapon(n){
-  if(n<0||n>=inv.length)return;
+  if(n<0||n>=inv.length||!slotList().includes(n))return;
   const target=gun.switchTo>=0?gun.switchTo:curW;if(n===target)return;
   if(gun.reloading>0){gun.reloading=0;gun.reloadClick=false;rifle.slideLocked=inv[curW].mag===0&&rifle.pistol;applyParts(rifle,null,true)}   // przerwane przeładowanie
   if(rifle.flash){rifle.flash.visible=false;rifle.flashLight.intensity=0}
@@ -598,11 +734,54 @@ function startPlay(){
   try{const r=renderer.domElement.requestPointerLock();if(r&&r.catch)r.catch(()=>{})}catch(e){}
   renderer.domElement.focus({preventScroll:true});
 }
-$('overlay').addEventListener('click',()=>{if(duel.mapBanner){const d={ok:true};dispatchEvent(new CustomEvent('fasolka:rematch',{detail:d}));if(!d.ok){duel.mapBanner=false;$('toLobby').click();return}}startPlay()});
+$('overlay').addEventListener('click',()=>{if(duel.mapBanner){const d={ok:true};dispatchEvent(new CustomEvent('fasolka:rematch',{detail:d}));if(!d.ok){duel.mapBanner=false;leaveToLobby();return}}startPlay()});
 for(const b of document.querySelectorAll('.mute'))b.addEventListener('click',e=>{e.stopPropagation();initAudio();setMuted(!muted)});
+// ---- menu pauzy: Wznów / Ustawienia / Wróć do lobby; ustawienia wspólne z lobby (localStorage „fasolka-settings”) ----
+let SENS_K=1;
+const readSet=()=>{try{return JSON.parse(localStorage.getItem('fasolka-settings')||'null')||{}}catch(e){return {}}};
+{const v=readSet();if(+v.sens>0)SENS_K=+v.sens}
+const PM_SL=[['volume','Głośność ogólna',0,100,1,v=>Math.round(v)+'%'],['vGame','Dźwięki w grze',0,100,1,v=>Math.round(v)+'%'],
+  ['fov','Pole widzenia',60,110,1,v=>Math.round(v)+'°'],['sens','Czułość myszy',.2,3,.05,v=>(+v).toFixed(2)]];
+{
+  const rows=$('pmRows');
+  for(const [k,lab,mn,mx,st,fmt] of PM_SL){
+    const r=document.createElement('div');r.className='pm-row';
+    r.innerHTML=`<label for="pm-${k}">${lab}</label><output id="pm-${k}-v"></output><input type="range" id="pm-${k}" min="${mn}" max="${mx}" step="${st}">`;
+    rows.appendChild(r);const inp=r.querySelector('input'),o=r.querySelector('output');
+    const paint=()=>{o.textContent=fmt(+inp.value);inp.style.setProperty('--p',((+inp.value-mn)/(mx-mn)*100)+'%')};
+    inp.addEventListener('input',()=>{paint();const v=+inp.value;
+      if(k==='sens')SENS_K=v;
+      const s={volume:80,vGame:100,fov:78,...readSet(),[k]:v};
+      if(k!=='sens'){VOL=Math.max(0,Math.min(1,s.volume/100*s.vGame/100));if(master&&!muted)master.gain.setTargetAtTime(VOL,AC.currentTime,.02);FOV_BASE=Math.max(60,Math.min(110,s.fov))}
+      dispatchEvent(new CustomEvent('fasolka:settings-set',{detail:{[k]:v}}));   // lobby zapisuje i rozsyła wspólne ustawienia
+      try{const cur=readSet();if(cur[k]!==v){cur[k]=v;localStorage.setItem('fasolka-settings',JSON.stringify(cur))}}catch(e){}
+    });
+    r._fill=s=>{inp.value=s[k];paint()};
+  }
+  const mr=document.createElement('div');mr.className='pm-row';mr.innerHTML='<label>Dźwięk</label><button class="mute" type="button" aria-pressed="false">Dźwięk: wł. (M)</button>';rows.appendChild(mr);
+  const mb=mr.querySelector('.mute');mb.textContent=muted?'Dźwięk: wył. (M)':'Dźwięk: wł. (M)';mb.setAttribute('aria-pressed',String(muted));
+  mb.addEventListener('click',e=>{e.stopPropagation();initAudio();setMuted(!muted)});
+}
+function pmShow(v){$('pmMenu').hidden=v!=='menu';$('pmSet').hidden=v!=='set';$('pmQuit').hidden=v!=='quit';$('ovText').hidden=v!=='menu';$('ovTitle').hidden=v==='quit';
+  $('pmTag').textContent=v==='set'?'USTAWIENIA':v==='quit'?'OPUSZCZASZ MECZ':pmTag();
+  if(v==='set'){const s={volume:80,vGame:100,fov:78,sens:SENS_K,...readSet()};for(const r of $('pmRows').children)if(r._fill)r._fill(s)}
+}
+function pmTag(){return MODE==='1v1'?'1 NA 1'+(oaza.map?' · '+oaza.map.name.toUpperCase():''):'STRZELNICA'}
+$('pm').addEventListener('click',e=>e.stopPropagation());                    // klik w panel nie wznawia gry (wznawia przycisk albo klik obok)
+$('pmResume').addEventListener('click',()=>$('overlay').click());
+$('pmOpenSet').addEventListener('click',()=>pmShow('set'));
+$('pmBack').addEventListener('click',()=>pmShow('menu'));
+['pointerup','change','keyup'].forEach(t=>$('pmRows').addEventListener(t,e=>{if(e.target.tagName==='INPUT'&&e.key!=='ArrowLeft'&&e.key!=='ArrowRight')e.target.blur()}));   // suwak nie trzyma fokusu, żeby Esc działał
+let pmOpenT=0;
+addEventListener('keydown',e=>{if(e.code!=='Escape'||e.repeat||$('overlay').style.display==='none'||document.body.classList.contains('in-lobby'))return;
+  e.preventDefault();e.stopImmediatePropagation();if(!$('pmSet').hidden||!$('pmQuit').hidden){pmShow('menu');return}
+  if(performance.now()-pmOpenT>350)$('pmResume').click()},true);   // Esc w pauzie = Wznów
+new MutationObserver(()=>{if($('overlay').style.display!=='none'){pmOpenT=performance.now();$('pmTag').textContent=pmTag();pmShow('menu')}}).observe($('overlay'),{attributes:true,attributeFilter:['style']});
+
 addEventListener('keydown',e=>{if(e.code==='KeyM'&&!playing)setMuted(!muted)});
 setMuted(muted);
-document.addEventListener('pointerlockchange',()=>{if(!document.pointerLockElement&&playing){/* Esc: pauza */playing=false;gun.firing=false;$('overlay').style.display='flex'}
+document.addEventListener('pointerlockerror',()=>{if(playing)$('lockHint').hidden=false});
+document.addEventListener('pointerlockchange',()=>{if(document.pointerLockElement)$('lockHint').hidden=true;if(!document.pointerLockElement&&playing){/* Esc: pauza */playing=false;gun.firing=false;$('overlay').style.display='flex'}
   if(!document.pointerLockElement&&window.__match&&window.__match.cancelable)window.__match.cancel()});   // Esc podczas szukania meczu = anuluj
 addEventListener('keydown',e=>{
   keys[e.code]=true;
@@ -610,7 +789,7 @@ addEventListener('keydown',e=>{
   if(!playing)return;
   if(e.code==='KeyR')startReload();
   if(e.code==='KeyF')startInspect();
-  if(/^Digit[1-9]$/.test(e.code))selectWeapon(+e.code.slice(5)-1);
+  if(/^Digit[1-9]$/.test(e.code)){const sl=slotList(),k=+e.code.slice(5)-1;if(k<sl.length)selectWeapon(sl[k])}
   if(e.code==='KeyQ')selectWeapon(prevW);
   if(e.code==='KeyM')setMuted(!muted);
   if(e.code==='KeyV')attachRifle({fps:'tps',tps:'front',front:'fps'}[player.view]);
@@ -619,15 +798,15 @@ addEventListener('keydown',e=>{
 addEventListener('keyup',e=>keys[e.code]=false);
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false;gun.firing=false});
 let adsHeld=false;
-renderer.domElement.addEventListener('mousedown',e=>{if(!playing)return;if(range.active&&e.button===0&&range.press()){e.preventDefault();return}   // strzelnica: celownik na tablicy ustawień = klik w przycisk, nie strzał
+renderer.domElement.addEventListener('mousedown',e=>{if(!playing)return;if(!document.pointerLockElement){try{const r=renderer.domElement.requestPointerLock();if(r&&r.catch)r.catch(()=>{})}catch(er){}e.preventDefault();return}if(range.active&&e.button===0&&range.press()){e.preventDefault();return}   // strzelnica: celownik na tablicy ustawień = klik w przycisk, nie strzał
   if(e.button===0){gun.firing=true;gun.trigger=true}if(e.button===2)adsHeld=true;e.preventDefault()});
 addEventListener('mouseup',e=>{if(e.button===0)gun.firing=false;if(e.button===2)adsHeld=false});
 addEventListener('contextmenu',e=>e.preventDefault());
-renderer.domElement.addEventListener('wheel',e=>{if(!playing||Math.abs(e.deltaY)<4)return;const t=gun.switchTo>=0?gun.switchTo:curW;selectWeapon((t+(e.deltaY>0?1:-1)+inv.length)%inv.length)},{passive:true});
+renderer.domElement.addEventListener('wheel',e=>{if(!playing||Math.abs(e.deltaY)<4)return;const sl=slotList(),t=gun.switchTo>=0?gun.switchTo:curW,j=Math.max(0,sl.indexOf(t));selectWeapon(sl[(j+(e.deltaY>0?1:-1)+sl.length)%sl.length])},{passive:true});
 const SENS=.0022;let mdx=0,mdy=0;
 addEventListener('mousemove',e=>{
   if(!playing||player.dead)return;const k=player.ads>.5?.55:1;
-  player.yaw-=e.movementX*SENS*k;player.pitch=clamp(player.pitch-e.movementY*SENS*k,-1.45,1.45);
+  player.yaw-=e.movementX*SENS*SENS_K*k;player.pitch=clamp(player.pitch-e.movementY*SENS*SENS_K*k,-1.45,1.45);
   mdx+=e.movementX;mdy+=e.movementY;
 });
 
@@ -681,7 +860,7 @@ function fireShot(){
 
 // ================= pętla =================
 const clock=new THREE.Clock();let time=0;
-const keyDown=c=>!!keys[c]&&!match.frozen;           // plansze meczu i odliczanie: gracz stoi w miejscu
+const keyDown=c=>playing&&!!keys[c]&&!match.frozen;   // menu (Esc): klawisze nie sterują, ale fizyka gracza działa dalej           // plansze meczu i odliczanie: gracz stoi w miejscu
 const _wish=V3(),_fwd=V3(),_right=V3();
 function stepPlayer(dt){
   const sprint=keyDown('ShiftLeft')||keyDown('ShiftRight');
@@ -1112,15 +1291,19 @@ function updateCross(){updateFatigue();
   const g=(6+gun.spread*26+player.speed01*10+(player.onGround?0:10))*(1-player.crouch*.3)*(.55+.45*WEAPON_STATS[inv[curW].id].spread.hip/.0065);
   $('cross').style.setProperty('--g',g+'px');$('cross').classList.toggle('ads',player.ads>.6&&player.view==='fps');
 }
+const OVL=$('overlay');
+const live=()=>playing||(OVL.style.display!=='none'&&!duel.mapBanner&&!document.body.classList.contains('in-lobby'));   // gra trwa (też przy menu pod Esc)
 function frame(){
   const dt=Math.min(clock.getDelta(),.05);time+=dt;
   if(thumbQ.length)snapMap(thumbQ.shift());           // miniatura mapy do losowania (renderuje się przed właściwą klatką)
   if(lobby.active||match.lobbyPhase){lobby.update(dt);match.update(dt,false);requestAnimationFrame(frame);return}
-  if(playing){if(match.frozen){gun.firing=false;gun.trigger=false}stepPlayer(dt);stepGun(dt);applyRecoil()}else{gun.firing=false}
+  // menu pod Esc nie zatrzymuje gry (multiplayer): spadanie, przeładowanie, bot i odliczanie lecą dalej, tylko sterowanie jest wyłączone
+  if(playing){if(match.frozen){gun.firing=false;gun.trigger=false}}else{gun.firing=false;gun.trigger=false;adsHeld=false}
+  stepPlayer(dt);stepGun(dt);applyRecoil();
   stepEnemies(dt);
   if(player.view==='fps'){poseViewmodel(dt);me.visible=false}else{poseThirdPerson(dt)}
   if(window.__frameHook)window.__frameHook(dt);          // testy: odczyt pozy broni po każdej klatce
-  updateCamera(dt);updateFx(dt);shells.update(dt,0);updateCross();match.update(dt,!playing);
+  updateCamera(dt);updateFx(dt);shells.update(dt,0);updateCross();match.update(dt,!live());
   sun.position.set(player.pos.x+14,26,player.pos.z+10);sun.target.position.copy(player.pos);
   // świat, a potem broń z pierwszej osoby z wyczyszczoną głębią – broń nigdy nie wchodzi w ściany
   camera.layers.set(0);renderer.render(scene,camera);
@@ -1136,11 +1319,11 @@ setHud();
 // ================= tryb 1v1: pojedynek z botem do 5 trafień =================
 let MODE='range';
 const WIN=5,duel={bot:null,hp:100,botScore:0,inv:0};
-function setPauseText(){$('ovTitle').textContent='Pauza';$('ovText').textContent='Kliknij, aby wrócić do gry. Mysz obraca kamerę, Esc robi pauzę.';$('ovGo').textContent='WZNÓW'}
-function setHp(v){duel.hp=Math.max(0,v);$('hpbar').style.width=duel.hp+'%';$('hpnum').textContent=Math.ceil(duel.hp);$('hp').classList.toggle('low',duel.hp<35)}
+function setPauseText(){$('ovTitle').textContent='Menu';$('ovText').textContent='Gra toczy się dalej. Naciśnij Esc albo kliknij Wznów, aby wrócić.';$('ovGo').textContent='WZNÓW'}
+function setHp(v){duel.hp=Math.max(0,v);const w=duel.hp+'%';$('hpbar').style.width=w;$('hpghost').style.width=w;$('hpnum').textContent=Math.ceil(duel.hp);const h=$('hp');h.classList.toggle('low',duel.hp<=20);h.classList.toggle('mid',duel.hp>20&&duel.hp<=50)}
 function banner(t,c){const b=$('banner');b.textContent=t;b.style.color=c||'#fff';b.classList.remove('show');void b.offsetWidth;b.classList.add('show')}
-function resetPlayer(){player.pos.set(0,0,-14);player.vel.set(0,0,0);player.yaw=Math.PI;if(oaza.active){const s=oaza.spawns[0];player.pos.set(s.x,s.y||0,s.z);player.yaw=s.yaw}player.pitch=0;refillAll();setHud();setHp(100);duel.inv=1.2}
-function duelSpawn(e){Object.assign(e,{hp:100,dead:0,fall:0,cd:1,react:.8,strafe:rnd()<.5?1:-1,turn:1.5,counted:false});e.root.rotation.z=0;if(oaza.active){const s=oaza.spawns[1];e.root.position.set(s.x+(rnd()-.5)*2,0,s.z-rnd()*2)}else e.root.position.set((rnd()-.5)*16,0,12+rnd()*8)}
+function resetPlayer(){player.pos.set(0,0,-14);player.vel.set(0,0,0);player.yaw=Math.PI;if(oaza.active){const s=oaza.spawns[TEAM.me===1&&oaza.spawns[1]?1:0];player.pos.set(s.x,s.y||0,s.z);player.yaw=s.yaw}player.pitch=0;refillAll();setHud();setHp(100);duel.inv=1.2}
+function duelSpawn(e){Object.assign(e,{hp:100,dead:0,fall:0,cd:1,react:.8,strafe:rnd()<.5?1:-1,turn:1.5,counted:false});e.root.rotation.z=0;if(oaza.active){const s=oaza.spawns[TEAM.me===1?0:1];e.root.position.set(s.x+(rnd()-.5)*2,0,s.z-Math.sign(s.z||1)*rnd()*2)}else e.root.position.set((rnd()-.5)*16,0,12+rnd()*8)}
 function setMode(m,mi,quiet){
   range.leave();
   MODE=m==='1v1'?'1v1':'range';document.body.classList.toggle('duel',MODE==='1v1');
@@ -1152,6 +1335,7 @@ function setMode(m,mi,quiet){
   if(MODE==='1v1'){if(mi!=null&&mi>=0&&MAPS[mi]&&MAPS[mi].ready)mapIdx=mi;else nextMap()}
   useOaza(MODE==='1v1'||!!rm,rm);
   if(oaza.active&&!quiet)setTimeout(()=>banner('MAPA: '+oaza.map.name.toUpperCase(),'#ffe14a'),600);
+  setTeam(MODE==='1v1'?(Math.random()<.5?0:1):null);       // losowanie strony: bez komunikatu dla graczy
   if(MODE==='1v1'){duelSpawn(duel.bot);resetPlayer()}
   if(rm){range.enter(rm);resetPlayer()}
   setPauseText();
@@ -1189,7 +1373,7 @@ function stepDuelBot(e,dt){
   _bt.copy(_bp).sub(_be);const L=_bt.length();_bt.multiplyScalar(1/L);losRay.set(_be,_bt);losRay.far=L;
   const see=oaza.active?!segHitsBoxes(_be,_bp,oaza.boxes):losRay.intersectObjects(boxMeshes,false).length===0;      // czy skrzynie nie zasłaniają gracza
   let moving=0;
-  if(playing&&!match.frozen){
+  if(live()&&!match.frozen){                                            // przy otwartym menu (Esc) przeciwnik gra dalej
     duel.inv=Math.max(0,duel.inv-dt);
     e.turn-=dt;if(e.turn<=0){e.turn=1.2+rnd()*2.2;e.strafe*=-1}
     const radial=clamp((dist-(see?13:6))*.25,-1,1);                      // bez widoczności podchodzi bliżej
@@ -1252,6 +1436,40 @@ function useOaza(on,forced){                         // forced: konkretna mapa (
   window.__ground=on?m.ground:arenaGround;
   if(on)Object.assign(oaza,{boxes:m.boxes,meshes:m.meshes,spawns:m.spawns,ladders:m.ladders,bx:m.bx,bz:m.bz});else oaza.ladders=[];
 }
+// ---- podesty startowe w mapach 1v1: zostaje sam pierścień z kafelków i tarcza; flagi z literą, litera na podeście i strzałka znikają ----
+function stripSpawnDecor(scene,spawns){
+  const pads=(spawns||[]).filter(s=>/^Spawn_[AB]$/.test(s.name));if(!pads.length)return;
+  scene.updateMatrixWorld(true);const V=new THREE.Vector3(),ZONE=3.4;
+  scene.traverse(o=>{
+    if(!o.isMesh||!o.geometry||!o.geometry.attributes.position)return;
+    const geo=o.geometry,P=geo.attributes.position,idx=geo.index,nt=idx?idx.count/3:P.count/3;if(!nt)return;
+    const vid=i=>idx?idx.getX(i):i,isPad=/spawn[AB]$/i.test(o.name),W=new Float32Array(P.count*3);
+    for(let i=0;i<P.count;i++){V.fromBufferAttribute(P,i).applyMatrix4(o.matrixWorld);W[i*3]=V.x;W[i*3+1]=V.y;W[i*3+2]=V.z}
+    const key=v=>Math.round(W[v*3]*1000)+','+Math.round(W[v*3+1]*1000)+','+Math.round(W[v*3+2]*1000);
+    const parent=new Map(),find=a=>{while(parent.get(a)!==a){parent.set(a,parent.get(parent.get(a)));a=parent.get(a)}return a};
+    const uni=(a,b)=>{if(!parent.has(a))parent.set(a,a);if(!parent.has(b))parent.set(b,b);const ra=find(a),rb=find(b);if(ra!==rb)parent.set(ra,rb)};
+    const near=[];                                           // tylko trójkąty w pobliżu podestów
+    for(let t=0;t<nt;t++){const v=vid(t*3);if(pads.some(p=>Math.abs(W[v*3]-p.x)<ZONE&&Math.abs(W[v*3+2]-p.z)<ZONE))near.push(t)}
+    if(!near.length)return;
+    for(const t of near){const a=key(vid(t*3)),b=key(vid(t*3+1)),c=key(vid(t*3+2));uni(a,b);uni(b,c)}
+    const comps=new Map();
+    for(const t of near){const r=find(key(vid(t*3)));let c=comps.get(r);if(!c)comps.set(r,c={ts:[],mn:[1e9,1e9,1e9],mx:[-1e9,-1e9,-1e9]});c.ts.push(t);
+      for(let k=0;k<3;k++){const v=vid(t*3+k);for(let a=0;a<3;a++){const x=W[v*3+a];if(x<c.mn[a])c.mn[a]=x;if(x>c.mx[a])c.mx[a]=x}}}
+    const drop=new Set();
+    for(const c of comps.values()){
+      const cx=(c.mn[0]+c.mx[0])/2,cz=(c.mn[2]+c.mx[2])/2,pad=pads.find(p=>Math.abs(cx-p.x)<ZONE&&Math.abs(cz-p.z)<ZONE);if(!pad)continue;
+      const d=Math.hypot(cx-pad.x,cz-pad.z);let rm;
+      if(isPad)rm=!(c.mx[1]<.2&&d>=1.72&&d<=2.33);          // zostają tylko kafelki pierścienia (litera w środku, strzałka i płótno flag znikają)
+      else rm=c.mn[2]>=pad.z-.26&&c.mx[2]<=pad.z+.26&&c.mn[0]>=pad.x-2.7&&c.mx[0]<=pad.x+2.7&&c.mn[1]>=-.05&&c.mx[1]>=.25&&c.mx[1]<=4.1;   // maszty, belki, listwy, podstawy i litery flag w cienkim pasie na linii startu
+      if(rm)for(const t of c.ts)drop.add(t);
+    }
+    if(!drop.size)return;
+    const keep=[];for(let t=0;t<nt;t++)if(!drop.has(t))keep.push(vid(t*3),vid(t*3+1),vid(t*3+2));
+    geo.setIndex(keep);geo.computeBoundingSphere();geo.computeBoundingBox();
+  });
+}
+const stripPadColliders=(D,list)=>{const sp=(D.spawns||[]).filter(s=>/^Spawn_[AB]$/.test(s.name));       // niewidoczne kolizje masztów flag też znikają
+  return(list||[]).filter(c=>!sp.some(p=>{const cx=(c[0]+c[3])/2,cz=(c[2]+c[5])/2;return Math.abs(Math.abs(cx-p.x)-2.35)<.4&&Math.abs(cz-p.z)<.3&&c[4]>=2.5&&c[4]<=4.2&&c[1]<=.1}))};
 const loadMaps=(async()=>{                         // mapy ładują się w tle, żeby nie opóźniać startu gry
   const {MeshoptDecoder}=await import('three/addons/libs/meshopt_decoder.module.js');
   const ld=new GLTFLoader();ld.setMeshoptDecoder(MeshoptDecoder);
@@ -1259,6 +1477,7 @@ const loadMaps=(async()=>{                         // mapy ładują się w tle, 
     try{
       const mod=await import(M.src),D=mod.MAP||mod.OAZA,B=mod.GLB||mod.OAZA_GLB;
       const g=await new Promise((res,rej)=>ld.parse(Uint8Array.from(atob(B),c=>c.charCodeAt(0)).buffer,'',res,rej));
+      if(!M.range)try{stripSpawnDecor(g.scene,D.spawns)}catch(e){console.warn('Podesty:',e)}
       M.meshes=[];let roof=null;g.scene.traverse(o=>{if(o.name==='Dach')roof=o});M.roof=roof;
       g.scene.traverse(o=>{if(!o.isMesh)return;const c=o.material&&o.material.color;
         if(c&&c.r>.99&&c.g<.01&&c.b>.99){o.visible=false;return}     // siatka kolizji z eksportu – niewidoczna
@@ -1266,10 +1485,11 @@ const loadMaps=(async()=>{                         // mapy ładują się w tle, 
         o.castShadow=!inRoof;o.receiveShadow=true;M.meshes.push(o)});   // dach nie rzuca cienia – w hali jest jasno
       M.ground=M.meshes.find(o=>/floor|ground|teren/i.test(o.name))||M.meshes[0];
       g.scene.visible=false;scene.add(g.scene);M.group=g.scene;M.spawns=D.spawns;
-      M.boxes=D.colliders.concat(D.clips||[]).map(([x0,y0,z0,x1,y1,z1])=>({minX:x0,maxX:x1,minZ:z0,maxZ:z1,top:y1,bottom:y0}));   // clips: blokady ruchu gracza (kule i tak lecą po siatce mapy)
+      const cols=stripPadColliders(D,D.colliders),clips=stripPadColliders(D,D.clips);
+      M.boxes=cols.concat(clips).map(([x0,y0,z0,x1,y1,z1])=>({minX:x0,maxX:x1,minZ:z0,maxZ:z1,top:y1,bottom:y0}));   // clips: blokady ruchu gracza (kule i tak lecą po siatce mapy)
       M.targets=D.targets||[];M.panel=D.panel||null;
       M.ladders=(D.ladders||[]).map(([x0,y0,z0,x1,y1,z1,nx,nz])=>({x0,y0,z0,x1,y1,z1,nx,nz}));
-      M.bx=Math.max(...D.colliders.map(c=>Math.max(-c[0],c[3])))-.6;M.bz=Math.max(...D.colliders.map(c=>Math.max(-c[2],c[5])))-.6;
+      M.bx=Math.max(...D.colliders.map(c=>Math.max(-c[0],c[3])))-.6;M.bz=Math.max(...D.colliders.map(c=>Math.max(-c[2],c[5])))-.6;   // granice areny z pełnej listy kolizji
       M.ready=true;if(!M.range)thumbQ.push(M);          // miniatury tylko dla map z rotacji 1v1
       if(M.range&&MODE==='range'&&!oaza.active&&!lobby.active&&!match.on&&!match.lobbyPhase)setMode('range',null,true);   // Strzelnica wczytała się już po wejściu w tryb: przenieś grę na jej mapę
       if(MODE==='1v1'&&!oaza.active&&!match.on&&!match.lobbyPhase){if(mapIdx<0)nextMap();useOaza(true);duelSpawn(duel.bot);resetPlayer();banner('MAPA: '+oaza.map.name.toUpperCase(),'#ffe14a')}
@@ -1298,11 +1518,23 @@ const lobby=createLobby({renderer,bean:lobbyBean,animate:lobbyAnimate,
     setMode(m,null);lobby.hide();document.body.classList.remove('in-lobby');startPlay()},
   onSkin:s=>{applySkin(me.userData.mats.skin,s);applySkin(me.userData.mats.body,s);applySkin(fpsSkin,s);me.userData.eyes.visible=s.eyes!==false}});   // skin z lobby także na postaci w grze
 $('overlay').addEventListener('click',()=>setTimeout(()=>{setPauseText();if(duel.mapBanner&&oaza.active){duel.mapBanner=false;banner('MAPA: '+oaza.map.name.toUpperCase(),'#ffe14a')}},0));
+const stakeTxt=v=>'$'+(Math.round(v*100)/100).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2});   // kwota w USD (płatna w SOL)
+const midMatch=()=>match.on&&match.phase!=='final';     // trwa mecz (po zakończeniu wyjście nic nie kosztuje)
 $('toLobby').addEventListener('click',e=>{
-  e.stopPropagation();playing=false;gun.firing=false;match.abort();player.dead=false;document.body.classList.remove('mt-dead');
+  e.stopPropagation();
+  if(midMatch()&&!$('pmQuit')._ok){                     // najpierw pytanie „Na pewno?”
+    const st=+match.state.stake||0;
+    $('pmQuitTxt').innerHTML=st?'Wyjście w trakcie meczu oznacza <b>przegraną walkowerem i utratę stawki</b>. Tej operacji nie da się cofnąć.':'Wyjście w trakcie meczu oznacza <b>przegraną walkowerem</b>.';
+    $('pmLoss').hidden=!st;$('pmLossAmt').textContent='−'+stakeTxt(st);
+    pmShow('quit');return}
+  $('pmQuit')._ok=false;leaveToLobby()});
+$('pmStay').addEventListener('click',()=>pmShow('menu'));
+$('pmQuitYes').addEventListener('click',e=>{e.stopPropagation();$('pmQuit')._ok=true;$('toLobby').click()});
+function leaveToLobby(){
+  playing=false;gun.firing=false;match.abort();player.dead=false;document.body.classList.remove('mt-dead');
   if(document.pointerLockElement)document.exitPointerLock();
   document.body.classList.add('in-lobby');lobby.show();
-});
+}
 // ================= mecz 1v1: szukanie przeciwnika, losowanie mapy, rundy do 3 wygranych (match.js) =================
 function tone(seq,type='triangle',vol=.16){            // seq: [[częstotliwość Hz, start s, czas s], ...]
   if(!AC)return;const t0=AC.currentTime;
@@ -1319,7 +1551,7 @@ function matchLock(){                                   // wołane w obsłudze k
 }
 function toLobbyBg(){playing=false;gun.firing=false;player.dead=false;document.body.classList.remove('mt-dead');document.body.classList.add('in-lobby')}
 const match=createMatch({
-  money:v=>(Math.round(v*100)/100).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2})+' USDT',
+  money:v=>'$'+(Math.round(v*100)/100).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2}),
   prize:s=>payout(s),                                   // wypłata za wygraną (pula 2 × stawka minus prowizja lobby)
   matchEnd:won=>dispatchEvent(new CustomEvent('fasolka:match',{detail:{won:!!won}})),   // lobby rozlicza stawkę w portfelu
   again:()=>{toLobbyBg();lobby.show();const b=lobby.ui.querySelector('#lb-play');if(b)b.click()},   // nowa stawka i losowanie mapy w lobby
@@ -1415,7 +1647,7 @@ function inspectProbe(){
   out.shoulderVisible=shVis;out.sl=+rifle.slideBack.toFixed(4);
   return out;
 }
-window.__game={match,MAPS,snapMap,playerHit,armJoints,bodyHit,inv,selectWeapon,get curW(){return curW},get rifle(){return rifle},solveArm,armR,armL,TP_HOLD,VM,me,poseArmsTo,makeBean,scene,keepRifleOut,placeTP,createWeapon,lobby,duel,setMode,player,gun,enemies,camera,setView:attachRifle,startPlay,start:()=>{playing=true;$('overlay').style.display='none'},fire:()=>{if(gun.mag>0&&gun.cd<=0&&gun.reloading<=0)fireShot()},reload:startReload,inspect:startInspect,inspectProbe,INSP,fpsArms:[fpsArmR,fpsArmL],viewModel,vmCam,WRIST,setAds:v=>adsHeld=v,keys};
+window.__game={TEAM,slotList,match,MAPS,snapMap,playerHit,armJoints,bodyHit,inv,selectWeapon,get curW(){return curW},get rifle(){return rifle},solveArm,armR,armL,TP_HOLD,VM,me,poseArmsTo,makeBean,scene,keepRifleOut,placeTP,createWeapon,lobby,duel,setMode,player,gun,enemies,camera,setView:attachRifle,startPlay,start:()=>{playing=true;$('overlay').style.display='none'},fire:()=>{if(gun.mag>0&&gun.cd<=0&&gun.reloading<=0)fireShot()},reload:startReload,inspect:startInspect,inspectProbe,INSP,fpsArms:[fpsArmR,fpsArmL],viewModel,vmCam,WRIST,setAds:v=>adsHeld=v,keys};
 $('loading').remove();window.__ready=true;frame();
 </script>
 
