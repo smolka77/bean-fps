@@ -7,7 +7,7 @@ import { renderEarnings } from './earnings.js';
 const TXT = {
   pl: { title: 'Portfel', bal: 'Saldo', dep: 'Wpłać', wd: 'Wypłać', hist: 'Historia', earn: 'Zarobki', swap: 'Zamień dolary i SOL', rate: '1 SOL = {p}',
     depInfo: 'Twój adres portfela w grze. Wysyłaj tylko SOL w sieci Solana{net}. Wpłata pojawi się na saldzie po około 15–30 sekundach.',
-    copy: 'Kopiuj adres', copied: 'Adres skopiowany', faucet: 'Pobierz testowe SOL', faucetInfo: 'Sieć testowa: darmowe SOL weźmiesz z faucet.solana.com – adres jest już skopiowany, wklej go tam.',
+    copy: 'Kopiuj adres', copied: 'Adres skopiowany', copyManual: 'Zaznaczono adres – naciśnij Ctrl+C', faucet: 'Pobierz testowe SOL', faucetInfo: 'Sieć testowa: darmowe SOL weźmiesz z faucet.solana.com – adres jest już skopiowany, wklej go tam.',
     check: 'Sprawdź wpłaty', checking: 'Sprawdzanie…', to: 'Adres odbiorcy (Solana)', amount: 'Kwota', max: 'MAX', youGet: 'Odbiorca dostanie ≈ {s}', feeNote: 'Opłatę sieci pokrywa gra.',
     send: 'Wypłać', sending: 'Wysyłanie…', sent: 'Wypłata wysłana', view: 'Zobacz w eksploratorze', errAddr: 'Nieprawidłowy adres Solana', errAmt: 'Podaj kwotę', errFunds: 'Za mało środków',
     empty: 'Brak operacji', pending: 'w toku', failed: 'nieudana', net: 'Wynik', won: 'Wygrane', lost: 'Przegrane', wr: 'Skuteczność', games: 'Mecze', noGames: 'Zagraj mecz o stawkę, a tu zobaczysz swój wynik w czasie.',
@@ -15,7 +15,7 @@ const TXT = {
     tx: { deposit: 'Wpłata', withdraw: 'Wypłata', stake: 'Stawka 1v1', win: 'Wygrana 1v1', loss: 'Przegrana 1v1' }, fee: 'prowizja {a}', match: 'Mecz {n}' },
   en: { title: 'Wallet', bal: 'Balance', dep: 'Deposit', wd: 'Withdraw', hist: 'History', earn: 'Earnings', swap: 'Swap dollars and SOL', rate: '1 SOL = {p}',
     depInfo: 'Your in-game wallet address. Send only SOL on the Solana network{net}. Deposits show up in your balance in about 15–30 seconds.',
-    copy: 'Copy address', copied: 'Address copied', faucet: 'Get test SOL', faucetInfo: 'Test network: get free SOL at faucet.solana.com – your address is copied, paste it there.',
+    copy: 'Copy address', copied: 'Address copied', copyManual: 'Address selected – press Ctrl+C', faucet: 'Get test SOL', faucetInfo: 'Test network: get free SOL at faucet.solana.com – your address is copied, paste it there.',
     check: 'Check deposits', checking: 'Checking…', to: 'Recipient address (Solana)', amount: 'Amount', max: 'MAX', youGet: 'Recipient gets ≈ {s}', feeNote: 'Network fee is covered by the game.',
     send: 'Withdraw', sending: 'Sending…', sent: 'Withdrawal sent', view: 'View in explorer', errAddr: 'Invalid Solana address', errAmt: 'Enter an amount', errFunds: 'Insufficient funds',
     empty: 'No transactions', pending: 'pending', failed: 'failed', net: 'Net result', won: 'Won', lost: 'Lost', wr: 'Win rate', games: 'Matches', noGames: 'Play a staked match and your results over time will show up here.',
@@ -23,7 +23,7 @@ const TXT = {
     tx: { deposit: 'Deposit', withdraw: 'Withdrawal', stake: '1v1 stake', win: '1v1 win', loss: '1v1 loss' }, fee: 'fee {a}', match: 'Match {n}' },
   ru: { title: 'Кошелёк', bal: 'Баланс', dep: 'Пополнить', wd: 'Вывести', hist: 'История', earn: 'Доход', swap: 'Поменять доллары и SOL', rate: '1 SOL = {p}',
     depInfo: 'Адрес твоего игрового кошелька. Отправляй только SOL в сети Solana{net}. Пополнение появится на балансе примерно через 15–30 секунд.',
-    copy: 'Копировать адрес', copied: 'Адрес скопирован', faucet: 'Получить тестовые SOL', faucetInfo: 'Тестовая сеть: бесплатные SOL на faucet.solana.com – адрес уже скопирован, вставь его там.',
+    copy: 'Копировать адрес', copied: 'Адрес скопирован', copyManual: 'Адрес выделен – нажмите Ctrl+C', faucet: 'Получить тестовые SOL', faucetInfo: 'Тестовая сеть: бесплатные SOL на faucet.solana.com – адрес уже скопирован, вставь его там.',
     check: 'Проверить пополнения', checking: 'Проверка…', to: 'Адрес получателя (Solana)', amount: 'Сумма', max: 'МАКС', youGet: 'Получатель получит ≈ {s}', feeNote: 'Комиссию сети платит игра.',
     send: 'Вывести', sending: 'Отправка…', sent: 'Вывод отправлен', view: 'Открыть в обозревателе', errAddr: 'Неверный адрес Solana', errAmt: 'Введите сумму', errFunds: 'Недостаточно средств',
     empty: 'Операций нет', pending: 'в процессе', failed: 'не удалось', net: 'Итог', won: 'Выиграно', lost: 'Проиграно', wr: 'Побед', games: 'Матчи', noGames: 'Сыграй матч на ставку – здесь появится твой результат.',
@@ -31,7 +31,7 @@ const TXT = {
     tx: { deposit: 'Пополнение', withdraw: 'Вывод', stake: 'Ставка 1v1', win: 'Победа 1v1', loss: 'Поражение 1v1' }, fee: 'комиссия {a}', match: 'Матч {n}' },
   es: { title: 'Cartera', bal: 'Saldo', dep: 'Depositar', wd: 'Retirar', hist: 'Historial', earn: 'Ganancias', swap: 'Cambiar dólares y SOL', rate: '1 SOL = {p}',
     depInfo: 'La dirección de tu cartera en el juego. Envía solo SOL en la red Solana{net}. El depósito aparece en tu saldo en unos 15–30 segundos.',
-    copy: 'Copiar dirección', copied: 'Dirección copiada', faucet: 'Obtener SOL de prueba', faucetInfo: 'Red de prueba: SOL gratis en faucet.solana.com – tu dirección ya está copiada, pégala allí.',
+    copy: 'Copiar dirección', copied: 'Dirección copiada', copyManual: 'Dirección seleccionada – pulsa Ctrl+C', faucet: 'Obtener SOL de prueba', faucetInfo: 'Red de prueba: SOL gratis en faucet.solana.com – tu dirección ya está copiada, pégala allí.',
     check: 'Comprobar depósitos', checking: 'Comprobando…', to: 'Dirección de destino (Solana)', amount: 'Importe', max: 'MÁX', youGet: 'El destinatario recibe ≈ {s}', feeNote: 'La comisión de red la paga el juego.',
     send: 'Retirar', sending: 'Enviando…', sent: 'Retiro enviado', view: 'Ver en el explorador', errAddr: 'Dirección de Solana no válida', errAmt: 'Introduce un importe', errFunds: 'Fondos insuficientes',
     empty: 'Sin operaciones', pending: 'en curso', failed: 'fallido', net: 'Resultado', won: 'Ganado', lost: 'Perdido', wr: 'Victorias', games: 'Partidas', noGames: 'Juega una partida con apuesta y aquí verás tu resultado en el tiempo.',
@@ -76,7 +76,7 @@ const CSS = `
 #bl-w .bw-qrimg svg{width:100%;height:100%;display:block}
 #bl-w .bw-qr p{margin:0;font-size:13px;color:#c3cbdb}
 #bl-w .bw-addr{display:flex;align-items:center;gap:8px;margin-top:14px;padding:10px 10px 10px 14px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid var(--bw-line)}
-#bl-w .bw-addr code{flex:1;min-width:0;font:600 13px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;color:#f2f5fb}
+#bl-w .bw-addr code{flex:1;min-width:0;-webkit-user-select:all;user-select:all;cursor:copy;font:600 13px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;color:#f2f5fb}
 #bl-w .bw-btn{height:42px;padding:0 16px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);font:700 13px/1 Inter,sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:8px}
 #bl-w .bw-btn:hover{background:rgba(255,255,255,.11)}
 #bl-w .bw-btn.pri{border:0;background:linear-gradient(180deg,#ffd84d,#ffb411);color:#1d1300;box-shadow:0 8px 22px rgba(255,180,17,.25)}
@@ -193,7 +193,17 @@ export function createWallet({ api, root, getLang, toast, onChange }) {
   addEventListener('keydown', e => { if (e.key === 'Escape' && !wrap.hidden) { e.stopImmediatePropagation(); close(); } }, true);
   wrap.querySelector('.bw-tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { tab = b.dataset.tab; render(); if (tab === 'earn') loadEarn(); } });
   $('bw-swap').addEventListener('click', () => { solFirst = !solFirst; try { localStorage.setItem('bl-solfirst', solFirst ? '1' : '0'); } catch {} render(); });
-  const copyAddr = async () => { try { await navigator.clipboard.writeText(acct.address); } catch { const r = document.createRange(); r.selectNodeContents($('bw-addr')); getSelection().removeAllRanges(); getSelection().addRange(r); document.execCommand('copy'); } toast(T('copied'), 'ok'); };
+  // kopiowanie adresu: nowoczesny schowek (tylko https/localhost), a na zwykłym http ukryte pole tekstowe + execCommand
+  const copyText = async txt => {
+    try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(txt); return true; } } catch {}
+    try {
+      const ta = document.createElement('textarea'); ta.value = txt; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;user-select:text;-webkit-user-select:text';
+      wrap.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0, txt.length); const ok = document.execCommand('copy'); ta.remove(); return ok;
+    } catch { return false; }
+  };
+  const selectAddr = () => { const r = document.createRange(); r.selectNodeContents($('bw-addr')); const g = getSelection(); g.removeAllRanges(); g.addRange(r); };
+  const copyAddr = async () => { const ok = await copyText(acct.address); if (ok) toast(T('copied'), 'ok'); else { selectAddr(); toast(T('copyManual'), 'err'); } return ok; };
+  $('bw-addr').addEventListener('click', () => { selectAddr(); copyAddr(); });
   $('bw-copy').addEventListener('click', copyAddr);
   $('bw-check').addEventListener('click', async e => { const b = e.currentTarget; b.disabled = true; b.textContent = T('checking'); await api$.refresh(true); b.disabled = false; b.textContent = T('check'); });
   $('bw-faucet').addEventListener('click', async () => {
