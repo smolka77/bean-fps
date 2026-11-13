@@ -6,6 +6,7 @@ import { buildVillage } from './village.js';
 import { buildBattlefield } from './battlefield.js';
 import { buildHangar } from './hangar.js';
 import { initLobbyUI, t as tr, skinName } from './lobby-ui.js';
+import CUSTOM_SKINS from './skins-data.js';
 
 const CSS = `
 #lb-ui{--bg:rgba(10,14,24,.72);--bg2:rgba(14,19,32,.97);--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.15);--tx:#eef1f7;--mut:#8e9ab0;
@@ -367,7 +368,7 @@ const CSS = `
   display:flex;flex-direction:column;align-items:center;gap:5px;transition:transform .12s,border-color .12s,background .12s}
 #lb-ui .lb-skin:hover{transform:translateY(-2px);background:rgba(255,255,255,.09);border-color:var(--line2)}
 #lb-ui .lb-skin.sel{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc);background:rgba(255,198,41,.1)}
-#lb-ui .lb-skin svg{width:42px;height:56px;display:block}
+#lb-ui .lb-skin svg,#lb-ui .lb-skin img{width:42px;height:56px;display:block;object-fit:contain}
 #lb-ui .lb-skin span{font:600 12.5px/1.1 Inter,sans-serif;text-align:center}
 #lb-ui .lb-skin small{font:700 8.5px/1 Inter,sans-serif;letter-spacing:.12em;color:var(--acc);min-height:9px}
 #lb-ui .lb-skins .lb-btn{align-self:flex-start;margin-top:auto}
@@ -684,8 +685,9 @@ export const SKINS = [
   { id: 'zlota', name: 'Złota', c: 0xffc23a, metal: true, tag: 'LEGENDA' },
   { id: 'teczowa', name: 'Tęczowa', c: 0xffffff, p: 4, tag: 'RZADKI' },
   { id: 'arktyka', name: 'Arktyka', c: 0xe8eef2, c2: 0xb9c7d2, c3: 0x8a9aa8, p: 1, tag: 'WOJSKO' },
+  ...CUSTOM_SKINS,                                    // skiny z kreatora (skins-data.js)
 ];
-const SKIN_GLSL = `uniform float uPat,uRim;uniform vec3 uC2,uC3,uRimC;varying vec3 vObj;
+const SKIN_GLSL = `uniform float uPat,uRim,uHasTex;uniform vec3 uC2,uC3,uRimC;uniform sampler2D uTex;uniform vec4 uProj;varying vec3 vObj;
   float h3(vec3 p){return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453);}
   float vn(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
     return mix(mix(mix(h3(i),h3(i+vec3(1,0,0)),f.x),mix(h3(i+vec3(0,1,0)),h3(i+vec3(1,1,0)),f.x),f.y),
@@ -693,7 +695,8 @@ const SKIN_GLSL = `uniform float uPat,uRim;uniform vec3 uC2,uC3,uRimC;varying ve
 // Nakłada skin na materiał skóry fasolki (kolor + wzór + metal). Działa też na postaci w grze.
 export function applySkin(mat, skin) {
   if (!mat.userData.skinU) {
-    const U = { uPat: { value: 0 }, uC2: { value: new THREE.Color() }, uC3: { value: new THREE.Color() }, uRim: { value: 0 }, uRimC: { value: new THREE.Color(0xfff0a8) } };
+    const U = { uPat: { value: 0 }, uC2: { value: new THREE.Color() }, uC3: { value: new THREE.Color() }, uRim: { value: 0 }, uRimC: { value: new THREE.Color(0xfff0a8) },
+      uTex: { value: null }, uHasTex: { value: 0 }, uProj: { value: new THREE.Vector4() } };
     mat.userData.skinU = U;
     mat.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, U);
@@ -705,7 +708,10 @@ export function applySkin(mat, skin) {
           else if (uPat > 1.5 && uPat < 2.5) { float a = atan(P.z, P.x); float st = step(.5, fract(a * 1.6 + vn(P * 7.) * .18)); diffuseColor.rgb = mix(diffuseColor.rgb, uC2, st); }
           else if (uPat > 2.5 && uPat < 3.5) { vec3 q = P * 15.; float d = length(fract(q) - .5); diffuseColor.rgb = mix(diffuseColor.rgb, uC2, step(d, .17) * step(.55, h3(floor(q)))); }
           else if (uPat > 3.5 && uPat < 4.5) { diffuseColor.rgb = .55 + .45 * cos(6.2832 * (P.y * 1.1 + vec3(0., .33, .67))); }
-          else if (uPat > 4.5) { float n = vn(P * 6.5) * .7 + vn(P * 13.) * .3; lavaGlow = 1. - smoothstep(.0, .07, abs(n - .5)); diffuseColor.rgb = mix(diffuseColor.rgb, uC2, lavaGlow); }`)
+          else if (uPat > 4.5) { float n = vn(P * 6.5) * .7 + vn(P * 13.) * .3; lavaGlow = 1. - smoothstep(.0, .07, abs(n - .5)); diffuseColor.rgb = mix(diffuseColor.rgb, uC2, lavaGlow); }
+          if (uHasTex > .5) { vec2 d = P.xz - uProj.xy;          // rysunek z kreatora: walec wokół osi korpusu, przód = środek tekstury
+            vec4 tx = texture2D(uTex, vec2(atan(-d.x, -d.y) / 6.2831853 + .5, (P.y - uProj.z) / (uProj.w - uProj.z)));
+            diffuseColor.rgb = mix(diffuseColor.rgb, tx.rgb, tx.a); }`)
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
           totalEmissiveRadiance += uC2 * lavaGlow * 2.2;
           float rimK = 1. - abs(dot(normalize(normal), normalize(vViewPosition)));
@@ -718,9 +724,24 @@ export function applySkin(mat, skin) {
   const U = mat.userData.skinU, P = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 };
   mat.color.set(skin.c); U.uPat.value = skin.metal ? -1 : (P[skin.p] || 0); U.uC2.value.set(skin.c2 ?? skin.c); U.uC3.value.set(skin.c3 ?? skin.c);
   mat.metalness = skin.metal ? .35 : 0; mat.roughness = skin.metal ? .3 : .55;
+  const tx = mat.userData.body && skin.tex ? skinTexture(skin) : null;   // rysunek tylko na korpusie (ręce/nogi mają inne współrzędne)
+  U.uTex.value = tx; U.uHasTex.value = tx ? 1 : 0;
+  if (tx) { const j = skin.proj; U.uProj.value.set(j.cx, j.cz, j.y0, j.y1); }
+}
+// tekstura skina z kreatora (data URL w skins-data.js), ładowana raz
+const SKIN_TEX = new Map();
+function skinTexture(skin) {
+  let t = SKIN_TEX.get(skin.tex);
+  if (!t) {
+    const img = new Image(); t = new THREE.Texture(img);
+    t.colorSpace = THREE.SRGBColorSpace; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; t.wrapS = THREE.RepeatWrapping;
+    img.onload = () => { t.needsUpdate = true; }; img.src = skin.tex; SKIN_TEX.set(skin.tex, t);
+  }
+  return t;
 }
 // ikona fasolki do kafelka (SVG z kolorem/wzorem)
 function skinIcon(sk) {
+  if (sk.icon) return `<img src="${sk.icon}" alt="">`;            // skin z kreatora ma gotową ikonkę
   const hex = c => '#' + new THREE.Color(c).getHexString(), c1 = hex(sk.c), c2 = hex(sk.c2 ?? sk.c), c3 = hex(sk.c3 ?? sk.c), id = 'sk' + sk.id;
   let fill = c1, defs = '';
   if (sk.p === 1) { defs = `<pattern id="${id}" width="24" height="24" patternUnits="userSpaceOnUse"><rect width="24" height="24" fill="${c1}"/><path d="M2 4c6-3 9 2 7 6s-7 3-8 0z" fill="${c2}"/><path d="M14 13c5-2 9 1 8 5s-6 4-9 1z" fill="${c3}"/><path d="M12 1c3 0 4 3 2 4s-4 0-2-4z" fill="${c3}"/><path d="M1 16c3-1 5 2 3 4s-4 0-3-4z" fill="${c2}"/></pattern>`; fill = `url(#${id})`; }
@@ -1153,7 +1174,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   const holder = new THREE.Group(); holder.add(bean); scene.add(holder);
   const hitProxy = new THREE.Mesh(new THREE.CylinderGeometry(.48, .48, 1.75, 10), new THREE.MeshBasicMaterial({ visible: false })); hitProxy.position.y = .87; holder.add(hitProxy);
   const skinMats = [];                                   // materiały skóry fasolki (z gry: userData.mats.skin, inaczej wszystkie)
-  if (bean.userData.mats && bean.userData.mats.skin) skinMats.push(bean.userData.mats.skin);
+  if (bean.userData.mats && bean.userData.mats.skin) skinMats.push(bean.userData.mats.skin, ...(bean.userData.mats.body ? [bean.userData.mats.body] : []));
   else bean.traverse(o => { if (o.isMesh && o.material && !skinMats.includes(o.material)) skinMats.push(o.material); });
   let skin = skins.find(k => k.id === store.get('fasolka-skin')) || skins[0];
   const setSkin = k => { skin = k; skinMats.forEach(m => applySkin(m, k)); store.set('fasolka-skin', k.id); onSkin(k);

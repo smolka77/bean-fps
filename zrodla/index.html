@@ -301,7 +301,9 @@ const armDefs=armsC.map(a=>{
 const armR=armDefs.find(d=>d.side>0),armL=armDefs.find(d=>d.side<0);
 
 function beanMats(color){
-  return{skin:new THREE.MeshStandardMaterial({color,roughness:.55,metalness:0}),
+  const skin=new THREE.MeshStandardMaterial({color,roughness:.55,metalness:0});
+  const body=skin.clone();body.emissive=skin.emissive;body.userData.body=true;   // korpus: osobny materiał (rysunek skina z kreatora tylko na nim), ten sam błysk trafienia
+  return{skin,body,
     eyeW:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.3}),eyeB:new THREE.MeshStandardMaterial({color:0x111111,roughness:.3})};
 }
 // jedna ręka: pivot (bark) -> SkinnedMesh z 3 kośćmi (bark, ramię, przedramię); scale < 1 dla widoku z pierwszej osoby
@@ -421,7 +423,7 @@ function keepRifleOut(ud,rg){
 }
 function makeBean(color,opts={}){
   const mats=beanMats(color);const root=new THREE.Group();
-  const body=new THREE.Mesh(bodyGeo,mats.skin);body.castShadow=true;root.add(body);
+  const body=new THREE.Mesh(bodyGeo,mats.body);body.castShadow=true;root.add(body);
   const upper=new THREE.Group();root.add(upper);       // wszystko poza stopami opada przy kucaniu
   const torso=new THREE.Group();upper.add(torso);      // tułów + oczy + ręce + karabin: pochyla się w biodrach
   torso.add(body);
@@ -1294,7 +1296,7 @@ function lobbyAnimate(b,t,dt,st){
 const lobby=createLobby({renderer,bean:lobbyBean,animate:lobbyAnimate,
   onPlay:(m,o)=>{o=o||{};if(m==='1v1'){matchLock();lobby.hide();match.start({map:o.map,stake:o.stake});return}   // mecz: mapa i stawka z losowania w lobby
     setMode(m,null);lobby.hide();document.body.classList.remove('in-lobby');startPlay()},
-  onSkin:s=>{applySkin(me.userData.mats.skin,s);applySkin(fpsSkin,s)}});   // skin z lobby także na postaci w grze
+  onSkin:s=>{applySkin(me.userData.mats.skin,s);applySkin(me.userData.mats.body,s);applySkin(fpsSkin,s);me.userData.eyes.visible=s.eyes!==false}});   // skin z lobby także na postaci w grze
 $('overlay').addEventListener('click',()=>setTimeout(()=>{setPauseText();if(duel.mapBanner&&oaza.active){duel.mapBanner=false;banner('MAPA: '+oaza.map.name.toUpperCase(),'#ffe14a')}},0));
 $('toLobby').addEventListener('click',e=>{
   e.stopPropagation();playing=false;gun.firing=false;match.abort();player.dead=false;document.body.classList.remove('mt-dead');
