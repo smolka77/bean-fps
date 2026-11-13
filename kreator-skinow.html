@@ -44,6 +44,9 @@ main{flex:1;position:relative;min-width:0}
 #views{position:absolute;right:12px;top:12px;display:flex;gap:6px}
 #drop{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(255,198,41,.15);border:3px dashed var(--acc);font-size:22px;font-weight:700;pointer-events:none}
 #drop.show{display:flex}
+#pickTip{position:fixed;z-index:30;pointer-events:none;display:none;align-items:center;gap:7px;background:rgba(10,12,16,.85);padding:4px 9px 4px 4px;border-radius:9px;font:700 12px ui-monospace,Consolas,monospace;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+#pickTip.show{display:flex}
+#pickTip i{width:24px;height:24px;border-radius:6px;border:1px solid rgba(255,255,255,.55)}
 #toast{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:var(--acc);color:#1b1e25;font-weight:700;padding:7px 14px;border-radius:8px;opacity:0;transition:opacity .25s;pointer-events:none}
 #toast.show{opacity:1}
 #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--dim)}
@@ -68,9 +71,10 @@ main{flex:1;position:relative;min-width:0}
     <div class="tools">
       <button id="tBrush" class="on" title="B">Pędzel</button>
       <button id="tErase" title="E">Gumka</button>
-      <button id="tPick" title="I">Pipeta</button>
+      <button id="tPick" title="I – najedź na fasolkę, kliknij, żeby pobrać kolor (Alt+klik działa przy każdym narzędziu)">Próbka</button>
     </div>
     <div class="row" style="margin-top:9px"><input type="color" id="brush" value="#e0343a"><div class="sw" id="brushSw"></div></div>
+    <button id="screenPick" style="width:100%;margin:4px 0 2px" title="Kliknij, potem wskaż dowolny punkt na ekranie (np. obrazek obok)">Próbka koloru z ekranu</button>
     <div class="row"><span>Rozmiar</span><input type="range" id="size" min="2" max="150" value="18"><em id="sizeV">18</em></div>
     <div class="row"><span>Krycie</span><input type="range" id="opac" min="5" max="100" value="100"><em id="opacV">100%</em></div>
     <div class="two"><button id="undo" title="Ctrl+Z">Cofnij</button><button id="clear">Wyczyść rysunek</button></div>
@@ -113,6 +117,7 @@ main{flex:1;position:relative;min-width:0}
   <div id="flatWrap"><div><span>tył</span><span>lewy bok</span><span>PRZÓD</span><span>prawy bok</span><span>tył</span></div><canvas id="flat"></canvas></div>
   <div id="drop">Upuść obrazek</div>
   <div id="toast"></div>
+  <div id="pickTip"><i></i><span></span></div>
 </main>
 
 <script>/* model fasolki z gry (bean-data.js) */
@@ -320,7 +325,7 @@ function setTool(t) { st.tool = t; ['Brush', 'Erase', 'Pick'].forEach(n => $('t'
 $('tBrush').onclick = () => setTool('brush'); $('tErase').onclick = () => setTool('erase'); $('tPick').onclick = () => setTool('pick');
 function updateHint() {
   $('hint').textContent = decal ? 'Kliknij/przeciągnij na fasolce: ustaw obrazek · kółko: rozmiar · Q/E: obrót · Enter: przyklej · Esc: anuluj'
-    : st.tool === 'pick' ? 'Kliknij na fasolce, żeby pobrać kolor · LPM/PPM obok: obracaj'
+    : st.tool === 'pick' ? 'Najedź na fasolkę: widać kolor · klik: pobierz i skopiuj kod · Alt+klik działa też przy pędzlu'
     : 'LPM na fasolce: ' + (st.tool === 'erase' ? 'zmazuj' : 'rysuj') + ' · LPM/PPM obok: obracaj · kółko: zoom · Ctrl+Z: cofnij';
 }
 
@@ -441,12 +446,21 @@ function endStroke() {
   pctx.save(); pctx.globalAlpha = st.tool === 'erase' ? 1 : st.opac; pctx.globalCompositeOperation = st.tool === 'erase' ? 'destination-out' : 'source-over'; pctx.drawImage(stroke, 0, 0); pctx.restore();
   sctx.clearRect(0, 0, TW, TH); redraw(); autosave();
 }
-function pickColor(h) {
+// próbka koloru: kolor skina w punkcie (rysunek na kolorze bazowym, bez światła), ręce i nogi = kolor bazowy
+function colorAt(h) {
+  if (!h) return null;
+  if (h.object !== body) return h.object === eyes || eyes.children.includes(h.object) || h.object.parent?.parent === eyes ? null : st.base;
   const { u, v } = uvOf(h.point), d = vctx.getImageData(clamp(Math.floor(u * TW), 0, TW - 1), clamp(Math.floor((1 - v) * TH), 0, TH - 1), 1, 1).data;
-  const bc = new THREE.Color(st.base), a = d[3] / 255;
-  const hex = '#' + [bc.r * 255, bc.g * 255, bc.b * 255].map((b, i) => Math.round(b * (1 - a) + d[i] * a).toString(16).padStart(2, '0')).join('');
-  setBrush(hex); setTool('brush'); toast('Kolor pobrany: ' + hex);
+  const bh = parseInt(st.base.slice(1), 16), a = d[3] / 255;     // kolor bazowy prosto z kodu (sRGB), bez przeliczeń biblioteki 3D
+  return '#' + [bh >> 16 & 255, bh >> 8 & 255, bh & 255].map((b, i) => Math.round(b * (1 - a) + d[i] * a).toString(16).padStart(2, '0')).join('');
 }
+const copyHex = hex => { try { navigator.clipboard && navigator.clipboard.writeText(hex).catch(() => {}); } catch {} };
+function takeColor(hex, keepTool) { if (!hex) return; setBrush(hex); copyHex(hex); if (!keepTool) setTool('brush'); toast('Kolor ' + hex + ' – ustawiony na pędzlu i skopiowany'); }
+const pickTip = $('pickTip');
+function showTip(e, hex) { if (!hex) { pickTip.classList.remove('show'); return; } pickTip.querySelector('i').style.background = hex; pickTip.querySelector('span').textContent = hex;
+  pickTip.style.left = (e.clientX + 16) + 'px'; pickTip.style.top = (e.clientY + 16) + 'px'; pickTip.classList.add('show'); }
+if (window.EyeDropper) $('screenPick').onclick = async () => { try { const r = await new EyeDropper().open(); takeColor(r.sRGBHex, true); } catch {} };
+else $('screenPick').style.display = 'none';      // przeglądarka bez EyeDropper (np. Firefox) – zostaje próbka z fasolki
 
 // ================= mysz =================
 const rc = new THREE.Raycaster(), ndc = new THREE.Vector2();
@@ -455,20 +469,25 @@ function pick(e) {
   rc.setFromCamera(ndc, camera);
   const objs = [body, ...limbs]; if (eyes.visible) objs.push(eyes);
   const h = rc.intersectObjects(objs, true)[0];
+  pick.any = h || null;                       // pierwsze trafienie (także ręce/nogi) – do próbki koloru
   return h && h.object === body ? h : null;
 }
 let drag = null;
 canvas.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
-  const h = pick(e); if (!h) return;          // poza fasolką: obracanie kamerą
+  const h = pick(e);
+  if (!decal && (st.tool === 'pick' || e.altKey) && pick.any) {      // próbka koloru (narzędzie Próbka albo Alt+klik)
+    const hex = colorAt(pick.any); if (hex) { e.stopImmediatePropagation(); takeColor(hex, e.altKey && st.tool !== 'pick'); return; } }
+  if (!h) return;          // poza fasolką: obracanie kamerą
   controls.enabled = false; canvas.setPointerCapture(e.pointerId); drag = e.pointerId;
   if (decal) moveDecal(h);
-  else if (st.tool === 'pick') { pickColor(h); drag = null; }
+  else if (st.tool === 'pick') { drag = null; }
   else beginStroke(h);
 }, { capture: true });
 canvas.addEventListener('pointermove', e => {
   const h = pick(e);
-  if (h && !decal && st.tool !== 'pick') {
+  showTip(e, !decal && !drag && (st.tool === 'pick' || e.altKey) ? colorAt(pick.any) : null);
+  if (h && !decal && st.tool !== 'pick' && !e.altKey) {
     const n = h.face.normal.clone(); if (n.dot(rc.ray.direction) > 0) n.negate();
     ring.position.copy(h.point).addScaledVector(n, .003); ring.lookAt(h.point.clone().add(n));
     ring.scale.setScalar(st.size * S_TOT / TH); ring.visible = true;
@@ -478,7 +497,7 @@ canvas.addEventListener('pointermove', e => {
 });
 const release = e => { if (drag !== e.pointerId) { controls.enabled = true; return; } drag = null; endStroke(); controls.enabled = true; };
 canvas.addEventListener('pointerup', release); canvas.addEventListener('pointercancel', release);
-canvas.addEventListener('pointerleave', () => { ring.visible = false; });
+canvas.addEventListener('pointerleave', () => { ring.visible = false; pickTip.classList.remove('show'); });
 canvas.addEventListener('wheel', e => {
   if (!decal) return; e.preventDefault(); e.stopImmediatePropagation();
   if (e.shiftKey) setDecal({ rot: decal.rot + Math.sign(e.deltaY) * .06 }); else setDecal({ size: decal.size * (e.deltaY > 0 ? .93 : 1.075) });

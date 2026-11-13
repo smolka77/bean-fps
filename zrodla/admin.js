@@ -296,7 +296,7 @@ function buildDashboard(db, close) {
   function openKreator(k, done) {
     let ov = document.getElementById('fa-kreator');
     if (!ov) { ov = document.createElement('div'); ov.id = 'fa-kreator'; document.body.appendChild(ov); }
-    ov.innerHTML = ''; const fr = document.createElement('iframe'); fr.src = './kreator-skinow.html?embed=1'; fr.title = 'Kreator skinów'; ov.appendChild(fr); ov.hidden = false;
+    ov.innerHTML = ''; const fr = document.createElement('iframe'); fr.src = './kreator-skinow.html?embed=1'; fr.title = 'Kreator skinów'; fr.allow = 'clipboard-write'; ov.appendChild(fr); ov.hidden = false;
     const shut = () => { removeEventListener('message', onMsg); ov.hidden = true; ov.innerHTML = ''; };
     const onMsg = e => {
       if (e.source !== fr.contentWindow) return; const m = e.data || {};
