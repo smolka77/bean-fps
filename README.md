@@ -24,6 +24,13 @@ F oglądanie broni, 1–4 / kółko zmiana broni, V widok, M dźwięk, Esc pauza
 | `index.html` | gotowa gra w jednym pliku (three.js r170, moduły, mapy i zdjęcia map wbudowane) |
 | `zrodla/` | pliki źródłowe gry, osobne moduły (tak jak w artefakcie gry na claude.ai) |
 | `narzedzia/build_game.mjs` | skrypt, który skleja `zrodla/` w `index.html` (esbuild) |
+| `skins.json` | skiny z kreatora (gra wczytuje je przy starcie; panel admina zapisuje tu zmiany) |
+| `kreator-skinow.html` | kreator skinów (otwierany z panelu admina, działa też samodzielnie) |
+
+## Skiny z kreatora
+
+Panel admina (menu ☰ albo Ctrl+Shift+A) ma zakładkę **Skiny**: dodawanie, edycja w kreatorze, usuwanie i kolejność.
+„Opublikuj w grze” zapisuje `skins.json` w tym repo przez GitHub API (token z dostępem Contents: zapis), więc zmiany widzą wszyscy po odświeżeniu strony.
 
 ## Przebudowanie po zmianach w `zrodla/`
 

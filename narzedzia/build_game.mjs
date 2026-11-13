@@ -22,6 +22,10 @@ const patch = (f, from, to) => {
   wr(f, s.split(from).join(to));
 };
 
+// 0) skiny z kreatora: aktualna lista z skins.json w katalogu repo trafia też do pliku gry (zapas, gdy skins.json się nie wczyta)
+const skinsJson = path.join(srcDir, '..', 'skins.json');
+if (fs.existsSync(skinsJson)) wr('skins-data.js', '// wygenerowane z skins.json przy budowaniu\nexport default ' + JSON.stringify(JSON.parse(fs.readFileSync(skinsJson, 'utf8'))) + ';\n');
+
 // 1) skrypt modułu ze strony -> main.js
 let html = rd('index.html');
 const open = '<script type="module">';
@@ -69,4 +73,6 @@ const body = '<script type="module">\n' + js.replace(/<\/script/gi, '<\\/script'
 html = html.replace('@@BUNDLE@@', () => body);
 html = html.replace(/^<!doctype html>/i, '<!doctype html>\n<!-- Bean FPS — cała gra w jednym pliku (three.js, mapy, bronie, lobby). Otwórz dwuklikiem w Chrome/Edge/Firefox. -->');
 fs.writeFileSync(outFile, html);
+// kreator skinów (panel admina otwiera go w okienku) leży obok gry
+if (fs.existsSync(path.join(srcDir, 'kreator-skinow.html'))) fs.copyFileSync(path.join(srcDir, 'kreator-skinow.html'), path.join(path.dirname(outFile), 'kreator-skinow.html'));
 console.log('OK', outFile, (Buffer.byteLength(html) / 1048576).toFixed(2) + ' MB', 'bronie:', weapons.join(','), 'zdjęcia:', imgs.join(','));

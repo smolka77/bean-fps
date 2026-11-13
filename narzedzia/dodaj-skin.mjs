@@ -28,7 +28,8 @@ if (args[0] === '--usun') {
     const d = JSON.parse(fs.readFileSync(f, 'utf8'));
     if (d.format !== 'fasolka-skin') throw new Error(`${f}: to nie jest plik z kreatora skinów`);
     if (d.version !== 1) throw new Error(`${f}: nieznana wersja formatu ${d.version}`);
-    if (d.tex && (!d.proj || d.proj.type !== 'cylinder-y')) throw new Error(`${f}: brak mapowania proj`);
+    if (d.tex && (!d.proj || !['cylinder-y', 'arc-y'].includes(d.proj.type))) throw new Error(`${f}: brak mapowania proj`);
+    if (d.proj && d.proj.type === 'arc-y' && (!Array.isArray(d.proj.vmap) || d.proj.vmap.length !== 129)) throw new Error(`${f}: zła tablica vmap`);
     if (!/^[a-z0-9-]+$/.test(d.id || '')) throw new Error(`${f}: złe id "${d.id}"`);
     if (builtIn.includes(d.id)) d.id += '-k';                       // nie nadpisujemy wbudowanych skinów
     const skin = { id: d.id, name: d.name || d.id, c: d.c || '#ffffff', eyes: d.eyes !== false, tag: d.tag || 'WŁASNY',
@@ -39,4 +40,5 @@ if (args[0] === '--usun') {
   }
 }
 fs.writeFileSync(dataFile, HEAD + skins.map((s) => JSON.stringify(s) + ',\n').join('') + '];\n');
+fs.writeFileSync(path.join(here, '..', 'skins.json'), '[\n' + skins.map((s) => JSON.stringify(s)).join(',\n') + '\n]\n');   // to czyta gra na stronie
 console.log(`skins-data.js: ${skins.length} skin(ów). Teraz: npm run build`);
