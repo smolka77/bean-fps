@@ -15,6 +15,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { Connection, Keypair, PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL, sendAndConfirmTransaction, clusterApiUrl } from '@solana/web3.js';
 import { derivePath } from 'ed25519-hd-key';
 import * as bip39 from 'bip39';
+import { WebSocketServer } from 'ws';
 
 // ---------------- konfiguracja ----------------
 const env = process.env;
@@ -401,7 +402,122 @@ function serveCover(res) {
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' });
   res.end(fs.readFileSync(new URL('./cover.html', import.meta.url)));
 }
-http.createServer(async (req, res) => {
+// ---------------- 1v1 z prawdziwymi graczami: kolejka, pokoje meczowe, przekazywanie ruchu (WebSocket /ws) ----------------
+// Gracz płaci stawkę (/api/match/start), łączy się z /ws?t=TOKEN i wysyła {t:'queue', matchId}. Serwer paruje dwóch różnych
+// graczy z tą samą stawką, losuje mapę, a potem przekazuje między nimi stan (ruch, strzały, trafienia). Rundy liczy serwer
+// (z meldunków 'dead' gracza, który zginął) i to on rozlicza stawki obu graczy po meczu. Wyjście z kolejki = zwrot stawki,
+// zerwanie połączenia w trakcie meczu = wygrana przeciwnika.
+const DUEL_MAPS = ['Oaza', 'Magazyn', 'Baza'], DUEL_ROUNDS = 3;
+const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
+const mmQueue = [];                                             // czekający: {ws, user, matchId, stake, nick, skin}
+let roomSeq = 0;
+const wsSend = (ws, o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
+function userFromToken(tok) { return tok ? q('SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=?').get(sha(tok)) || null : null; }
+
+// anulowane szukanie: stawka wraca, a mecz i pobranie stawki znikają z historii (jakby gry nie było)
+function refundMatch(matchId, userId) {
+  try {
+    tx(() => {
+      const m = q("SELECT * FROM matches WHERE id=? AND user_id=? AND state='open'").get(matchId, userId); if (!m) return;
+      q('DELETE FROM matches WHERE id=?').run(m.id);
+      const st = q("SELECT id FROM txs WHERE user_id=? AND type='stake' AND lamports=? AND t>=? ORDER BY t DESC, id DESC LIMIT 1").get(userId, -m.stake_lamports, m.t - 5000);
+      if (st) q('DELETE FROM txs WHERE id=?').run(st.id);
+      q('UPDATE users SET lamports=lamports+? WHERE id=?').run(m.stake_lamports, userId);
+      console.log(`[1v1] zwrot stawki ${m.stake_usd} USD dla użytkownika ${userId} (anulowane szukanie)`);
+    });
+  } catch (e) { console.error('[1v1] zwrot stawki', e); }
+}
+// rozliczenie jednego gracza po meczu (to samo co POST /api/match/end, ale decyduje serwer)
+function settleDuel(matchId, userId, won, forfeit, map) {
+  try {
+    tx(() => {
+      const m = q("SELECT * FROM matches WHERE id=? AND user_id=? AND state='open'").get(matchId, userId); if (!m) return;
+      if (won) {
+        const pot = m.stake_lamports * 2, fee = Math.round(pot * HOUSE_FEE), pay = pot - fee;
+        q("UPDATE matches SET state='won', payout_lamports=?, fee_lamports=?, ended=?, map=COALESCE(?,map) WHERE id=?").run(pay, fee, Date.now(), map || null, m.id);
+        q('UPDATE users SET lamports=lamports+? WHERE id=?').run(pay, userId);
+        addTx(userId, 'win', pay, Math.round(pay / 1e9 * m.price * 100) / 100, { fee: Math.round(fee / 1e9 * m.price * 100) / 100 });
+      } else {
+        q("UPDATE matches SET state='lost', forfeit=?, ended=?, map=COALESCE(?,map) WHERE id=?").run(forfeit ? 1 : 0, Date.now(), map || null, m.id);
+        addTx(userId, 'loss', 0, 0, { note: '$' + m.stake_usd.toFixed(2) });
+      }
+    });
+  } catch (e) { console.error('[1v1] rozliczenie', e); }
+}
+
+function leaveQueue(ws, refund) {
+  const i = mmQueue.findIndex(x => x.ws === ws); if (i < 0) return false;
+  const me = mmQueue.splice(i, 1)[0]; ws.mm = null;
+  if (refund) refundMatch(me.matchId, me.user.id);
+  return true;
+}
+function startRoom(a, b) {
+  const room = { id: ++roomSeq, p: [a, b], score: [0, 0], map: DUEL_MAPS[Math.floor(Math.random() * DUEL_MAPS.length)], ready: [false, false], over: false, roundAt: 0 };
+  [a, b].forEach((pl, seat) => { pl.room = room; pl.seat = seat; pl.ws.mm = pl; });
+  for (const pl of [a, b]) try { q('UPDATE matches SET map=? WHERE id=?').run(room.map, pl.matchId); } catch {}
+  [a, b].forEach((pl, seat) => { const op = room.p[1 - seat]; wsSend(pl.ws, { t: 'matched', seat, map: room.map, opp: { nick: op.nick, skin: op.skin } }); });
+  console.log(`[1v1] pokój ${room.id}: ${a.nick} vs ${b.nick}, stawka $${a.stake}, mapa ${room.map}`);
+}
+function endRoom(room, winner, reason) {
+  if (room.over) return; room.over = true;
+  room.p.forEach((pl, seat) => settleDuel(pl.matchId, pl.user.id, seat === winner, seat !== winner && reason === 'left', room.map));
+  room.p.forEach(pl => { wsSend(pl.ws, { t: 'end', winner, score: room.score, reason }); if (pl.ws) pl.ws.mm = null; });
+  console.log(`[1v1] pokój ${room.id}: koniec, wygrał ${room.p[winner].nick} (${room.score.join(':')}${reason === 'left' ? ', walkower' : ''})`);
+}
+function onDuelMessage(ws, user, raw) {
+  let m; try { m = JSON.parse(raw); } catch { return; }
+  if (!m || typeof m.t !== 'string') return;
+  const me = ws.mm;
+  if (m.t === 'queue') {
+    if (me) return;                                              // już w kolejce albo w meczu
+    const match = q("SELECT * FROM matches WHERE id=? AND user_id=? AND state='open'").get(+m.matchId, user.id);
+    if (!match) return wsSend(ws, { t: 'error', code: 'match', message: 'Brak opłaconej stawki – zagraj jeszcze raz z lobby.' });
+    for (const x of mmQueue.filter(x => x.user.id === user.id)) { leaveQueue(x.ws, true); wsSend(x.ws, { t: 'error', code: 'dup', message: 'Szukasz meczu w innej karcie.' }); }
+    const entry = { ws, user, matchId: match.id, stake: match.stake_usd, nick: user.username, skin: String(m.skin || '').slice(0, 64) };
+    const i = mmQueue.findIndex(x => x.stake === entry.stake && x.user.id !== user.id && x.ws.readyState === 1);
+    if (i < 0) { mmQueue.push(entry); ws.mm = entry; wsSend(ws, { t: 'queued', waiting: mmQueue.filter(x => x.stake === entry.stake).length }); return; }
+    startRoom(mmQueue.splice(i, 1)[0], entry); return;
+  }
+  if (m.t === 'cancel') { if (me && !me.room) { leaveQueue(ws, true); wsSend(ws, { t: 'cancelled' }); } return; }
+  if (!me || !me.room || me.room.over) return;
+  const room = me.room, op = room.p[1 - me.seat];
+  switch (m.t) {
+    case 'ready': room.ready[me.seat] = true; if (room.ready[0] && room.ready[1]) room.p.forEach(pl => wsSend(pl.ws, { t: 'go' })); break;
+    case 'st': {                                                  // stan gracza ~20/s: przekazywany przeciwnikowi bez zmian
+      const now = Date.now(); if (now - (me.lastSt || 0) < 25) return; me.lastSt = now;
+      wsSend(op.ws, { t: 'st', s: m.s }); break;
+    }
+    case 'shot': wsSend(op.ws, { t: 'shot', a: m.a, b: m.b, w: m.w }); break;
+    case 'hit': wsSend(op.ws, { t: 'hit', d: Math.max(0, Math.min(150, +m.d || 0)), h: !!m.h }); break;
+    case 'dead': {                                                // zginął ten gracz: rundę wygrywa przeciwnik
+      const now = Date.now(); if (now - room.roundAt < 3000) return; room.roundAt = now;
+      const w = 1 - me.seat; room.score[w]++;
+      room.p.forEach(pl => wsSend(pl.ws, { t: 'round', winner: w, score: room.score }));
+      if (room.score[w] >= DUEL_ROUNDS) setTimeout(() => endRoom(room, w, 'score'), 1200);
+      break;
+    }
+    case 'leave': endRoom(room, 1 - me.seat, 'left'); break;
+  }
+}
+wss.on('connection', (ws, req, user) => {
+  ws.alive = true; ws.on('pong', () => { ws.alive = true; });
+  ws.on('message', d => onDuelMessage(ws, user, String(d)));
+  ws.on('close', () => {
+    const me = ws.mm; if (!me) return;
+    if (!me.room) leaveQueue(ws, true);                           // zamknięta karta w trakcie szukania: zwrot stawki
+    else if (!me.room.over) endRoom(me.room, 1 - me.seat, 'left');   // wyjście z meczu: wygrywa przeciwnik
+  });
+  wsSend(ws, { t: 'hello', nick: user.username });
+});
+setInterval(() => { for (const ws of wss.clients) { if (!ws.alive) { ws.terminate(); continue; } ws.alive = false; try { ws.ping(); } catch {} } }, 20000);
+function onUpgrade(req, socket, head) {
+  const url = new URL(req.url, 'http://x');
+  if (url.pathname !== '/ws' || (COVER_PW && !coverOk(req))) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); return socket.destroy(); }
+  const user = userFromToken(url.searchParams.get('t'));
+  if (!user) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); return socket.destroy(); }
+  wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req, user));
+}
+const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin;
   if (req.method === 'OPTIONS') { res.writeHead(204, cors(origin)); return res.end(); }
   if (COVER_PW) {                                               // bramka z hasłem (lock screen)
@@ -425,7 +541,9 @@ http.createServer(async (req, res) => {
     if (!(e instanceof E)) console.error(key, e);
     send(res, e.status || 500, { error: e.code || 'server', message: e instanceof E ? e.message : 'Błąd serwera' }, origin);
   }
-}).listen(PORT, () => {
+});
+server.on('upgrade', onUpgrade);                              // WebSocket /ws: kolejka i mecze 1v1
+server.listen(PORT, () => {
   console.log(`Portfele BEANLADEN: http://localhost:${PORT}  sieć: ${CLUSTER}  skarbiec: ${TREASURY.publicKey.toBase58()}`);
   if (!ADMIN_USERS.size) console.log('Uwaga: brak ADMIN_USERS – panel admina nie wpuści nikogo.');
 });

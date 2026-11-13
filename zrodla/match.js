@@ -6,6 +6,8 @@
 //
 // Użycie: const match = createMatch(hooks); match.start({map, stake}) po GRAJ; match.kill('me' | 'op') przy zabójstwie;
 // match.update(dt, paused) w każdej klatce. Haki gry opisane są przy createMatch.
+// Tryb online (g.online() = true): szukanie trwa, aż serwer znajdzie drugiego gracza (match.found), wczytywanie czeka,
+// aż obaj są gotowi (match.oppGo), a wyjście przeciwnika kończy mecz walkowerem (match.oppLeft).
 
 export const ROUNDS_TO_WIN = 3;
 const OPP_NAMES = ['Groszek', 'Bobek_PL', 'Fasolino', 'Cieciorka', 'Soczewica', 'Edamame', 'Pinto', 'Mung', 'Wielki Bób',
@@ -255,6 +257,8 @@ export function createMatch(g) {
   const stakeChip = () => S.stake ? `<span class="mt-chip"><small>STAWKA</small>${COIN}<b>${esc(money(S.stake))}</b></span>` : '';
   let phase = 'idle', t = 0, frozen = false, lastWinner = null;
   let searchDur = 3, nameT = 0, oppReadyT = 1, countN = 0, curtainT = -1, roul = null, drawDone = -1, switched = false;
+  let oppGo = false, sentReady = false;                    // online: przeciwnik gotowy (serwer: 'go'), my już zgłosiliśmy gotowość
+  const online = () => !!(g.online && g.online());
 
   const sfx = n => { try { g.sfx(n); } catch (e) {} };
   function setTitle(html, gold) { title.innerHTML = html; title.classList.toggle('gold', !!gold); }
@@ -283,21 +287,22 @@ export function createMatch(g) {
   function go(p) { phase = p; t = 0; (ENTER[p] || (() => {}))(); }
   const ENTER = {
     search() {
-      Object.assign(S, { me: 0, op: 0, round: 1, nick: g.nick(), opp: '', mapIdx: -1, mapName: '', stake: +opts.stake > 0 ? +opts.stake : 0, preset: opts.map || null });
+      Object.assign(S, { me: 0, op: 0, round: 1, nick: g.nick(), opp: '', mapIdx: -1, mapName: '', stake: +opts.stake > 0 ? +opts.stake : 0, preset: opts.map || null, forceWin: false });
+      oppGo = false; sentReady = false;
       frozen = false; lastWinner = null; switched = false; roul = null; drawDone = -1;
       root.classList.remove('needclick');
       mm.hidden = false; mm.classList.remove('out'); vs.classList.remove('compact'); mapsEl.hidden = true; mapsEl.classList.remove('done');
       $('mt-stakechip').hidden = !S.stake; $('mt-stake').textContent = S.stake ? money(S.stake) : '';
       $('mt-load').hidden = true; $('mt-timer').hidden = false;
-      $('mt-cancel').hidden = !!S.stake;     // stawka jest już pobrana z portfela – szukania nie da się przerwać
+      $('mt-cancel').hidden = !!S.stake && !online();     // online: anulowanie szukania zwraca stawkę (serwer); offline stawka przepada
       setTitle('SZUKANIE PRZECIWNIKA<span class="mt-dots"><i>.</i><i>.</i><i>.</i></span>');
       $('mt-me').textContent = S.nick;
-      opCard.className = 'mt-pl op searching'; $('mt-op').textContent = '???'; $('mt-opst').textContent = 'SZUKANIE';
+      opCard.className = 'mt-pl op searching'; $('mt-op').textContent = '???'; $('mt-opst').textContent = online() ? 'W KOLEJCE' : 'SZUKANIE';
       searchDur = rand(2.4, 4.8); nameT = 0;
     },
     found() {
-      const pool = OPP_NAMES.filter(n => n.toLowerCase() !== S.nick.toLowerCase());
-      S.opp = pool[Math.floor(Math.random() * pool.length)];
+      if (!S.opp) { const pool = OPP_NAMES.filter(n => n.toLowerCase() !== S.nick.toLowerCase()); S.opp = pool[Math.floor(Math.random() * pool.length)]; }
+      $('mt-cancel').hidden = true;
       $('mt-op').textContent = S.opp; $('mt-opst').textContent = 'PRZECIWNIK';
       opCard.className = 'mt-pl op'; void opCard.offsetWidth; opCard.classList.add('found');
       setTitle('PRZECIWNIK ZNALEZIONY', true); sfx('found');
@@ -351,12 +356,13 @@ export function createMatch(g) {
       sfx(won ? 'win' : 'lose');
     },
     final() {
-      const won = S.me > S.op; frozen = true; g.release(); dim.classList.add('on');
+      const won = S.forceWin || S.me > S.op; frozen = true; g.release(); dim.classList.add('on'); mm.hidden = true;
       if (g.matchEnd) g.matchEnd(won);       // lobby rozlicza stawkę w portfelu
       const prize = !S.stake ? '' : won
         ? `<div class="mt-prize plus"><small>WYGRANA</small>${COIN}<b>+${esc(money(g.prize ? g.prize(S.stake) : S.stake * 2))}</b></div>`
         : `<div class="mt-prize minus"><small>STAWKA</small>${COIN}<b>−${esc(money(S.stake))}</b></div>`;
       showStrip((won ? 'win' : 'loss') + ' final', `<span class="mt-sub">KONIEC MECZU · ${esc(S.mapName.toUpperCase())}</span><div class="mt-big">${won ? 'ZWYCIĘSTWO' : 'PORAŻKA'}</div>${scoreRow()}
+        ${S.forceWin ? '<span class="mt-note">PRZECIWNIK OPUŚCIŁ MECZ – WYGRANA WALKOWEREM</span>' : ''}
         ${prize}
         <div class="mt-actions"><button class="mt-btn pri" type="button" data-a="again">GRAJ DALEJ</button><button class="mt-btn ghost" type="button" data-a="lobby">LOBBY</button></div>`);
       sfx(won ? 'win' : 'lose');
@@ -395,6 +401,7 @@ export function createMatch(g) {
   const TICK = {
     search() {
       $('mt-timer').textContent = fmt(t);
+      if (online()) return;                  // prawdziwa kolejka: czekamy na match.found() od serwera
       nameT -= DT; if (nameT <= 0) { nameT = .09; $('mt-op').textContent = OPP_NAMES[Math.floor(Math.random() * OPP_NAMES.length)]; }
       if (t >= searchDur) go('found');
     },
@@ -407,10 +414,11 @@ export function createMatch(g) {
     load() {
       const M = S.mapIdx >= 0 ? g.maps()[S.mapIdx] : null, mready = !M || M.ready || g.mapsSettled();   // mapa z lobby mogła się jeszcze nie wczytać
       const p = Math.min(mready ? 1 : .9, t / 1.6); $('mt-bar').style.width = (p * 100).toFixed(1) + '%';
-      if (t >= .45 && mready) $('mt-rme').className = 'ok';
-      if (t >= oppReadyT) $('mt-rop').className = 'ok';
+      if (t >= .45 && mready) { $('mt-rme').className = 'ok'; if (online() && !sentReady) { sentReady = true; if (g.localReady) g.localReady(); } }
+      if (online()) { if (oppGo) $('mt-rop').className = 'ok'; else { if (mready) t = Math.min(t, 1.55); return; } }
+      else if (t >= oppReadyT) $('mt-rop').className = 'ok';
       if (!mready) { t = Math.min(t, 1.5); return; }
-      if (t >= Math.max(.45, oppReadyT) && t >= 1.6 && !$('mt-lbl').classList.contains('ok')) { $('mt-lbl').textContent = 'OBAJ GRACZE GOTOWI'; $('mt-lbl').classList.add('ok'); }
+      if (t >= Math.max(.45, online() ? 0 : oppReadyT) && t >= 1.6 && !$('mt-lbl').classList.contains('ok')) { $('mt-lbl').textContent = 'OBAJ GRACZE GOTOWI'; $('mt-lbl').classList.add('ok'); }
       if (t >= 1.9 && curtainT < 0) { curtainT = 0; curtain.classList.add('on'); }
       if (curtainT >= 0) { curtainT += DT; if (curtainT >= .4) { g.enterGame(S.mapIdx); go('intro'); curtain.classList.remove('on'); } }
     },
@@ -438,7 +446,7 @@ export function createMatch(g) {
     if (phase === 'idle') return;
     const inGame = !LOBBY_PHASES.has(phase);
     root.classList.toggle('needclick', phase === 'intro' && paused);
-    if ((inGame && paused) || hold) return;  // pauza (Esc) zatrzymuje plansze i odliczanie; hold = testy
+    if ((inGame && paused && !online()) || hold) return;  // pauza (Esc) zatrzymuje plansze i odliczanie (offline); hold = testy
     DT = dt; t += dt;
     (TICK[phase] || (() => {}))();
   }
@@ -447,8 +455,8 @@ export function createMatch(g) {
     curtain.classList.remove('on'); root.classList.remove('needclick'); document.body.classList.remove('mt-on');
   }
   function abort() { phase = 'idle'; frozen = false; roul = null; hideAll(); }
-  const cancelable = () => CANCELABLE.has(phase) && !S.stake;   // mecz o stawkę: stawka już pobrana, bez anulowania
-  function cancel() { if (!cancelable()) return; abort(); g.exitToLobby(); }
+  const cancelable = () => online() ? phase === 'search' : CANCELABLE.has(phase) && !S.stake;   // online: tylko szukanie (serwer zwraca stawkę)
+  function cancel() { if (!cancelable()) return; if (online() && g.cancelQueue) g.cancelQueue(); abort(); g.exitToLobby(); }
 
   $('mt-cancel').addEventListener('click', cancel);
   $('mt-catch').addEventListener('click', () => { if (phase === 'intro') g.resume(); });
@@ -470,6 +478,12 @@ export function createMatch(g) {
       lastWinner = w; if (w === 'me') S.me++; else S.op++;
       renderHud(w); count.classList.remove('on'); go('killcam'); return true;
     },
+    // online: serwer sparował nas z graczem (nick, nazwa mapy)
+    found(opp, mapName) { if (phase !== 'search') return; S.opp = String(opp || 'Gracz'); if (mapName) S.preset = mapName; go('found'); },
+    // online: obaj gracze wczytali mapę (serwer: 'go')
+    oppGo() { oppGo = true; },
+    // online: przeciwnik wyszedł albo się rozłączył – wygrana walkowerem
+    oppLeft() { if (phase === 'idle' || phase === 'final') return; S.forceWin = true; lastWinner = 'me'; hideAll(); curtain.classList.remove('on'); go('final'); },
     get frozen() { return frozen; },
     get phase() { return phase; },
     get lobbyPhase() { return LOBBY_PHASES.has(phase); },

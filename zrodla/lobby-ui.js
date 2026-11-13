@@ -35,7 +35,7 @@ const DICT = {
     'w.rejected': 'Połączenie odrzucone', 'w.empty': 'Brak operacji', 'w.loginFirst': 'Zaloguj się, aby korzystać z portfela', 'w.errAmount': 'Podaj kwotę od $1 do $10 000', 'w.errFunds': 'Za mało środków',
     'w.errAddr': 'Nieprawidłowy adres Solana', 'w.depOk': 'Dodano ${a} (test)', 'w.wdOk': 'Wypłata ${a} zlecona (test)',
     'tx.deposit': 'Wpłata (test)', 'tx.withdraw': 'Wypłata (test)', 'tx.stake': 'Stawka 1v1', 'tx.win': 'Wygrana 1v1', 'tx.loss': 'Przegrana 1v1',
-    'err.loginToPlay': 'Zaloguj się, aby grać o stawkę', 'err.funds': 'Za mało środków na stawkę – doładuj portfel', 'err.rematchFunds': 'Za mało środków na kolejny mecz',
+    'err.loginToPlay': 'Zaloguj się, aby grać o stawkę', 'err.funds': 'Za mało środków na stawkę – doładuj portfel', 'err.needServer': '1v1 wymaga połączenia z serwerem gry.', 'err.rematchFunds': 'Za mało środków na kolejny mecz',
     'draw.title': 'Losowanie mapy', 'draw.map': 'Mapa',
     'stake.fee': 'Prowizja (10%)', 'set.vMaster': 'Głośność ogólna', 'set.vMasterD': 'Wszystkie dźwięki', 'set.vMenu': 'Dźwięki w menu', 'set.vMenuD': 'Kliknięcia, okna, losowanie mapy', 'set.vGame': 'Dźwięki w grze', 'set.vGameD': 'Strzały, trafienia, przeładowanie', 'set.preview': 'Odsłuchaj', 'set.secView': 'Widok', 'set.secKeys': 'Klawisze', 'set.fovD': 'Szerszy kąt = więcej widać, mniejsze obiekty', 'tx.fee': 'prowizja {a}', 'set.reserved': 'Ten klawisz jest zarezerwowany (bronie 1–4 i Esc)', 'kb.move': 'Ruch', 'kb.fight': 'Walka', 'kb.sys': 'Inne', 'kb.lmb': 'LPM', 'kb.rmb': 'PPM', 'kb.mmb': 'Kółko', 'kb.fire': 'Strzał', 'kb.aim': 'Celowanie', 'kb.wheel': 'Zmiana broni', 'kb.weapons': 'Broń 1–4', 'kb.pause': 'Pauza', 'kb.alt': 'zapasowy',
   },
@@ -63,7 +63,7 @@ const DICT = {
     'w.rejected': 'Connection rejected', 'w.empty': 'No transactions', 'w.loginFirst': 'Log in to use the wallet', 'w.errAmount': 'Enter an amount between $1 and $10,000', 'w.errFunds': 'Insufficient funds',
     'w.errAddr': 'Invalid Solana address', 'w.depOk': 'Added ${a} (test)', 'w.wdOk': 'Withdrawal of ${a} requested (test)',
     'tx.deposit': 'Deposit (test)', 'tx.withdraw': 'Withdrawal (test)', 'tx.stake': '1v1 stake', 'tx.win': '1v1 win', 'tx.loss': '1v1 loss',
-    'err.loginToPlay': 'Log in to play for a stake', 'err.funds': 'Not enough funds for this stake – top up your wallet', 'err.rematchFunds': 'Not enough funds for another match',
+    'err.loginToPlay': 'Log in to play for a stake', 'err.funds': 'Not enough funds for this stake – top up your wallet', 'err.needServer': '1v1 needs a connection to the game server.', 'err.rematchFunds': 'Not enough funds for another match',
     'draw.title': 'Map draw', 'draw.map': 'Map',
     'stake.fee': 'House fee (10%)', 'set.vMaster': 'Master volume', 'set.vMasterD': 'All sounds', 'set.vMenu': 'Menu sounds', 'set.vMenuD': 'Clicks, windows, map draw', 'set.vGame': 'Game sounds', 'set.vGameD': 'Shots, hits, reloads', 'set.preview': 'Preview', 'set.secView': 'View', 'set.secKeys': 'Keys', 'set.fovD': 'Wider angle = see more, smaller objects', 'tx.fee': 'fee {a}', 'set.reserved': 'This key is reserved (weapons 1–4 and Esc)', 'kb.move': 'Movement', 'kb.fight': 'Combat', 'kb.sys': 'Other', 'kb.lmb': 'LMB', 'kb.rmb': 'RMB', 'kb.mmb': 'Wheel', 'kb.fire': 'Fire', 'kb.aim': 'Aim', 'kb.wheel': 'Switch weapon', 'kb.weapons': 'Weapon 1–4', 'kb.pause': 'Pause', 'kb.alt': 'alternate',
   },
@@ -91,7 +91,7 @@ const DICT = {
     'w.rejected': 'Подключение отклонено', 'w.empty': 'Операций нет', 'w.loginFirst': 'Войди, чтобы пользоваться кошельком', 'w.errAmount': 'Введите сумму от $1 до $10 000', 'w.errFunds': 'Недостаточно средств',
     'w.errAddr': 'Неверный адрес Solana', 'w.depOk': 'Добавлено ${a} (тест)', 'w.wdOk': 'Вывод ${a} оформлен (тест)',
     'tx.deposit': 'Пополнение (тест)', 'tx.withdraw': 'Вывод (тест)', 'tx.stake': 'Ставка 1v1', 'tx.win': 'Победа 1v1', 'tx.loss': 'Поражение 1v1',
-    'err.loginToPlay': 'Войди, чтобы играть на ставку', 'err.funds': 'Недостаточно средств для ставки – пополни кошелёк', 'err.rematchFunds': 'Недостаточно средств для следующего матча',
+    'err.loginToPlay': 'Войди, чтобы играть на ставку', 'err.funds': 'Недостаточно средств для ставки – пополни кошелёк', 'err.needServer': 'Для 1v1 нужно подключение к игровому серверу.', 'err.rematchFunds': 'Недостаточно средств для следующего матча',
     'draw.title': 'Выбор карты', 'draw.map': 'Карта',
     'stake.fee': 'Комиссия (10%)', 'set.vMaster': 'Общая громкость', 'set.vMasterD': 'Все звуки', 'set.vMenu': 'Звуки меню', 'set.vMenuD': 'Клики, окна, выбор карты', 'set.vGame': 'Звуки в игре', 'set.vGameD': 'Выстрелы, попадания, перезарядка', 'set.preview': 'Прослушать', 'set.secView': 'Обзор', 'set.secKeys': 'Клавиши', 'set.fovD': 'Шире угол – больше видно, объекты меньше', 'tx.fee': 'комиссия {a}', 'set.reserved': 'Эта клавиша зарезервирована (оружие 1–4 и Esc)', 'kb.move': 'Движение', 'kb.fight': 'Бой', 'kb.sys': 'Прочее', 'kb.lmb': 'ЛКМ', 'kb.rmb': 'ПКМ', 'kb.mmb': 'Колесо', 'kb.fire': 'Выстрел', 'kb.aim': 'Прицел', 'kb.wheel': 'Смена оружия', 'kb.weapons': 'Оружие 1–4', 'kb.pause': 'Пауза', 'kb.alt': 'запасная',
   },
@@ -119,7 +119,7 @@ const DICT = {
     'w.rejected': 'Conexión rechazada', 'w.empty': 'Sin operaciones', 'w.loginFirst': 'Inicia sesión para usar la cartera', 'w.errAmount': 'Introduce un importe entre $1 y $10 000', 'w.errFunds': 'Fondos insuficientes',
     'w.errAddr': 'Dirección de Solana no válida', 'w.depOk': 'Añadidos ${a} (prueba)', 'w.wdOk': 'Retiro de ${a} solicitado (prueba)',
     'tx.deposit': 'Depósito (prueba)', 'tx.withdraw': 'Retiro (prueba)', 'tx.stake': 'Apuesta 1v1', 'tx.win': 'Victoria 1v1', 'tx.loss': 'Derrota 1v1',
-    'err.loginToPlay': 'Inicia sesión para jugar con apuesta', 'err.funds': 'Fondos insuficientes para la apuesta – recarga la cartera', 'err.rematchFunds': 'Fondos insuficientes para otra partida',
+    'err.loginToPlay': 'Inicia sesión para jugar con apuesta', 'err.funds': 'Fondos insuficientes para la apuesta – recarga la cartera', 'err.needServer': 'El 1v1 necesita conexión con el servidor del juego.', 'err.rematchFunds': 'Fondos insuficientes para otra partida',
     'draw.title': 'Sorteo del mapa', 'draw.map': 'Mapa',
     'stake.fee': 'Comisión (10%)', 'set.vMaster': 'Volumen general', 'set.vMasterD': 'Todos los sonidos', 'set.vMenu': 'Sonidos del menú', 'set.vMenuD': 'Clics, ventanas, sorteo del mapa', 'set.vGame': 'Sonidos del juego', 'set.vGameD': 'Disparos, impactos, recargas', 'set.preview': 'Escuchar', 'set.secView': 'Vista', 'set.secKeys': 'Teclas', 'set.fovD': 'Más ángulo = ves más, objetos más pequeños', 'tx.fee': 'comisión {a}', 'set.reserved': 'Esta tecla está reservada (armas 1–4 y Esc)', 'kb.move': 'Movimiento', 'kb.fight': 'Combate', 'kb.sys': 'Otros', 'kb.lmb': 'Clic izq.', 'kb.rmb': 'Clic der.', 'kb.mmb': 'Rueda', 'kb.fire': 'Disparo', 'kb.aim': 'Apuntar', 'kb.wheel': 'Cambiar arma', 'kb.weapons': 'Arma 1–4', 'kb.pause': 'Pausa', 'kb.alt': 'alternativa',
   },
@@ -694,10 +694,11 @@ export function initLobbyUI(ctx) {
     if (!(s >= 1 && s <= 1000)) return toast(t('stake.invalid'), 'err');
     if (!acct) { toast(t('err.loginToPlay')); openModal('lb-auth'); showTab('lb-auth', 'login'); return; }
     if (acct.balance < s) { toast(t('err.funds'), 'err'); openWallet('deposit'); return; }
+    if (!W) return toast(t('err.needServer'), 'err');   // 1v1 to mecz z prawdziwym graczem: potrzebny serwer gry (kolejka)
     if (W) { busy = true;   // stawka pobierana z salda na serwerze (w SOL po bieżącym kursie)
       try { activeMatch = await W.startMatch(s); activeStake = lastStake = s; }
       catch (er) { busy = false; if (er.code === 'funds') { toast(t('err.funds'), 'err'); openWallet('deposit'); } else toast(er.message || t('auth.errDb'), 'err'); return; }
-      SFX.play(); busy = false; ctx.play(m, { stake: s }); return; }
+      SFX.play(); busy = false; ctx.play(m, { stake: s, matchId: activeMatch }); return; }
     busy = true;
     try { await addTx(-s, 'stake'); activeStake = lastStake = s; } catch { busy = false; return toast(t('auth.errDb'), 'err'); }
     SFX.play(); busy = false; ctx.play(m, { stake: s });   // najpierw szukanie przeciwnika, losowanie mapy dopiero potem (match.js: search → found → draw → load)
@@ -708,6 +709,11 @@ export function initLobbyUI(ctx) {
     if (W) { const id = activeMatch; activeMatch = null; sendStats(); W.endMatch(id, won, false, lastMap).catch(er => toast(er.message, 'err')); return; }
     if (won) await addTx(payout(s), 'win', '', { fee: feeOf(s) }); else await addTx(0, 'loss', usd(s));
     logMatch({ stake: s, won, payout: won ? payout(s) : 0, fee: won ? feeOf(s) : 0 });   // panel admina: lista meczów
+  });
+  addEventListener('fasolka:cancelled', e => {
+    activeStake = 0; lastStake = 0; activeMatch = null; busy = false;
+    if (W) W.refresh().catch(() => {}); renderAll();
+    const msg = e.detail && e.detail.message; if (msg) toast(msg, 'err');
   });
   addEventListener('fasolka:rematch', e => {
     if (!lastStake) return;
