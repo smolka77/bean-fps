@@ -1,4 +1,4 @@
-// Serwer portfeli BEENLADEN – konta graczy, adres depozytu SOL dla każdego konta, wykrywanie wpłat,
+// Serwer portfeli BEANLADEN – konta graczy, adres depozytu SOL dla każdego konta, wykrywanie wpłat,
 // wypłaty na dowolny adres, stawki meczów 1v1 i dane dla panelu admina.
 //
 // Model (jak w serwisach z grami): saldo gracza to księga w bazie (lamporty). Każde konto ma własny adres
@@ -29,6 +29,7 @@ const SCAN_MS = +(env.SCAN_MS || 15000);
 const MIN_WITHDRAW_LAMPORTS = Math.round(+(env.MIN_WITHDRAW_SOL || 0.001) * LAMPORTS_PER_SOL);
 const STAKE_MIN_USD = 1, STAKE_MAX_USD = 1000;
 const TX_FEE = 5000;
+const GOOGLE_CLIENT_ID = (env.GOOGLE_CLIENT_ID || '').trim();   // logowanie przez Google (OAuth, typ: aplikacja internetowa)
 const GAME_DIR = path.resolve(env.GAME_DIR || path.join(path.dirname(new URL(import.meta.url).pathname), '..'));   // zbudowana gra (index.html) – serwer może ją podawać pod tym samym adresem                                                   // opłata sieci za prosty przelew (lamporty)
 if (CLUSTER === 'mainnet-beta' && env.ALLOW_MAINNET !== 'tak') {
   console.error('Mainnet jest zablokowany: wyniki meczów liczy przeglądarka gracza (do oszukania). Zobacz README – „Przed mainnetem”.');
@@ -62,7 +63,9 @@ CREATE INDEX IF NOT EXISTS txs_user ON txs(user_id, t DESC);
 CREATE TABLE IF NOT EXISTS deposits(sig TEXT PRIMARY KEY, user_id INTEGER NOT NULL, lamports INTEGER NOT NULL, t INTEGER NOT NULL, swept INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS matches(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), t INTEGER NOT NULL, stake_usd REAL NOT NULL, stake_lamports INTEGER NOT NULL,
   price REAL NOT NULL, state TEXT NOT NULL DEFAULT 'open', payout_lamports INTEGER NOT NULL DEFAULT 0, fee_lamports INTEGER NOT NULL DEFAULT 0, map TEXT, forfeit INTEGER NOT NULL DEFAULT 0, ended INTEGER);
-CREATE INDEX IF NOT EXISTS matches_t ON matches(t DESC);`);
+CREATE INDEX IF NOT EXISTS matches_t ON matches(t DESC);
+CREATE TABLE IF NOT EXISTS config(key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
+for (const c of ['email TEXT', 'avatar TEXT', 'google_sub TEXT']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + c); } catch {} }   // profil: e-mail i awatar (starsze bazy)
 const q = sql => db.prepare(sql);
 const tx = fn => { db.exec('BEGIN IMMEDIATE'); try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; } };
 const STAT_KEYS = ['shots', 'hits', 'heads', 'kills', 'deaths'];
@@ -98,7 +101,7 @@ function totals(uid) {
   return { matches: m.n || 0, wins: m.w || 0, losses: m.l || 0, staked: r2(m.staked), won: r2(m.won), fees: r2(m.fees), deposits: r2(d.dep), withdrawn: r2(d.wd) };
 }
 function publicUser(u) {
-  return { username: u.username, createdAt: new Date(u.created).toISOString(), address: u.address, lamports: u.lamports, sol: u.lamports / LAMPORTS_PER_SOL,
+  return { username: u.username, email: u.email || '', avatar: u.avatar || '', createdAt: new Date(u.created).toISOString(), address: u.address, lamports: u.lamports, sol: u.lamports / LAMPORTS_PER_SOL,
     balance: toUsd(u.lamports), price: PRICE, cluster: CLUSTER, admin: ADMIN_USERS.has(u.username.toLowerCase()),
     stats: { ...Object.fromEntries(STAT_KEYS.map(k => [k, 0])), ...JSON.parse(u.stats || '{}'), ...totals(u.id), lastActive: u.last_active || u.created } };
 }
@@ -268,6 +271,81 @@ const routes = {
       return { account: publicUser(fresh(user.id)), history: histOf(user.id) };
     });
   },
+  'GET /api/config': async () => {
+    const g = k => { const r = q('SELECT value FROM config WHERE key=?').get(k); return r ? r.value : ''; };
+    let authTexts = {}; try { authTexts = JSON.parse(g('authTexts') || '{}'); } catch {}
+    return { businessEmail: g('businessEmail'), googleClientId: GOOGLE_CLIENT_ID, authTexts };
+  },
+  // logowanie przez Google: przeglądarka dostaje token dostępu (Google Identity Services), serwer sprawdza go w Google
+  // (czy wydany dla naszej aplikacji i czy e-mail jest potwierdzony), potem loguje albo zakłada konto
+  'POST /api/google': async ({ body, ip }) => {
+    if (!GOOGLE_CLIENT_ID) throw new E('google_off', 'Logowanie przez Google nie jest skonfigurowane', 503);
+    if (limited(ip)) throw new E('rate', 'Za dużo prób – odczekaj minutę', 429);
+    let info; try { const r = await fetch('https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(String(body.accessToken || '')), { signal: AbortSignal.timeout(8000) }); info = await r.json(); if (!r.ok) throw 0; }
+    catch { throw new E('google', 'Google nie potwierdził logowania – spróbuj ponownie', 401); }
+    if ((info.aud !== GOOGLE_CLIENT_ID && info.azp !== GOOGLE_CLIENT_ID) || !info.sub) throw new E('google', 'Token Google nie jest dla tej gry', 401);
+    if (!info.email || String(info.email_verified) !== 'true') throw new E('google', 'Konto Google bez potwierdzonego e-maila', 401);
+    const email = String(info.email).toLowerCase();
+    let u = q('SELECT * FROM users WHERE google_sub=?').get(info.sub), created = false;
+    if (!u) {
+      // nowe konto: nick z początku adresu e-mail (litery, cyfry, _), w razie zajętości z dopiskiem cyfr
+      let base = email.split('@')[0].replace(/[^a-z0-9_]/gi, '').slice(0, 12) || 'gracz'; if (base.length < 3) base = (base + 'gracz').slice(0, 5);
+      let name = base; for (let i = 0; q('SELECT 1 FROM users WHERE username=?').get(name); i++) name = base + (Math.floor(Math.random() * 9000) + 1000);
+      const pass = await hashPass(crypto.randomBytes(24).toString('base64'));   // hasło losowe – logowanie przez Google
+      const id = tx(() => {
+        const idx = (q('SELECT MAX(idx) m FROM users').get().m || 0) + 1, address = keypairAt(idx).publicKey.toBase58();
+        return Number(q('INSERT INTO users(username,pass,created,idx,address,last_active,email,google_sub) VALUES(?,?,?,?,?,?,?,?)').run(name, pass, Date.now(), idx, address, Date.now(), email, info.sub).lastInsertRowid);
+      });
+      u = fresh(id); created = true; console.log('[konto google]', name, u.address);
+    }
+    q('UPDATE users SET last_active=? WHERE id=?').run(Date.now(), u.id);
+    return { token: newSession(u.id), account: publicUser(fresh(u.id)), history: histOf(u.id), created };
+  },
+  'POST /api/admin/config': async ({ user, body }) => {
+    need(user); if (!ADMIN_USERS.has(user.username.toLowerCase())) throw new E('admin', 'Brak dostępu do panelu admina', 403);
+    const put = (k, v) => q('INSERT INTO config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(k, v), out = {};
+    if (body.businessEmail !== undefined) {
+      const m = String(body.businessEmail ?? '').trim();
+      if (m && (m.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(m))) throw new E('email', 'Nieprawidłowy adres e-mail');
+      put('businessEmail', m); out.businessEmail = m;
+    }
+    if (body.authTexts !== undefined) {   // hasła w oknie logowania: { pl|en|ru|es: { tag, f1, f2, f3 } }, puste = tekst domyślny
+      const clean = {};
+      for (const l of ['pl', 'en', 'ru', 'es']) { const src = (body.authTexts || {})[l] || {}; const o = {};
+        for (const k of ['tag', 'f1', 'f2', 'f3']) { const v = String(src[k] ?? '').trim().slice(0, 140); if (v) o[k] = v; } if (Object.keys(o).length) clean[l] = o; }
+      put('authTexts', JSON.stringify(clean)); out.authTexts = clean;
+    }
+    return out;
+  },
+  'POST /api/profile': async ({ user, body }) => {
+    need(user); const u = fresh(user.id);
+    if (body.username != null && String(body.username).trim() !== u.username) {
+      const n = String(body.username).trim();
+      if (!/^[a-z0-9_]{3,16}$/i.test(n)) throw new E('user', 'Nazwa: 3–16 znaków (litery, cyfry, _)');
+      const other = q('SELECT id FROM users WHERE username=?').get(n); if (other && other.id !== u.id) throw new E('exists', 'Ta nazwa jest zajęta', 409);
+      q('UPDATE users SET username=? WHERE id=?').run(n, u.id);
+    }
+    if (body.email != null) {
+      const m = String(body.email).trim().toLowerCase();
+      if (m && (m.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(m))) throw new E('email', 'Nieprawidłowy adres e-mail');
+      q('UPDATE users SET email=? WHERE id=?').run(m || null, u.id);
+    }
+    if (body.avatar != null) {
+      const a = String(body.avatar);
+      if (a && !(/^preset:[a-z0-9-]{1,24}$/.test(a) || (/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(a) && a.length <= 90000))) throw new E('avatar', 'Nieprawidłowy obrazek (PNG/JPG do ~60 KB)');
+      q('UPDATE users SET avatar=? WHERE id=?').run(a || null, u.id);
+    }
+    return { account: publicUser(fresh(u.id)), history: histOf(u.id) };
+  },
+  'POST /api/password': async ({ user, body, ip }) => {
+    need(user); if (limited('pw:' + ip, 8)) throw new E('rate', 'Za dużo prób – odczekaj minutę', 429);
+    const u = fresh(user.id), np = String(body.newPassword || '');
+    if (!(await checkPass(String(body.oldPassword || ''), u.pass))) throw new E('oldpass', 'Obecne hasło jest nieprawidłowe', 400);
+    if (np.length < 6 || np.length > 128) throw new E('pass', 'Nowe hasło: co najmniej 6 znaków');
+    q('UPDATE users SET pass=? WHERE id=?').run(await hashPass(np), u.id);
+    const m = /^Bearer (.+)$/.exec(user._auth || ''); q('DELETE FROM sessions WHERE user_id=? AND token!=?').run(u.id, m ? sha(m[1]) : '');   // wyloguj inne urządzenia
+    return { ok: true };
+  },
   'POST /api/stats': async ({ user, body }) => {
     need(user); const u = fresh(user.id), st = JSON.parse(u.stats || '{}');
     for (const k of STAT_KEYS) { const v = Math.floor(+body[k] || 0); if (v > 0 && v < 10000) st[k] = (st[k] || 0) + v; }
@@ -293,7 +371,7 @@ function serveGame(p, res) {
   const f = STATIC[p] && path.join(GAME_DIR, STATIC[p]);
   if (!f || !fs.existsSync(f)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Nie znaleziono'); }
   let b = fs.readFileSync(f);
-  if (f.endsWith('index.html')) { const s = b.toString('utf8'), i = s.indexOf('<head>'); b = Buffer.from(i >= 0 ? s.slice(0, i + 6) + '<script>window.BEENLADEN_API=location.origin</script>' + s.slice(i + 6) : s); }
+  if (f.endsWith('index.html')) { const s = b.toString('utf8'), i = s.indexOf('<head>'); b = Buffer.from(i >= 0 ? s.slice(0, i + 6) + '<script>window.BEANLADEN_API=location.origin</script>' + s.slice(i + 6) : s); }
   res.writeHead(200, { 'Content-Type': f.endsWith('.json') ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(b);
 }
 http.createServer(async (req, res) => {
@@ -305,13 +383,14 @@ http.createServer(async (req, res) => {
   try {
     const body = req.method === 'POST' ? await readBody(req) : {};
     const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress;
-    send(res, 200, await h({ req, body, ip, user: userFromReq(req) }), origin);
+    const user = userFromReq(req); if (user) user._auth = req.headers.authorization;
+    send(res, 200, await h({ req, body, ip, user }), origin);
   } catch (e) {
     if (!(e instanceof E)) console.error(key, e);
     send(res, e.status || 500, { error: e.code || 'server', message: e instanceof E ? e.message : 'Błąd serwera' }, origin);
   }
 }).listen(PORT, () => {
-  console.log(`Portfele BEENLADEN: http://localhost:${PORT}  sieć: ${CLUSTER}  skarbiec: ${TREASURY.publicKey.toBase58()}`);
+  console.log(`Portfele BEANLADEN: http://localhost:${PORT}  sieć: ${CLUSTER}  skarbiec: ${TREASURY.publicKey.toBase58()}`);
   if (!ADMIN_USERS.size) console.log('Uwaga: brak ADMIN_USERS – panel admina nie wpuści nikogo.');
 });
 refreshPrice(); setInterval(refreshPrice, 60000);

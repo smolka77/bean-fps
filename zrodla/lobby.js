@@ -51,7 +51,8 @@ const CSS = `
   transition:border-color .15s,background .15s}
 #lb-ui .lb-chip:hover{border-color:rgba(255,198,41,.55);background:rgba(16,22,38,.82)}
 #lb-ui .lb-chip:focus-visible,#lb-ui .lb-burger:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-#lb-ui .lb-coin{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;background:linear-gradient(150deg,#9945ff,#14f195);
+#lb-ui .lb-coin svg{width:15px;height:12px;display:block}
+#lb-ui .lb-coin{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;background:radial-gradient(circle at 30% 25%,#252a3d,#0b0d16);border:1px solid rgba(255,255,255,.12);
   color:#fff;font:800 16px/1 Inter,sans-serif;box-shadow:inset 0 -2px 0 rgba(0,0,0,.2)}
 #lb-ui .lb-wbal{display:flex;align-items:baseline;gap:5px}
 #lb-ui .lb-wbal b{font:700 19px/1 Rajdhani,Oswald,sans-serif;letter-spacing:.02em}
@@ -84,6 +85,8 @@ const CSS = `
 #lb-ui .lb-plate{position:absolute;left:0;top:0;transform:translate(-50%,-100%);white-space:nowrap;display:flex;flex-direction:column;align-items:center;gap:4px}
 #lb-ui .lb-plate>span{font:700 22px/1 Rajdhani,Oswald,sans-serif;letter-spacing:.05em;text-shadow:0 2px 6px rgba(0,0,0,.6)}
 #lb-ui .lb-plate small{font:700 9.5px/1 Inter,sans-serif;letter-spacing:.16em;color:#04220f;background:var(--ok);border-radius:4px;padding:3px 7px}
+/* READY: tyle samo zieleni nad i pod napisem – ramka liczona od wysokości wielkich liter, niezależnie od czcionki (gdzie przeglądarka to obsługuje) */
+@supports (text-box:trim-both cap alphabetic){#lb-ui .lb-plate small{text-box:trim-both cap alphabetic;padding:4px 7px 5px 7.5px}}
 #lb-ui .lb-plate em{display:block;font:700 9.5px/1 Inter,sans-serif;font-style:normal;letter-spacing:.14em;color:#1a1200;background:var(--acc);
   border-radius:4px;padding:4px 7px;opacity:0;transform:translateY(4px);transition:opacity .15s,transform .15s}
 #lb-ui .lb-plate.hov em{opacity:1;transform:none}
@@ -108,15 +111,36 @@ const CSS = `
 #lb-ui .lb-lbl{display:flex;justify-content:space-between;align-items:center;font:700 10px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);margin:0 2px 8px}
 #lb-ui .lb-usdt{display:inline-flex;align-items:center;gap:5px;color:#5fe0b8}
 #lb-ui .lb-usdt::before{content:"";width:7px;height:7px;border-radius:50%;background:#2fd3a0;box-shadow:0 0 8px #2fd3a0}
-#lb-ui .lb-stake{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-#lb-ui .lb-stake button{height:44px;border-radius:10px;border:1px solid var(--line2);background:rgba(255,255,255,.04);cursor:pointer;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:background .12s,border-color .12s,transform .12s}
-#lb-ui .lb-stake button:hover{background:rgba(255,255,255,.09);transform:translateY(-1px)}
-#lb-ui .lb-stake button b{font:700 19px/1 Rajdhani,Oswald,sans-serif;letter-spacing:.02em}
-#lb-ui .lb-stake button small{font:600 8.5px/1 Inter,sans-serif;letter-spacing:.12em;color:var(--mut)}
-#lb-ui .lb-stake button[data-stake=custom] b{font-size:15px;text-transform:uppercase;letter-spacing:.04em}
-#lb-ui .lb-stake button.on{border-color:var(--acc);background:rgba(255,198,41,.13);box-shadow:inset 0 0 0 1px var(--acc)}
-#lb-ui .lb-stake button.on small{color:var(--acc)}
+/* stawka: kafelki z kwotą w $ i jej równowartością w SOL, kupon z prowizją i mnożnikiem wygranej */
+#lb-ui .lb-solq{font:600 10.5px/1 Inter,sans-serif;letter-spacing:.02em;text-transform:none;color:var(--mut);font-variant-numeric:tabular-nums}
+#lb-ui .lb-solq b{color:#d9def0;font-weight:700}
+#lb-ui .lb-stake{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+#lb-ui .lb-stake button{position:relative;height:56px;border-radius:12px;border:1px solid rgba(255,255,255,.1);overflow:hidden;cursor:pointer;color:#eef1f7;
+  background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;transition:background .15s,border-color .15s,transform .15s,box-shadow .15s}
+#lb-ui .lb-stake button:hover{border-color:rgba(255,255,255,.24);transform:translateY(-1px);background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.04))}
+#lb-ui .lb-stake button:active{transform:translateY(0)}
+#lb-ui .lb-stake button b{font:700 25px/1 Rajdhani,Oswald,sans-serif;letter-spacing:.01em;font-variant-numeric:tabular-nums}
+#lb-ui .lb-stake button b i{font-style:normal;font-size:.6em;vertical-align:.42em;margin-right:1px;opacity:.75}
+#lb-ui .lb-stake button small{font:600 9.5px/1 Inter,sans-serif;letter-spacing:.03em;color:var(--mut);font-variant-numeric:tabular-nums;white-space:nowrap}
+#lb-ui .lb-stake button[data-stake=custom] b{font-size:15px;text-transform:uppercase;letter-spacing:.06em}
+#lb-ui .lb-stake button.on{border-color:rgba(255,198,41,.95);background:linear-gradient(180deg,rgba(255,198,41,.26),rgba(255,198,41,.07));
+  box-shadow:inset 0 0 0 1px rgba(255,198,41,.9),inset 0 1px 0 rgba(255,240,180,.35),0 8px 22px rgba(255,170,0,.22)}
+#lb-ui .lb-stake button.on b{color:#ffe28a;text-shadow:0 0 18px rgba(255,198,41,.35)}
+#lb-ui .lb-stake button.on small{color:rgba(255,226,138,.85)}
+#lb-ui .lb-stake button.on::after{content:"";position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--acc);box-shadow:0 0 8px var(--acc)}
+#lb-ui .lb-stakewrap.off .lb-stake button{opacity:.38;filter:grayscale(1);cursor:not-allowed;transform:none;box-shadow:none}
+#lb-ui .lb-stakewrap.off .lb-slip{opacity:.55}
+#lb-ui .lb-stakewrap.off .lb-slip b{text-shadow:none}
+#lb-ui .lb-wv em:empty{display:none}
+#lb-ui .lb-slip{margin-top:10px;padding:11px 13px;border-radius:12px;background:rgba(0,0,0,.24);border:1px solid rgba(255,255,255,.06)}
+#lb-ui .lb-slip[hidden]{display:none}
+#lb-ui .lb-slip .lb-win{margin:0}
+#lb-ui .lb-slip .lb-fee+.lb-win{margin-top:9px;padding-top:9px;border-top:1px dashed rgba(255,255,255,.1)}
+#lb-ui .lb-wv{display:inline-flex;align-items:center;gap:8px}
+#lb-ui .lb-wv em{font:700 10px/1 Inter,sans-serif;font-style:normal;letter-spacing:.04em;padding:4px 7px;border-radius:999px;color:#7ff0b4;background:rgba(47,210,122,.13);border:1px solid rgba(47,210,122,.3)}
+#lb-ui .lb-slip .lb-win:not(.lb-fee) span{color:#e6eaf4;font-weight:600}
+#lb-ui .lb-slip .lb-win:not(.lb-fee) b{font-size:23px;text-shadow:0 0 18px rgba(47,210,122,.35)}
 #lb-ui .lb-custom{display:flex;align-items:center;margin-top:8px;border:1px solid var(--line2);border-radius:10px;background:rgba(0,0,0,.25);transition:border-color .12s}
 #lb-ui .lb-custom:focus-within{border-color:var(--acc)}
 #lb-ui .lb-custom input{flex:1;min-width:0;height:42px;border:0;background:none;outline:none;padding:0 12px;color:#fff;font:700 18px/1 Rajdhani,Oswald,sans-serif;letter-spacing:.02em;
@@ -195,9 +219,124 @@ const CSS = `
 #lb-ui .lb-vval{font:700 20px/1 Rajdhani,Oswald,sans-serif;color:var(--c);min-width:54px;text-align:right}
 #lb-ui .lb-vrow.muted .lb-vval{color:var(--mut)}
 #lb-ui .lb-vsl{grid-column:2/4;display:flex;align-items:center;gap:12px}
+/* czułość myszy (zakładka Sterowanie) – ten sam wygląd co suwaki głośności */
+#lb-ui .lb-srow{display:grid;grid-template-columns:48px minmax(0,1fr) auto;align-items:center;gap:10px 14px;padding:14px 16px;margin-bottom:10px;border-radius:16px;
+  background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));border:1px solid var(--line)}
+#lb-ui .lb-srow .lb-vic{cursor:default}#lb-ui .lb-srow .lb-vic svg{display:block!important}
 #lb-ui .lb-vplay{width:32px;height:32px;flex:none;border-radius:50%;border:1px solid var(--line2);background:rgba(255,255,255,.05);color:#fff;cursor:pointer;display:grid;place-items:center}
 #lb-ui .lb-vplay:hover{border-color:var(--c);color:var(--c)}
 #lb-ui .lb-vplay svg{width:13px;height:13px;margin-left:2px}
+/* logowanie / rejestracja: panel z grafiką gry + formularz (Google, pokaż hasło, siła hasła, zgoda 18+) */
+#lb-ui .lb-dlg.lb-authdlg{width:min(880px,100%);padding:0;display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);overflow:hidden;border-radius:22px;
+  border:1px solid rgba(255,255,255,.12);box-shadow:0 40px 100px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06)}
+#lb-ui .lb-aart{position:relative;overflow:hidden;padding:30px 28px;display:flex;flex-direction:column;justify-content:space-between;min-height:0;
+  background:#5a2a4a}
+#lb-ui .lb-abg{position:absolute;inset:0;overflow:hidden;background:#140a10}   /* tło: zmieniające się ujęcia z map gry */
+#lb-ui .lb-abg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.04);transition:opacity 1.1s ease}
+#lb-ui .lb-abg img.on{opacity:1;animation:lb-kb 5.5s linear forwards}
+@keyframes lb-kb{to{transform:scale(1.12)}}
+@media (prefers-reduced-motion:reduce){#lb-ui .lb-abg img.on{animation:none}}
+#lb-ui .lb-ashade{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(14,6,10,.85) 0%,rgba(30,10,12,.25) 24%,rgba(0,0,0,0) 46%,rgba(24,8,10,.3) 64%,rgba(12,5,8,.9) 100%),repeating-linear-gradient(115deg,rgba(255,255,255,.035) 0 2px,transparent 2px 14px)}
+#lb-ui .lb-aart::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 45%,transparent 55%,rgba(10,4,16,.45));pointer-events:none}
+#lb-ui .lb-atop,#lb-ui .lb-afeat{position:relative;z-index:1}
+#lb-ui .lb-alogo{font:400 40px/1 Anton,Oswald,Impact,sans-serif;letter-spacing:.04em;transform:skewX(-6deg);color:#fff;text-shadow:0 3px 0 rgba(60,0,30,.45),0 10px 30px rgba(0,0,0,.3)}
+#lb-ui .lb-alogo b{color:#ffd23a;font-weight:400}
+#lb-ui .lb-atop p{margin:8px 0 0;font:700 13.5px/1.3 Inter,sans-serif;letter-spacing:.01em;color:rgba(255,236,220,.92);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* jedna linijka */
+#lb-ui .lb-afeat{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+#lb-ui .lb-afeat li{display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:12px;background:rgba(20,6,24,.38);border:1px solid rgba(255,255,255,.14);
+  font:600 13px/1.25 Inter,sans-serif;color:#fff;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+#lb-ui .lb-afeat i{flex:none;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;background:rgba(255,255,255,.14);font-style:normal;font-size:14px}
+#lb-ui .lb-aform{position:relative;padding:30px 30px 20px;background:linear-gradient(180deg,#121a2c,#0b111e);overflow:auto;display:flex;flex-direction:column;justify-content:center}   /* wysokość okna = formularz; odstęp na dole jak nad przyciskiem */
+#lb-ui .lb-aform>.lb-x{position:absolute;top:16px;right:16px;z-index:2}
+#lb-ui .lb-ah{margin:0;font:800 26px/1.15 Inter,sans-serif;letter-spacing:-.01em;color:#fff;padding-right:40px}
+#lb-ui .lb-asub{margin:6px 0 18px;font:500 13.5px/1.4 Inter,sans-serif;color:var(--mut)}
+#lb-ui .lb-atabs{margin-bottom:16px}
+#lb-ui .lb-gbtn{width:100%;height:48px;display:flex;align-items:center;justify-content:center;gap:12px;border-radius:13px;border:1px solid rgba(255,255,255,.16);background:#fff;color:#1f2430;
+  font:700 14.5px/1 Inter,sans-serif;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.25);transition:transform .15s,box-shadow .15s,filter .15s}
+#lb-ui .lb-gbtn:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(0,0,0,.32)}
+#lb-ui .lb-gbtn:disabled{filter:grayscale(.4) brightness(.9);cursor:progress}
+#lb-ui .lb-gbtn svg{width:20px;height:20px}
+#lb-ui .lb-or{display:flex;align-items:center;gap:12px;margin:16px 0;font:600 11px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+#lb-ui .lb-or::before,#lb-ui .lb-or::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.1)}
+#lb-ui label.lb-af{display:block;margin-bottom:13px}
+#lb-ui label.lb-af>span{display:block;margin-bottom:6px;font:600 12px/1 Inter,sans-serif;color:#aeb8cc}
+#lb-ui label.lb-af>i{display:block;margin-top:5px;font:500 11.5px/1.3 Inter,sans-serif;font-style:normal;color:#6f7a8f}
+#lb-ui .lb-aiw{position:relative}
+#lb-ui .lb-aiw>svg{position:absolute;left:14px;top:50%;width:17px;height:17px;transform:translateY(-50%);color:#7d889c;pointer-events:none}
+#lb-ui .lb-aiw input{width:100%;height:48px;padding:0 44px 0 42px;border-radius:13px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.12);color:#fff;
+  font:600 15px/1 Inter,sans-serif;outline:none;transition:border-color .15s,box-shadow .15s;-webkit-user-select:text;user-select:text}
+#lb-ui .lb-aiw input:focus{border-color:rgba(255,198,41,.65);box-shadow:0 0 0 3px rgba(255,198,41,.13)}
+#lb-ui .lb-aiw:focus-within>svg{color:var(--acc)}
+#lb-ui .lb-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:0;border-radius:10px;background:none;color:#7d889c;cursor:pointer;display:grid;place-items:center}
+#lb-ui .lb-eye:hover{color:#fff;background:rgba(255,255,255,.06)}
+#lb-ui .lb-eye.on{color:var(--acc)}
+#lb-ui .lb-eye svg{width:18px;height:18px}
+#lb-ui .lb-pwm{display:grid;grid-template-columns:repeat(4,1fr) auto;gap:5px;align-items:center;margin-top:7px}
+#lb-ui .lb-pwm b{height:4px;border-radius:2px;background:rgba(255,255,255,.1);transition:background .2s}
+#lb-ui .lb-pwm em{min-width:56px;text-align:right;font:600 11px/1 Inter,sans-serif;font-style:normal;color:var(--mut)}
+#lb-ui .lb-pwm[data-s="1"] b:nth-child(-n+1){background:#ff6b5e}#lb-ui .lb-pwm[data-s="2"] b:nth-child(-n+2){background:#ffb020}
+#lb-ui .lb-pwm[data-s="3"] b:nth-child(-n+3){background:#c6e04a}#lb-ui .lb-pwm[data-s="4"] b{background:#2fd27a}
+#lb-ui .lb-terms{display:flex;align-items:flex-start;gap:10px;margin:4px 0 14px;cursor:pointer;font:500 12.5px/1.45 Inter,sans-serif;color:#aeb8cc}
+#lb-ui .lb-terms input{position:absolute;opacity:0;pointer-events:none}
+#lb-ui .lb-terms>i{flex:none;width:20px;height:20px;margin-top:1px;border-radius:6px;border:1.5px solid rgba(255,255,255,.28);background:rgba(0,0,0,.25);display:grid;place-items:center;transition:background .15s,border-color .15s}
+#lb-ui .lb-terms input:checked+i{background:var(--acc);border-color:var(--acc)}
+#lb-ui .lb-terms input:checked+i::after{content:"";width:10px;height:5px;border:2.5px solid #1d1300;border-top:0;border-right:0;transform:translateY(-1px) rotate(-45deg)}
+#lb-ui .lb-terms input:focus-visible+i{box-shadow:0 0 0 3px rgba(255,198,41,.35)}
+#lb-ui .lb-terms a{color:#ffd36a;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+#lb-ui .lb-abtn{width:100%;height:50px;margin-top:7px;border:0;border-radius:13px;cursor:pointer;font:800 15px/1 Inter,sans-serif;letter-spacing:.02em;color:#1d1300;
+  background:linear-gradient(180deg,#ffe066,#ffc629 55%,#f5a90a);box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 10px 26px rgba(255,170,0,.3);transition:transform .15s,filter .15s}
+#lb-ui .lb-abtn:hover{transform:translateY(-1px);filter:brightness(1.05)}
+#lb-ui .lb-abtn:disabled{filter:grayscale(.5);cursor:progress;transform:none}
+#lb-ui .lb-aswap{margin:14px 0 0;text-align:center;font:500 13px/1 Inter,sans-serif;color:var(--mut)}
+#lb-ui .lb-aswap button{border:0;background:none;padding:0;color:#ffd36a;font:700 13px/1 Inter,sans-serif;cursor:pointer}
+#lb-ui .lb-aswap button:hover{text-decoration:underline}
+#lb-ui #lb-auth .lb-err{margin:-2px 0 12px;padding:10px 12px;border-radius:11px;background:rgba(255,107,94,.1);border:1px solid rgba(255,107,94,.35);color:#ffd2cc;font:600 13px/1.35 Inter,sans-serif}
+#lb-ui #lb-auth-in{padding-top:30px}
+@media (max-width:760px){#lb-ui .lb-dlg.lb-authdlg{grid-template-columns:1fr}#lb-ui .lb-aart{min-height:0;padding:22px 22px 18px}
+  #lb-ui .lb-afeat{display:none}#lb-ui .lb-alogo{font-size:32px}#lb-ui .lb-aform{padding:22px 20px}}
+/* zakładka Biznes: kontakt biznesowy (adres ustawia admin), regulamin, polityka prywatności */
+#lb-ui .lb-bizcard{position:relative;overflow:hidden;padding:26px 24px 22px;border-radius:18px;text-align:center;border:1px solid rgba(255,198,41,.3);
+  background:linear-gradient(180deg,rgba(255,198,41,.1),rgba(255,255,255,.02) 55%),#0f1524;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+#lb-ui .lb-bizglow{position:absolute;left:50%;top:-120px;width:420px;height:220px;transform:translateX(-50%);background:radial-gradient(closest-side,rgba(255,198,41,.28),transparent);pointer-events:none}
+#lb-ui .lb-bizic{position:relative;width:56px;height:56px;margin:0 auto 12px;border-radius:17px;display:grid;place-items:center;background:linear-gradient(150deg,#ffd76a,#f09a1a);color:#2a1c00;
+  box-shadow:0 12px 28px rgba(240,154,26,.35),inset 0 -3px 0 rgba(0,0,0,.15)}
+#lb-ui .lb-bizic svg{width:26px;height:26px}
+#lb-ui .lb-bizcard h4{position:relative;margin:0;font:800 22px/1.2 Inter,sans-serif;letter-spacing:-.01em}
+#lb-ui .lb-bizcard p{position:relative;max-width:440px;margin:6px auto 18px;font:500 13.5px/1.45 Inter,sans-serif;color:var(--mut)}
+#lb-ui .lb-mailbox{position:relative;display:flex;align-items:center;gap:12px;padding:10px 10px 10px 14px;border-radius:14px;background:rgba(0,0,0,.32);border:1px solid var(--line2);text-align:left;flex-wrap:wrap}
+#lb-ui .lb-mailbox>i{flex:none;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:rgba(255,198,41,.12);color:var(--acc)}
+#lb-ui .lb-mailbox>i svg{width:19px;height:19px}
+#lb-ui .lb-mailbox>span{flex:1;min-width:160px}
+#lb-ui .lb-mailbox small{display:block;font:600 10.5px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
+#lb-ui .lb-mailbox b{display:block;margin-top:5px;font:700 16px/1.2 Inter,sans-serif;color:#fff;word-break:break-all;-webkit-user-select:text;user-select:text}
+#lb-ui .lb-mailbox.none b{color:var(--mut);font-weight:600;font-size:14px}
+#lb-ui .lb-bizbtn{height:40px;padding:0 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(255,255,255,.06);color:#fff;font:700 13px/1 Inter,sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:7px;text-decoration:none}
+#lb-ui .lb-bizbtn:hover{background:rgba(255,255,255,.12)}
+#lb-ui .lb-bizbtn.pri{border:0;background:linear-gradient(180deg,#ffd84d,#ffb411);color:#1d1300;box-shadow:0 8px 20px rgba(255,180,17,.25)}
+#lb-ui .lb-bizback{height:38px;padding:0 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(255,255,255,.06);color:#fff;font:700 13px/1 Inter,sans-serif;cursor:pointer}
+#lb-ui .lb-bizback:hover{background:rgba(255,255,255,.12)}
+#lb-ui .lb-docsh{margin-top:20px!important}
+#lb-ui .lb-docs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#lb-ui .lb-docbtn{display:flex;align-items:center;gap:13px;padding:16px;border-radius:15px;border:1px solid var(--line2);background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));color:#fff;text-align:left;cursor:pointer;
+  transition:background .15s,border-color .15s,transform .15s}
+#lb-ui .lb-docbtn:hover{transform:translateY(-2px);background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.03))}
+#lb-ui .lb-docbtn.t:hover{border-color:rgba(255,198,41,.5)}#lb-ui .lb-docbtn.p:hover{border-color:rgba(153,69,255,.6)}
+#lb-ui .lb-docbtn>i{flex:none;width:42px;height:42px;border-radius:12px;display:grid;place-items:center}
+#lb-ui .lb-docbtn.t>i{background:rgba(255,198,41,.13);color:var(--acc)}#lb-ui .lb-docbtn.p>i{background:rgba(153,69,255,.16);color:#c3a4ff}
+#lb-ui .lb-docbtn>i svg{width:20px;height:20px}
+#lb-ui .lb-docbtn b{display:block;font:700 14.5px/1.2 Inter,sans-serif}
+#lb-ui .lb-docbtn small{display:block;margin-top:4px;font:500 12px/1.35 Inter,sans-serif;color:var(--mut)}
+#lb-ui .lb-docbtn em{margin-left:auto;font-style:normal;color:var(--mut);font-size:20px}
+#lb-ui .lb-doc{max-height:min(56vh,520px);overflow:auto;margin-top:10px;padding:4px 18px 18px;border-radius:14px;background:rgba(0,0,0,.2);border:1px solid var(--line);
+  font:500 13.5px/1.6 Inter,sans-serif;color:#cfd6e4;-webkit-user-select:text;user-select:text}
+#lb-ui .lb-doc h4{margin:16px 0 2px;font:800 20px/1.2 Inter,sans-serif;color:#fff}
+#lb-ui .lb-doc .lg-upd{margin:0 0 6px;font-size:12px;color:var(--mut)}
+#lb-ui .lb-doc h5{margin:18px 0 6px;font:700 14px/1.3 Inter,sans-serif;color:#fff}
+#lb-ui .lb-doc p{margin:0 0 8px}#lb-ui .lb-doc ul{margin:0 0 8px;padding-left:20px}#lb-ui .lb-doc li{margin:3px 0}
+#lb-ui .lb-doc a{color:#ffd36a}#lb-ui .lb-doc b{color:#fff}
+#lb-ui .lb-doc .lg-todo{padding:1px 6px;border-radius:5px;background:rgba(255,198,41,.15);color:#ffd36a;font-weight:700;font-size:12px}
+@media (max-width:640px){#lb-ui .lb-docs{grid-template-columns:1fr}}
 #lb-ui .lb-sec{margin:0 0 10px;font:700 11px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
 #lb-ui .lb-sec:not(:first-child){margin-top:18px}
 #lb-ui .lb-sec+.lb-note{margin:-2px 0 10px}
@@ -388,6 +527,9 @@ const CSS = `
 #lb-ui .lb-skin span{font:600 12.5px/1.1 Inter,sans-serif;text-align:center}
 #lb-ui .lb-skin small{font:700 8.5px/1 Inter,sans-serif;letter-spacing:.12em;color:var(--acc);min-height:9px}
 #lb-ui .lb-skins .lb-btn{align-self:flex-start;margin-top:auto}
+/* panel trybu, stawki i GRAJ – skala na komputerze (cały element w tej samej proporcji) */
+@media (min-width:641px) and (min-height:640px){#lb-ui .lb-dock{zoom:1.012}}
+@media (min-width:1500px) and (min-height:860px){#lb-ui .lb-dock{zoom:1.1}}
 @media (max-width:640px){
   #lb-ui .lb-dock{left:12px;right:12px;width:auto;bottom:max(12px,env(safe-area-inset-bottom))}
   #lb-ui .lb-card{padding:10px}
@@ -445,11 +587,11 @@ const X_BTN = `<button class="lb-x" type="button" aria-label="Zamknij">${IC.x}</
 const HTML = `
 <div class="lb-shade"></div>
 <header class="lb-top">
-  <div class="lb-logo">BEEN<b>LADEN</b></div>
+  <div class="lb-logo">BEAN<b>LADEN</b></div>
   <div class="lb-sp"></div>
   <div class="lb-lang"><button class="lb-chip lb-lchip" id="lb-langbtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Language"><i class="lb-flag" id="lb-langflag"></i><b id="lb-langcode">EN</b><svg class="lb-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4.5 6 8.5 10 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
     <div class="lb-langmenu" id="lb-langmenu" role="menu" hidden></div></div>
-  <button class="lb-chip lb-wchip" id="lb-walletchip" type="button" aria-label="Portfel"><span class="lb-coin">◎</span><span class="lb-wbal"><b id="lb-bal">—</b><small data-i18n="cur.in">in SOL</small></span><span class="lb-plus">+</span></button>
+  <button class="lb-chip lb-wchip" id="lb-walletchip" type="button" aria-label="Portfel"><span class="lb-coin"><svg viewBox="0 0 398 312" aria-hidden="true"><defs><linearGradient id="lbsol" x1="361" y1="-37" x2="141" y2="383" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#00ffa3"/><stop offset="1" stop-color="#dc1fff"/></linearGradient></defs><g fill="url(#lbsol)"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1z"/></g></svg></span><span class="lb-wbal"><b id="lb-bal">—</b><small data-i18n="cur.in">in SOL</small></span><span class="lb-plus">+</span></button>
     <button class="lb-burger" id="lb-burger" type="button" aria-label="Menu" aria-haspopup="menu" aria-expanded="false"><span></span><span></span><span></span></button>
 </header>
 <nav class="lb-menu" id="lb-menu" role="menu" hidden>
@@ -467,15 +609,15 @@ const HTML = `
     <button class="lb-mode" id="lb-mode" type="button" aria-haspopup="dialog"><div class="lb-thumb" id="lb-mode-ic"></div>
       <div class="lb-mtxt"><small data-i18n="mode.label"></small><span id="lb-mode-name"></span><em id="lb-mode-desc"></em></div><i class="lb-chev"><span data-i18n="mode.change"></span> ›</i></button>
     <div class="lb-stakewrap" id="lb-stake-wrap">
-      <div class="lb-lbl"><span data-i18n="stake.label"></span><span class="lb-usdt" data-i18n="cur.tag">USD · paid in SOL</span></div>
+      <div class="lb-lbl"><span data-i18n="stake.label"></span><span class="lb-solq" id="lb-stake-sol"></span></div>
       <div class="lb-stake" id="lb-stake">
-        <button type="button" data-stake="5"><b>$5</b><small data-i18n="cur.in">in SOL</small></button><button type="button" data-stake="10"><b>$10</b><small data-i18n="cur.in">in SOL</small></button>
-        <button type="button" data-stake="20"><b>$20</b><small data-i18n="cur.in">in SOL</small></button><button type="button" data-stake="custom"><b data-i18n="stake.custom"></b><small>$1–1000</small></button>
+        <button type="button" data-stake="5"><b><i>$</i>5</b><small data-sol="5">SOL</small></button><button type="button" data-stake="10"><b><i>$</i>10</b><small data-sol="10">SOL</small></button>
+        <button type="button" data-stake="20"><b><i>$</i>20</b><small data-sol="20">SOL</small></button><button type="button" data-stake="custom"><b data-i18n="stake.custom"></b><small>$1–1000</small></button>
       </div>
       <div class="lb-custom" id="lb-stake-custom" hidden><input id="lb-stake-in" type="number" min="1" max="1000" step="1" inputmode="numeric" data-i18n-ph="stake.range" aria-label="USD"><span>USD</span></div>
       <div class="lb-free" id="lb-stake-free" hidden>${IC.info}<span data-i18n="stake.free"></span></div>
-      <div class="lb-win lb-fee" id="lb-stake-feerow"><span data-i18n="stake.fee"></span><b id="lb-stake-fee"></b></div>
-      <div class="lb-win" id="lb-stake-winrow"><span data-i18n="stake.win"></span><b id="lb-stake-win"></b></div>
+      <div class="lb-slip" id="lb-stake-slip"><div class="lb-win lb-fee" id="lb-stake-feerow"><span data-i18n="stake.fee"></span><b id="lb-stake-fee"></b></div>
+      <div class="lb-win" id="lb-stake-winrow"><span data-i18n="stake.win"></span><span class="lb-wv"><em id="lb-stake-x"></em><b id="lb-stake-win"></b></span></div></div>
     </div>
   </div>
   <div class="lb-playwrap"><button class="lb-play" id="lb-play" type="button"><span class="lb-pl" data-i18n="play"></span><small id="lb-play-sub"></small></button></div>
@@ -492,20 +634,19 @@ const HTML = `
 </div>
 <div class="lb-modal" id="lb-set" hidden><div class="lb-dlg lb-wide" role="dialog" aria-modal="true">
   <div class="lb-dh"><h3 data-i18n="set.title"></h3>${X_BTN}</div>
-  <div class="lb-tabs"><button type="button" data-tab="audio" class="on" data-i18n="set.audio"></button><button type="button" data-tab="controls" data-i18n="set.controls"></button><button type="button" data-tab="lang" data-i18n="set.lang"></button></div>
-  <div data-pane="audio">
+  <div class="lb-tabs"><button type="button" data-tab="controls" class="on" data-i18n="set.controls"></button><button type="button" data-tab="audio" data-i18n="set.audio"></button><button type="button" data-tab="lang" data-i18n="set.lang"></button><button type="button" data-tab="biz" data-i18n="set.biz"></button></div>
+  <div data-pane="audio" hidden>
     ${VROW('volume', 'c-move', 'vol', 'set.vMaster', 'set.vMasterD')}
     ${VROW('vMenu', 'c-sys', 'menu', 'set.vMenu', 'set.vMenuD')}
     ${VROW('vGame', 'c-fight', 'cross', 'set.vGame', 'set.vGameD')}
   </div>
-  <div data-pane="controls" hidden>
-    <h5 class="lb-sec" data-i18n="set.secView"></h5>
-    <div class="lb-fovcard">
-      <svg class="lb-fovsvg" viewBox="0 0 120 64" aria-hidden="true"><defs><radialGradient id="lbfovg" cx="60" cy="58" r="56" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffc629" stop-opacity=".6"/><stop offset="1" stop-color="#ffc629" stop-opacity=".04"/></radialGradient></defs>
-        <path d="M8 58A52 52 0 0 1 112 58" fill="none" stroke="rgba(255,255,255,.1)" stroke-dasharray="2 3"/><path id="lb-fov-wedge" fill="url(#lbfovg)" stroke="#ffc629" stroke-width="1.2" stroke-linejoin="round"/>
-        <circle cx="60" cy="58" r="4.5" fill="#ffc629"/><circle cx="60" cy="58" r="8" fill="none" stroke="rgba(255,198,41,.35)"/></svg>
-      <div class="lb-fovmain"><div class="lb-row"><label for="lb-fov" data-i18n="set.fov"></label><b id="lb-fov-v"></b></div><small data-i18n="set.fovD"></small><input type="range" id="lb-fov" min="60" max="110" step="1"></div>
-    </div>
+  <div data-pane="biz" hidden><div class="lb-biz" id="lb-biz"></div></div>
+  <div data-pane="controls">
+    <h5 class="lb-sec" data-i18n="set.secMouse"></h5>
+    <div class="lb-srow c-move" data-k="sens"><span class="lb-vic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 7v4"/></svg></span><div class="lb-vtt"><b data-i18n="set.sens"></b><small data-i18n="set.sensD"></small></div><b class="lb-vval"></b>
+      <div class="lb-vsl"><input type="range" min="0.2" max="3" step="0.05" data-i18n-title="set.sens"></div></div>
+    <div class="lb-srow c-fight" data-k="sensAds"><span class="lb-vic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></span><div class="lb-vtt"><b data-i18n="set.sensAds"></b><small data-i18n="set.sensAdsD"></small></div><b class="lb-vval"></b>
+      <div class="lb-vsl"><input type="range" min="0.2" max="2" step="0.05" data-i18n-title="set.sensAds"></div></div>
     <h5 class="lb-sec" data-i18n="set.secKeys"></h5>
     <p class="lb-note" data-i18n="set.bindHint"></p>
     <div class="lb-binds" id="lb-binds"></div>
@@ -525,28 +666,41 @@ const HTML = `
   </div>
   <div data-pane="lang" hidden><div class="lb-langs" id="lb-langs"></div></div>
 </div></div>
-<div class="lb-modal" id="lb-auth" hidden><div class="lb-dlg lb-sm" role="dialog" aria-modal="true">
-  <div class="lb-dh"><h3 data-i18n="auth.title"></h3>${X_BTN}</div>
-  <div id="lb-auth-out">
-    <div class="lb-tabs"><button type="button" data-tab="login" class="on" data-i18n="auth.login"></button><button type="button" data-tab="register" data-i18n="auth.register"></button></div>
-    <form data-pane="login" id="lb-login-form" novalidate>
-      <label class="lb-field"><span data-i18n="auth.user"></span><input id="lb-l-user" autocomplete="username" maxlength="16" spellcheck="false" autocapitalize="off"></label>
-      <label class="lb-field"><span data-i18n="auth.pass"></span><input id="lb-l-pass" type="password" autocomplete="current-password" maxlength="128"></label>
-      <p class="lb-err" id="lb-login-err" hidden></p>
-      <button class="lb-btn pri" type="submit" data-i18n="auth.doLogin"></button>
-    </form>
-    <form data-pane="register" id="lb-reg-form" novalidate hidden>
-      <label class="lb-field"><span data-i18n="auth.user"></span><input id="lb-r-user" autocomplete="username" maxlength="16" spellcheck="false" autocapitalize="off"><i data-i18n="auth.userRule"></i></label>
-      <label class="lb-field"><span data-i18n="auth.pass"></span><input id="lb-r-pass" type="password" autocomplete="new-password" maxlength="128"><i data-i18n="auth.passRule"></i></label>
-      <label class="lb-field"><span data-i18n="auth.pass2"></span><input id="lb-r-pass2" type="password" autocomplete="new-password" maxlength="128"></label>
-      <p class="lb-err" id="lb-reg-err" hidden></p>
-      <button class="lb-btn pri" type="submit" data-i18n="auth.doRegister"></button>
-    </form>
-    <p class="lb-note" data-i18n="auth.note"></p>
-  </div>
-  <div id="lb-auth-in" hidden>
-    <div class="lb-me"><span class="lb-av lg" id="lb-me-av"></span><div><small data-i18n="auth.loggedAs"></small><b id="lb-me-name"></b><em><span data-i18n="auth.since"></span> <span id="lb-me-since"></span></em></div></div>
-    <button class="lb-btn" type="button" id="lb-logout" data-i18n="auth.logout"></button>
+<div class="lb-modal" id="lb-auth" hidden><div class="lb-dlg lb-authdlg" role="dialog" aria-modal="true" aria-labelledby="lb-auth-h">
+  <aside class="lb-aart" id="lb-aart" aria-hidden="true">
+    <div class="lb-abg" id="lb-abg"></div>
+    <div class="lb-ashade"></div>
+    <div class="lb-atop"><div class="lb-alogo">BEAN<b>LADEN</b></div><p data-i18n="auth.tag"></p></div>
+    <ul class="lb-afeat"><li><i>🏆</i><span data-i18n="auth.f1"></span></li><li><i><svg viewBox="0 0 398 312" width="14" height="11"><defs><linearGradient id="lbasol" x1="361" y1="-37" x2="141" y2="383" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#00ffa3"/><stop offset="1" stop-color="#dc1fff"/></linearGradient></defs><g fill="url(#lbasol)"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1z"/></g></svg></i><span data-i18n="auth.f2"></span></li><li><i>⚡</i><span data-i18n="auth.f3"></span></li></ul>
+  </aside>
+  <div class="lb-aform">
+    ${X_BTN}
+    <div id="lb-auth-out">
+      <h3 class="lb-ah" id="lb-auth-h"></h3><p class="lb-asub" id="lb-auth-sub"></p>
+      <div class="lb-tabs lb-atabs"><button type="button" data-tab="login" class="on" data-i18n="auth.doLogin"></button><button type="button" data-tab="register" data-i18n="auth.doRegister"></button></div>
+      <button type="button" class="lb-gbtn" id="lb-google"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg><span data-i18n="auth.google"></span></button>
+      <div class="lb-or"><span data-i18n="auth.or"></span></div>
+      <form data-pane="login" id="lb-login-form" novalidate>
+        <label class="lb-af"><span data-i18n="auth.user"></span><div class="lb-aiw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><input id="lb-l-user" autocomplete="username" maxlength="16" spellcheck="false" autocapitalize="off"></div></label>
+        <label class="lb-af"><span data-i18n="auth.pass"></span><div class="lb-aiw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><input id="lb-l-pass" type="password" autocomplete="current-password" maxlength="128" spellcheck="false" autocapitalize="off"><button type="button" class="lb-eye" data-eye="lb-l-pass" data-i18n-title="auth.show"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div></label>
+        <p class="lb-err" id="lb-login-err" hidden></p>
+        <button class="lb-abtn" type="submit"><span data-i18n="auth.doLogin"></span> ›</button>
+        <p class="lb-aswap"><span data-i18n="auth.noAcc"></span> <button type="button" data-goto="register" data-i18n="auth.doRegister"></button></p>
+      </form>
+      <form data-pane="register" id="lb-reg-form" novalidate hidden>
+        <label class="lb-af"><span data-i18n="auth.user"></span><div class="lb-aiw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><input id="lb-r-user" autocomplete="username" maxlength="16" spellcheck="false" autocapitalize="off"></div><i data-i18n="auth.userRule"></i></label>
+        <label class="lb-af"><span data-i18n="auth.pass"></span><div class="lb-aiw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><input id="lb-r-pass" type="password" autocomplete="new-password" maxlength="128" spellcheck="false" autocapitalize="off"><button type="button" class="lb-eye" data-eye="lb-r-pass" data-i18n-title="auth.show"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div><div class="lb-pwm" id="lb-pwm"><b></b><b></b><b></b><b></b><em></em></div></label>
+        <label class="lb-af"><span data-i18n="auth.pass2"></span><div class="lb-aiw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><input id="lb-r-pass2" type="password" autocomplete="new-password" maxlength="128" spellcheck="false" autocapitalize="off"><button type="button" class="lb-eye" data-eye="lb-r-pass2" data-i18n-title="auth.show"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div></label>
+        <label class="lb-terms"><input type="checkbox" id="lb-r-terms"><i></i><span id="lb-terms-txt"></span></label>
+        <p class="lb-err" id="lb-reg-err" hidden></p>
+        <button class="lb-abtn" type="submit"><span data-i18n="auth.doRegister"></span> ›</button>
+        <p class="lb-aswap"><span data-i18n="auth.haveAcc"></span> <button type="button" data-goto="login" data-i18n="auth.doLogin"></button></p>
+      </form>
+    </div>
+    <div id="lb-auth-in" hidden>
+      <div class="lb-me"><span class="lb-av lg" id="lb-me-av"></span><div><small data-i18n="auth.loggedAs"></small><b id="lb-me-name"></b><em><span data-i18n="auth.since"></span> <span id="lb-me-since"></span></em></div></div>
+      <button class="lb-btn" type="button" id="lb-logout" data-i18n="auth.logout"></button>
+    </div>
   </div>
 </div></div>
 <div class="lb-modal" id="lb-wallet" hidden><div class="lb-dlg" role="dialog" aria-modal="true">
@@ -593,8 +747,9 @@ const DEFS = u => `<radialGradient id="vg${u}" cx=".5" cy=".5" r=".72"><stop off
   <pattern id="ht${u}" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="3.5" cy="3.5" r="1.3" fill="#fff"/></pattern>
   <linearGradient id="hm${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset=".35" stop-color="#fff" stop-opacity="0"/></linearGradient>
   <mask id="mk${u}"><rect width="320" height="200" fill="url(#hm${u})"/></mask>`;
-const TXT = 'font-family="Anton,Impact,sans-serif" text-anchor="middle" stroke-linejoin="round"';
+const TXT = 'font-family="Anton,Oswald,Impact,sans-serif" text-anchor="middle" stroke-linejoin="round"';
 // duży napis: poświata, wytłoczenie w głąb (kilka warstw), obrys i połysk; y = środek wysokości liter
+// cyrylica (czcionka zapasowa Oswald) jest szersza niż Anton – napis dostaje mniejszy rozmiar
 function bigText(u, y, size, plain, spans, depth = '#1c0b16') {
   const base = y + size * .36, sw = size * .085;
   return `<g transform="translate(154 ${base}) skewX(-10)">
@@ -637,7 +792,7 @@ const ART = {
       <g fill="none" stroke="#fff" stroke-opacity=".14"><circle cx="160" cy="100" r="128" stroke-width="18"/><circle cx="160" cy="100" r="88" stroke-width="15"/><circle cx="160" cy="100" r="50" stroke-width="12"/></g>
       <g stroke="#fff" stroke-opacity=".22" stroke-width="2"><line x1="160" y1="0" x2="160" y2="200"/><line x1="0" y1="100" x2="320" y2="100"/></g>
       <rect width="320" height="200" fill="url(#hl${u})"/>
-      ${bigText(u, 100, 62, 'STRZELNICA', '<tspan fill="url(#slv' + u + ')">STRZELNICA</tspan>', '#4a0d0a')}
+      ${(() => { const w = String(tr('mode.range.name')).toUpperCase().replace(/[<&>"]/g, ''), fs = Math.min(62, Math.round(600 / Math.max(w.length, 1) * (/[А-яЁё]/.test(w) ? .76 : 1))); return bigText(u, 100, fs, w, '<tspan fill="url(#slv' + u + ')">' + w + '</tspan>', '#4a0d0a'); })()}   <!-- napis w języku gry -->
       ${finish(u)}</svg>`;
   },
   duel() {
@@ -666,7 +821,7 @@ const ART = {
     return `<svg class="art" viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice"><defs>${DEFS(u)}
       <radialGradient id="bg${u}" cx=".5" cy=".45" r=".75"><stop offset="0" stop-color="#3a5394"/><stop offset=".6" stop-color="#18234a"/><stop offset="1" stop-color="#080d22"/></radialGradient></defs>
       <rect width="320" height="200" fill="url(#bg${u})"/>${stripes(18, .05)}${halftone(u)}
-      ${bigText(u, 100, 50, 'COMING SOON...', '<tspan fill="#d6e1f7">COMING SOON...</tspan>', '#070b1c')}
+      ${(() => { const w = String(tr('soon.art')).toUpperCase().replace(/[<&>"]/g, ''), fs = Math.min(50, Math.round(700 / Math.max(w.length, 1) * (/[А-яЁё]/.test(w) ? .76 : 1))); return bigText(u, 100, fs, w, '<tspan fill="#d6e1f7">' + w + '</tspan>', '#070b1c'); })()}
       ${finish(u)}</svg>`;
   },
 };
@@ -789,7 +944,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   };
   // ---------- tryby gry ----------
   const playable = modes.filter(m => !m.soon);
-  let mode = playable.find(m => m.id === store.get('fasolka-mode')) || playable[0];
+  let mode = playable.find(m => m.id === store.get('fasolka-mode')) || playable.find(m => m.id === '1v1') || playable[0];   // domyślnie 1v1 (widać stawkę i możliwą wygraną)
   const picker = $('lb-picker'), tiles = $('lb-tiles');
   const mName = m => { const k = 'mode.' + m.id + '.name', v = tr(k); return v === k ? m.name : v; };
   const mDesc = m => { const k = 'mode.' + m.id + '.desc', v = tr(k); return v === k ? m.desc : v; };
@@ -797,10 +952,13 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   function renderMode() {
     $('lb-mode-name').textContent = mName(mode); $('lb-mode-desc').textContent = mDesc(mode);
     $('lb-mode-ic').innerHTML = ART[mode.icon] ? ART[mode.icon]() : '';
+    // napisy na obrazkach trybów (Strzelnica, Wkrótce) są w języku gry – po zmianie języka rysujemy je od nowa
+    const lk = tr('mode.range.name') + '|' + tr('soon.art');
+    if (tiles._lk !== lk) { tiles._lk = lk; tiles.querySelectorAll('.lb-tile[data-icon]').forEach(t => { const a = t.querySelector('svg.art'); if (a && ART[t.dataset.icon]) a.outerHTML = ART[t.dataset.icon](); }); }
     tiles.querySelectorAll('.lb-tile').forEach(t => {
       if (t.dataset.id) { const m = modes.find(x => x.id === t.dataset.id); t.classList.toggle('sel', m === mode); t.setAttribute('aria-pressed', m === mode);
         t.querySelector('.tag').textContent = mTag(m); t.setAttribute('aria-label', mName(m) + ' – ' + mDesc(m)); t.title = mDesc(m); }
-      else t.querySelector('.tag').textContent = tr('soon');
+      else { t.querySelector('.tag').textContent = tr('soon'); t.setAttribute('aria-label', tr('soon.art')); }
     });
     if (uiApi) uiApi.renderStake();
   }
@@ -808,7 +966,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   modes.forEach(m => {
     const t = document.createElement('button'); t.type = 'button';
     t.className = 'lb-tile' + (m.soon ? ' soon' : '');
-    const icon = m.soon ? 'soon' : m.icon;
+    const icon = m.soon ? 'soon' : m.icon; t.dataset.icon = icon;
     t.innerHTML = (ART[icon] ? ART[icon]() : '') + '<i class="tag"></i><i class="check">✓</i>';
     if (m.soon) { t.disabled = true; t.setAttribute('aria-label', 'Coming soon'); }
     else {

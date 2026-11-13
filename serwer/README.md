@@ -1,4 +1,4 @@
-# Serwer portfeli BEENLADEN
+# Serwer portfeli BEANLADEN
 
 Prawdziwe portfele SOL dla gry: konto gracza, własny adres depozytu, wpłaty z dowolnego portfela,
 wypłaty na dowolny adres, stawki meczów 1v1 i dane dla panelu admina. Domyślnie działa na **devnecie** Solany.
@@ -43,8 +43,17 @@ Testowe SOL na devnecie: <https://faucet.solana.com> (wklej adres z zakładki **
 | `DATA_DIR` | `serwer/dane` | baza SQLite i fraza – **musi być na trwałym dysku** |
 | `HOUSE_FEE` | `0.10` | prowizja od puli |
 | `MIN_WITHDRAW_SOL` | `0.001` | minimalna wypłata |
+| `GOOGLE_CLIENT_ID` | — | identyfikator klienta OAuth Google (logowanie „Kontynuuj z Google”) |
 
 Wymagany Node.js 22.5 lub nowszy (wbudowany `node:sqlite`).
+
+## Logowanie przez Google
+
+1. W Google Cloud Console utwórz projekt, a w „Interfejsy API i usługi → Dane logowania” identyfikator klienta OAuth typu **Aplikacja internetowa**.
+2. W „Autoryzowane źródła JavaScriptu” wpisz adresy gry, np. `https://smolka77.github.io` i adres serwera.
+3. Ustaw na serwerze `GOOGLE_CLIENT_ID` (np. `1234-abc.apps.googleusercontent.com`). Gra pobiera go z `/api/config`, więc w kodzie gry nic nie trzeba zmieniać.
+
+Serwer sprawdza w Google, czy token jest wydany dla tej aplikacji i czy e-mail jest potwierdzony. Nowe konto dostaje nick z początku adresu e-mail (gracz może go zmienić w profilu).
 
 ## Wdrożenie
 

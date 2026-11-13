@@ -5,6 +5,7 @@
 // poza claude.ai – konta z pamięci tej przeglądarki (tryb lokalny).
 import { LOBBY_MAPS, BUILTIN_SKINS, SKINS } from './lobby.js';
 import { walletApi } from './wallet-config.js';
+import { AUTH_TXT } from './lobby-ui.js';
 // serwer portfeli (gdy ustawiony): prawdziwe konta, adresy depozytów i salda SOL wszystkich graczy
 const SRV = walletApi();
 const srvToken = () => { try { return localStorage.getItem('bl-token'); } catch { return null; } };
@@ -174,7 +175,7 @@ export async function openAdmin({ onClose } = {}) {
   const close = () => { cleanup.forEach(f => { try { f(); } catch {} }); cleanup = []; root.remove(); root = null; if (onClose) onClose(); };
   const onKey = e => { if (e.key !== 'Escape' || !root) return; const d = root.querySelector('.fa-drw'); if (d && !d.hidden) d.hidden = true; else close(); };
   addEventListener('keydown', onKey); cleanup.push(() => removeEventListener('keydown', onKey));
-  root.innerHTML = `<div class="fa-wrap"><div class="fa-head"><div class="fa-brand"><b>BEEN<i>LADEN</i></b><span>Panel admina</span></div><div class="fa-sp"></div>
+  root.innerHTML = `<div class="fa-wrap"><div class="fa-head"><div class="fa-brand"><b>BEAN<i>LADEN</i></b><span>Panel admina</span></div><div class="fa-sp"></div>
     <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div><p class="fa-empty">Ładowanie danych…</p></div>`;
   root.querySelector('[data-close]').addEventListener('click', close);
 
@@ -200,7 +201,7 @@ export async function openAdmin({ onClose } = {}) {
 
 function buildDashboard(db, close) {
   root.innerHTML = `<div class="fa-wrap">
-    <div class="fa-head"><div class="fa-brand"><b>BEEN<i>LADEN</i></b><span>Panel admina</span></div><span class="fa-live" id="fa-live">Łączenie…</span><div class="fa-sp"></div>
+    <div class="fa-head"><div class="fa-brand"><b>BEAN<i>LADEN</i></b><span>Panel admina</span></div><span class="fa-live" id="fa-live">Łączenie…</span><div class="fa-sp"></div>
       <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div>
     <p class="fa-note" id="fa-note" hidden></p>
     <section class="fa-kpis" id="fa-kpis" aria-label="Liczby ogólne"></section>
@@ -215,6 +216,12 @@ function buildDashboard(db, close) {
       <div class="fa-card"><div class="fa-ch"><h3>Ustawienia gry</h3></div>
         <h4 style="margin-top:0">Mapa lobby (dla wszystkich graczy)</h4><div class="fa-maps" id="fa-maps"></div>
         <div class="fa-row"><button class="fa-btn pri" type="button" id="fa-map-save">Zapisz mapę lobby</button><span class="fa-msg" id="fa-map-msg"></span></div>
+        <h4>Zapytania biznesowe (zakładka Biznes w grze)</h4><div class="fa-row"><input class="fa-q" id="fa-biz" type="email" maxlength="120" spellcheck="false" autocomplete="off" placeholder="business@twojadomena.com" style="flex:1;min-width:200px">
+          <button class="fa-btn pri" type="button" id="fa-biz-save">Zapisz e-mail</button><span class="fa-msg" id="fa-biz-msg"></span></div>
+        <h4>Okno logowania – hasło i 3 punkty w lewym panelu</h4>
+        <div class="fa-row" id="fa-al-langs" style="gap:6px"></div>
+        <div id="fa-al" style="display:grid;gap:8px;margin-top:8px"></div>
+        <div class="fa-row"><button class="fa-btn pri" type="button" id="fa-al-save">Zapisz hasła</button><span class="fa-msg" id="fa-al-msg">Puste pole = tekst domyślny.</span></div>
         <h4>Baza danych</h4><div class="fa-meta" id="fa-dbmeta"></div></div>
     </section>
     <section class="fa-card" id="fa-skins-card"><div class="fa-ch"><h3>Skiny</h3><small id="fa-sk-sum">skiny z kreatora · kafelki w lobby</small></div>
@@ -278,6 +285,53 @@ function buildDashboard(db, close) {
       curMap = v; msg.className = 'fa-msg ok'; msg.textContent = db ? 'Zapisano. Gracze zobaczą nową mapę lobby przy następnym wejściu do gry.' : 'Zapisano w tej przeglądarce.';
     } catch (er) { msg.className = 'fa-msg err'; msg.textContent = 'Nie udało się zapisać (' + (er && er.code || 'błąd') + ').'; }
     e.currentTarget.disabled = false;
+  });
+
+  // ---------- e-mail do zapytań biznesowych (pokazuje go zakładka Biznes w ustawieniach gry) ----------
+  const bizIn = $('fa-biz'), bizMsg = $('fa-biz-msg'), H = () => ({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + srvToken() });
+  (async () => { try {
+    if (SRV) bizIn.value = (await (await fetch(SRV + '/api/config')).json()).businessEmail || '';
+    else if (db) { const sn = await db.doc('config/business').get(); bizIn.value = sn.exists ? sn.data().email || '' : ''; }
+    else bizIn.value = localStorage.getItem('fasolka-biz-email') || '';
+  } catch {} })();
+  $('fa-biz-save').addEventListener('click', async e => {
+    const v = bizIn.value.trim(); bizMsg.className = 'fa-msg';
+    if (v && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) { bizMsg.className = 'fa-msg err'; bizMsg.textContent = 'Nieprawidłowy adres e-mail.'; return; }
+    e.currentTarget.disabled = true; bizMsg.textContent = 'Zapisywanie…';
+    try {
+      if (SRV) { const r = await fetch(SRV + '/api/admin/config', { method: 'POST', headers: H(), body: JSON.stringify({ businessEmail: v }) }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || 'błąd'); }
+      else if (db) await db.doc('config/business').set({ email: v, updatedAt: Date.now() });
+      try { localStorage.setItem('fasolka-biz-email', v); } catch {}
+      dispatchEvent(new CustomEvent('fasolka:biz-email', { detail: v }));
+      bizMsg.className = 'fa-msg ok'; bizMsg.textContent = v ? 'Zapisano – gracze zobaczą ten adres w zakładce Biznes.' : 'Usunięto adres.';
+    } catch (er) { bizMsg.className = 'fa-msg err'; bizMsg.textContent = 'Nie udało się zapisać (' + (er.message || er.code || 'błąd') + ').'; }
+    e.currentTarget.disabled = false;
+  });
+
+  // ---------- okno logowania: hasło i 3 punkty (każdy język osobno; puste = domyślne) ----------
+  const AL_K = [['tag', 'Hasło pod logo'], ['f1', 'Punkt 1 (🏆)'], ['f2', 'Punkt 2 (Solana)'], ['f3', 'Punkt 3 (⚡)']], AL_L = { pl: 'PL', en: 'EN', ru: 'RU', es: 'ES' };
+  let alData = {}, alLang = 'en';
+  const alRender = () => {
+    $('fa-al-langs').innerHTML = Object.entries(AL_L).map(([l, n]) => `<button type="button" class="fa-btn${l === alLang ? ' pri' : ''}" data-al="${l}" style="height:32px;padding:0 12px">${n}</button>`).join('');
+    $('fa-al').innerHTML = AL_K.map(([k, n]) => `<label style="display:grid;gap:4px;font-size:12px;color:var(--mut)">${esc(n)}<input class="fa-q" data-k="${k}" maxlength="140" value="${esc((alData[alLang] || {})[k] || '')}" placeholder="${esc(AUTH_TXT[alLang]['auth.' + k])}" style="width:100%"></label>`).join('');
+  };
+  const alKeep = () => { const o = {}; $('fa-al').querySelectorAll('input').forEach(i => { if (i.value.trim()) o[i.dataset.k] = i.value.trim(); }); alData[alLang] = o; };
+  $('fa-al-langs').addEventListener('click', e => { const b = e.target.closest('[data-al]'); if (!b) return; alKeep(); alLang = b.dataset.al; alRender(); });
+  (async () => { try {
+    if (SRV) alData = (await (await fetch(SRV + '/api/config')).json()).authTexts || {};
+    else if (db) { const sn = await db.doc('config/auth').get(); alData = sn.exists ? sn.data().texts || {} : {}; }
+    else alData = JSON.parse(localStorage.getItem('fasolka-auth-texts') || '{}') || {};
+  } catch {} alRender(); })();
+  $('fa-al-save').addEventListener('click', async e => {
+    alKeep(); const msg = $('fa-al-msg'), btn = e.currentTarget; btn.disabled = true; msg.className = 'fa-msg'; msg.textContent = 'Zapisywanie…';
+    try {
+      if (SRV) { const r = await fetch(SRV + '/api/admin/config', { method: 'POST', headers: H(), body: JSON.stringify({ authTexts: alData }) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.message || 'błąd'); alData = j.authTexts || alData; }
+      else if (db) await db.doc('config/auth').set({ texts: alData, updatedAt: Date.now() });
+      try { localStorage.setItem('fasolka-auth-texts', JSON.stringify(alData)); } catch {}
+      dispatchEvent(new CustomEvent('fasolka:auth-texts', { detail: alData }));
+      msg.className = 'fa-msg ok'; msg.textContent = 'Zapisano – gracze zobaczą nowe hasła w oknie logowania.';
+    } catch (er) { msg.className = 'fa-msg err'; msg.textContent = 'Nie udało się zapisać (' + (er.message || 'błąd') + ').'; }
+    btn.disabled = false;
   });
 
   // ---------- skiny z kreatora: lista, nowy / edycja w kreatorze, usuwanie, kolejność, tag, publikacja ----------

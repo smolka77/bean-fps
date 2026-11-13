@@ -1,5 +1,5 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>BEENLADEN</title>
+<title>BEANLADEN</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
   /* Layout: pełny ekran 3D, celownik na środku, amunicja w prawym dolnym rogu, licznik w prawym górnym, nakładka startowa */
@@ -157,7 +157,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import glbB64 from './bean-data.js';
-import {createLobby,applySkin} from './lobby.js';
+import {createLobby,applySkin,SKINS} from './lobby.js';
 import {payout} from './lobby-ui.js';
 import {createMatch} from './match.js';
 import {createRange} from './range.js';
@@ -660,9 +660,9 @@ function selectWeapon(n){
 
 // ================= dźwięk =================
 let AC=null,master=null;
-let VOL=.8,FOV_BASE=78;   // z ustawień lobby (zdarzenie fasolka:settings)
+let VOL=.8;const FOV_BASE=78;   // głośność z ustawień lobby; pole widzenia stałe dla wszystkich
 let muted=false;try{muted=localStorage.getItem('beanfps-muted')==='1'}catch(e){}
-addEventListener('fasolka:settings',e=>{const d=e.detail||{};if(d.volume!=null){VOL=Math.max(0,Math.min(1,+d.volume));if(master&&!muted)master.gain.setTargetAtTime(VOL,AC.currentTime,.02)}if(d.fov)FOV_BASE=Math.max(60,Math.min(110,+d.fov))});
+addEventListener('fasolka:settings',e=>{const d=e.detail||{};if(d.volume!=null){VOL=Math.max(0,Math.min(1,+d.volume));if(master&&!muted)master.gain.setTargetAtTime(VOL,AC.currentTime,.02)}if(+d.sens>0)SENS_K=+d.sens;if(+d.sensAds>0)SENS_ADS=+d.sensAds});   // pole widzenia: stałe (FOV_BASE)
 const initAudio=()=>{if(AC)return;try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=muted?0:VOL;master.connect(AC.destination)}catch(e){}};
 function setMuted(v){
   muted=v;if(master)master.gain.setTargetAtTime(v?0:VOL,AC.currentTime,.02);
@@ -737,11 +737,11 @@ function startPlay(){
 $('overlay').addEventListener('click',()=>{if(duel.mapBanner){const d={ok:true};dispatchEvent(new CustomEvent('fasolka:rematch',{detail:d}));if(!d.ok){duel.mapBanner=false;leaveToLobby();return}}startPlay()});
 for(const b of document.querySelectorAll('.mute'))b.addEventListener('click',e=>{e.stopPropagation();initAudio();setMuted(!muted)});
 // ---- menu pauzy: Wznów / Ustawienia / Wróć do lobby; ustawienia wspólne z lobby (localStorage „fasolka-settings”) ----
-let SENS_K=1;
+let SENS_K=1,SENS_ADS=1;   // czułość myszy i mnożnik czułości przy celowaniu (ustawienia lobby / menu pod Esc)
 const readSet=()=>{try{return JSON.parse(localStorage.getItem('fasolka-settings')||'null')||{}}catch(e){return {}}};
-{const v=readSet();if(+v.sens>0)SENS_K=+v.sens}
+{const v=readSet();if(+v.sens>0)SENS_K=+v.sens;if(+v.sensAds>0)SENS_ADS=+v.sensAds}
 const PM_SL=[['volume','Głośność ogólna',0,100,1,v=>Math.round(v)+'%'],['vGame','Dźwięki w grze',0,100,1,v=>Math.round(v)+'%'],
-  ['fov','Pole widzenia',60,110,1,v=>Math.round(v)+'°'],['sens','Czułość myszy',.2,3,.05,v=>(+v).toFixed(2)]];
+  ['sens','Czułość myszy',.2,3,.05,v=>(+v).toFixed(2)],['sensAds','Czułość przy celowaniu',.2,2,.05,v=>(+v).toFixed(2)]];   // pole widzenia stałe (78°) – bez suwaka
 {
   const rows=$('pmRows');
   for(const [k,lab,mn,mx,st,fmt] of PM_SL){
@@ -750,9 +750,9 @@ const PM_SL=[['volume','Głośność ogólna',0,100,1,v=>Math.round(v)+'%'],['vG
     rows.appendChild(r);const inp=r.querySelector('input'),o=r.querySelector('output');
     const paint=()=>{o.textContent=fmt(+inp.value);inp.style.setProperty('--p',((+inp.value-mn)/(mx-mn)*100)+'%')};
     inp.addEventListener('input',()=>{paint();const v=+inp.value;
-      if(k==='sens')SENS_K=v;
+      if(k==='sens')SENS_K=v;if(k==='sensAds')SENS_ADS=v;
       const s={volume:80,vGame:100,fov:78,...readSet(),[k]:v};
-      if(k!=='sens'){VOL=Math.max(0,Math.min(1,s.volume/100*s.vGame/100));if(master&&!muted)master.gain.setTargetAtTime(VOL,AC.currentTime,.02);FOV_BASE=Math.max(60,Math.min(110,s.fov))}
+      if(k==='volume'||k==='vGame'){VOL=Math.max(0,Math.min(1,s.volume/100*s.vGame/100));if(master&&!muted)master.gain.setTargetAtTime(VOL,AC.currentTime,.02)}
       dispatchEvent(new CustomEvent('fasolka:settings-set',{detail:{[k]:v}}));   // lobby zapisuje i rozsyła wspólne ustawienia
       try{const cur=readSet();if(cur[k]!==v){cur[k]=v;localStorage.setItem('fasolka-settings',JSON.stringify(cur))}}catch(e){}
     });
@@ -764,7 +764,7 @@ const PM_SL=[['volume','Głośność ogólna',0,100,1,v=>Math.round(v)+'%'],['vG
 }
 function pmShow(v){$('pmMenu').hidden=v!=='menu';$('pmSet').hidden=v!=='set';$('pmQuit').hidden=v!=='quit';$('ovText').hidden=v!=='menu';$('ovTitle').hidden=v==='quit';
   $('pmTag').textContent=v==='set'?'USTAWIENIA':v==='quit'?'OPUSZCZASZ MECZ':pmTag();
-  if(v==='set'){const s={volume:80,vGame:100,fov:78,sens:SENS_K,...readSet()};for(const r of $('pmRows').children)if(r._fill)r._fill(s)}
+  if(v==='set'){const s={volume:80,vGame:100,fov:78,sens:SENS_K,sensAds:SENS_ADS,...readSet()};for(const r of $('pmRows').children)if(r._fill)r._fill(s)}
 }
 function pmTag(){return MODE==='1v1'?'1 NA 1'+(oaza.map?' · '+oaza.map.name.toUpperCase():''):'STRZELNICA'}
 $('pm').addEventListener('click',e=>e.stopPropagation());                    // klik w panel nie wznawia gry (wznawia przycisk albo klik obok)
@@ -805,7 +805,7 @@ addEventListener('contextmenu',e=>e.preventDefault());
 renderer.domElement.addEventListener('wheel',e=>{if(!playing||Math.abs(e.deltaY)<4)return;const sl=slotList(),t=gun.switchTo>=0?gun.switchTo:curW,j=Math.max(0,sl.indexOf(t));selectWeapon(sl[(j+(e.deltaY>0?1:-1)+sl.length)%sl.length])},{passive:true});
 const SENS=.0022;let mdx=0,mdy=0;
 addEventListener('mousemove',e=>{
-  if(!playing||player.dead)return;const k=player.ads>.5?.55:1;
+  if(!playing||player.dead)return;const k=player.ads>.5?.55*SENS_ADS:1;
   player.yaw-=e.movementX*SENS*SENS_K*k;player.pitch=clamp(player.pitch-e.movementY*SENS*SENS_K*k,-1.45,1.45);
   mdx+=e.movementX;mdy+=e.movementY;
 });

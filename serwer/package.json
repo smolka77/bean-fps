@@ -1,7 +1,7 @@
 {
-  "name": "beenladen-portfele",
+  "name": "beanladen-portfele",
   "version": "1.0.0",
-  "description": "Serwer portfeli SOL dla BEENLADEN (konta, adresy depozytów, wpłaty, wypłaty, stawki, panel admina)",
+  "description": "Serwer portfeli SOL dla BEANLADEN (konta, adresy depozytów, wpłaty, wypłaty, stawki, panel admina)",
   "main": "serwer.mjs",
   "scripts": {
     "start": "node serwer.mjs"

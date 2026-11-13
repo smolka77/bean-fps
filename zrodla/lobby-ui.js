@@ -5,6 +5,9 @@
 import { createSfx } from './sfx.js';
 import { createWallet } from './wallet.js';
 import { walletApi } from './wallet-config.js';
+import { createProfile, paintAvatar } from './profile.js';
+import { pointsFromHistory } from './earnings.js';
+import { OPERATOR, LEGAL_TXT, legalDoc } from './legal.js';
 
 // ---------------- tłumaczenia ----------------
 const DICT = {
@@ -14,7 +17,7 @@ const DICT = {
     'plate.ready': 'GOTOWY', 'plate.skin': 'KLIKNIJ, BY ZMIENIĆ SKIN',
     'mode.label': 'Tryb gry', 'mode.change': 'Zmień', 'mode.range.name': 'Strzelnica', 'mode.range.desc': 'Trening solo – zestrzel czerwone fasolki',
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Pojedynek · do 3 wygranych rund · Oaza / Magazyn / Baza',
-    'tag.range': 'SOLO', 'tag.1v1': '1 NA 1', 'soon': 'WKRÓTCE',
+    'tag.range': 'SOLO', 'tag.1v1': '1 NA 1', 'soon': 'WKRÓTCE', 'soon.art': 'WKRÓTCE...',
     'cur.tag': 'USD · płatność w SOL', 'cur.in': 'w SOL', 'stake.label': 'Stawka', 'stake.custom': 'Własna', 'stake.win': 'Możliwa wygrana', 'stake.free': 'Trening – bez stawki', 'stake.range': 'Kwota $1–$1000', 'stake.invalid': 'Podaj stawkę od $1 do $1000',
     'play': 'GRAJ', 'play.login': 'ZALOGUJ SIĘ', 'picker.title': 'Wybierz tryb', 'done': 'Gotowe', 'skins.title': 'Skiny', 'close': 'Zamknij',
     'set.title': 'Ustawienia', 'set.general': 'Ogólne', 'set.audio': 'Dźwięk', 'set.controls': 'Sterowanie', 'set.lang': 'Język', 'set.volume': 'Głośność', 'set.fov': 'Pole widzenia (FOV)',
@@ -42,7 +45,7 @@ const DICT = {
     'plate.ready': 'READY', 'plate.skin': 'CLICK TO CHANGE SKIN',
     'mode.label': 'Game mode', 'mode.change': 'Change', 'mode.range.name': 'Shooting range', 'mode.range.desc': 'Solo practice – shoot the red beans',
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Duel · first to 3 rounds · Oasis / Warehouse / Base',
-    'tag.range': 'SOLO', 'tag.1v1': '1 VS 1', 'soon': 'SOON',
+    'tag.range': 'SOLO', 'tag.1v1': '1 VS 1', 'soon': 'SOON', 'soon.art': 'COMING SOON...',
     'cur.tag': 'USD · paid in SOL', 'cur.in': 'in SOL', 'stake.label': 'Stake', 'stake.custom': 'Custom', 'stake.win': 'Potential win', 'stake.free': 'Practice – no stake', 'stake.range': 'Amount $1–$1000', 'stake.invalid': 'Enter a stake between $1 and $1000',
     'play': 'PLAY', 'play.login': 'LOG IN', 'picker.title': 'Choose mode', 'done': 'Done', 'skins.title': 'Skins', 'close': 'Close',
     'set.title': 'Settings', 'set.general': 'General', 'set.audio': 'Audio', 'set.controls': 'Controls', 'set.lang': 'Language', 'set.volume': 'Volume', 'set.fov': 'Field of view (FOV)',
@@ -70,7 +73,7 @@ const DICT = {
     'plate.ready': 'ГОТОВ', 'plate.skin': 'НАЖМИ, ЧТОБЫ СМЕНИТЬ СКИН',
     'mode.label': 'Режим игры', 'mode.change': 'Сменить', 'mode.range.name': 'Стрельбище', 'mode.range.desc': 'Соло-тренировка – сбей красные фасолины',
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Дуэль · до 3 выигранных раундов · Оазис / Склад / База',
-    'tag.range': 'СОЛО', 'tag.1v1': '1 НА 1', 'soon': 'СКОРО',
+    'tag.range': 'СОЛО', 'tag.1v1': '1 НА 1', 'soon': 'СКОРО', 'soon.art': 'СКОРО...',
     'cur.tag': 'USD · оплата в SOL', 'cur.in': 'в SOL', 'stake.label': 'Ставка', 'stake.custom': 'Своя', 'stake.win': 'Возможный выигрыш', 'stake.free': 'Тренировка – без ставки', 'stake.range': 'Сумма $1–$1000', 'stake.invalid': 'Введите ставку от $1 до $1000',
     'play': 'ИГРАТЬ', 'play.login': 'ВОЙТИ', 'picker.title': 'Выбери режим', 'done': 'Готово', 'skins.title': 'Скины', 'close': 'Закрыть',
     'set.title': 'Настройки', 'set.general': 'Общие', 'set.audio': 'Звук', 'set.controls': 'Управление', 'set.lang': 'Язык', 'set.volume': 'Громкость', 'set.fov': 'Поле зрения (FOV)',
@@ -98,7 +101,7 @@ const DICT = {
     'plate.ready': 'LISTO', 'plate.skin': 'HAZ CLIC PARA CAMBIAR DE SKIN',
     'mode.label': 'Modo de juego', 'mode.change': 'Cambiar', 'mode.range.name': 'Campo de tiro', 'mode.range.desc': 'Práctica en solitario – dispara a las judías rojas',
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Duelo · a 3 rondas ganadas · Oasis / Almacén / Base',
-    'tag.range': 'SOLO', 'tag.1v1': '1 VS 1', 'soon': 'PRONTO',
+    'tag.range': 'SOLO', 'tag.1v1': '1 VS 1', 'soon': 'PRONTO', 'soon.art': 'MUY PRONTO...',
     'cur.tag': 'USD · pago en SOL', 'cur.in': 'en SOL', 'stake.label': 'Apuesta', 'stake.custom': 'Otra', 'stake.win': 'Ganancia posible', 'stake.free': 'Práctica – sin apuesta', 'stake.range': 'Importe $1–$1000', 'stake.invalid': 'Introduce una apuesta entre $1 y $1000',
     'play': 'JUGAR', 'play.login': 'ACCEDER', 'picker.title': 'Elige modo', 'done': 'Listo', 'skins.title': 'Skins', 'close': 'Cerrar',
     'set.title': 'Ajustes', 'set.general': 'General', 'set.audio': 'Sonido', 'set.controls': 'Controles', 'set.lang': 'Idioma', 'set.volume': 'Volumen', 'set.fov': 'Campo de visión (FOV)',
@@ -134,6 +137,39 @@ const FLAGS = {
   es: '<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#aa151b"/><rect y="5" width="30" height="10" fill="#f1bf00"/><rect x="7" y="7.2" width="3.4" height="5.6" rx=".9" fill="#aa151b" opacity=".85"/></svg>',
 };
 let LANG = 'en';
+for (const l in LEGAL_TXT) if (DICT[l]) DICT[l]['set.biz'] = LEGAL_TXT[l].tab;
+// czułość myszy i czułość przy celowaniu (zakładka Sterowanie)
+const SENS_TXT = {
+  pl: { 'set.secMouse': 'Mysz', 'set.sens': 'Czułość myszy', 'set.sensD': 'Jak szybko obraca się kamera', 'set.sensAds': 'Czułość przy celowaniu', 'set.sensAdsD': 'Gdy celujesz przez celownik (prawy przycisk myszy)' },
+  en: { 'set.secMouse': 'Mouse', 'set.sens': 'Mouse sensitivity', 'set.sensD': 'How fast the camera turns', 'set.sensAds': 'Aim sensitivity', 'set.sensAdsD': 'While aiming down sights (right mouse button)' },
+  ru: { 'set.secMouse': 'Мышь', 'set.sens': 'Чувствительность мыши', 'set.sensD': 'Скорость поворота камеры', 'set.sensAds': 'Чувствительность в прицеле', 'set.sensAdsD': 'При прицеливании (правая кнопка мыши)' },
+  es: { 'set.secMouse': 'Ratón', 'set.sens': 'Sensibilidad del ratón', 'set.sensD': 'Velocidad de giro de la cámara', 'set.sensAds': 'Sensibilidad al apuntar', 'set.sensAdsD': 'Al apuntar con la mira (botón derecho)' },
+};
+for (const l in SENS_TXT) if (DICT[l]) Object.assign(DICT[l], SENS_TXT[l]);
+// okno logowania / rejestracji
+export const AUTH_TXT = {
+  pl: { 'auth.tag': 'Strzelanka FPS o prawdziwe pieniądze', 'auth.f1': 'Pojedynki 1v1 do 3 wygranych rund', 'auth.f2': 'Własny portfel Solana i wypłaty na dowolny adres', 'auth.f3': 'Wejdź do gry w kilka sekund',
+    'auth.hiLogin': 'Witaj z powrotem', 'auth.subLogin': 'Zaloguj się, aby grać o stawkę i odbierać wygrane.', 'auth.hiReg': 'Dołącz do gry', 'auth.subReg': 'Załóż konto w kilka sekund – dostaniesz własny portfel SOL.',
+    'auth.google': 'Kontynuuj z Google', 'auth.or': 'lub', 'auth.show': 'Pokaż hasło', 'auth.noAcc': 'Nie masz konta?', 'auth.haveAcc': 'Masz już konto?',
+    'auth.terms': 'Mam ukończone 18 lat i akceptuję {t} oraz {p}.', 'auth.termsT': 'Regulamin', 'auth.termsP': 'Politykę prywatności', 'auth.errTerms': 'Zaznacz, że masz 18 lat i akceptujesz regulamin.',
+    'auth.googleOff': 'Logowanie przez Google działa, gdy gra jest połączona z serwerem.', 'auth.googleErr': 'Nie udało się zalogować przez Google.', 'auth.pw1': 'Słabe', 'auth.pw2': 'Średnie', 'auth.pw3': 'Dobre', 'auth.pw4': 'Mocne' },
+  en: { 'auth.tag': 'FPS shooter with real money stakes', 'auth.f1': '1v1 duels, first to 3 rounds', 'auth.f2': 'Your own Solana wallet, withdraw to any address', 'auth.f3': 'Jump into a match in seconds',
+    'auth.hiLogin': 'Welcome back', 'auth.subLogin': 'Log in to play for stakes and collect your winnings.', 'auth.hiReg': 'Join the game', 'auth.subReg': 'Create an account in seconds – you get your own SOL wallet.',
+    'auth.google': 'Continue with Google', 'auth.or': 'or', 'auth.show': 'Show password', 'auth.noAcc': 'No account yet?', 'auth.haveAcc': 'Already have an account?',
+    'auth.terms': 'I am 18 or older and accept the {t} and the {p}.', 'auth.termsT': 'Terms of Service', 'auth.termsP': 'Privacy Policy', 'auth.errTerms': 'Confirm that you are 18+ and accept the terms.',
+    'auth.googleOff': 'Google sign-in works when the game is connected to its server.', 'auth.googleErr': 'Google sign-in failed.', 'auth.pw1': 'Weak', 'auth.pw2': 'Fair', 'auth.pw3': 'Good', 'auth.pw4': 'Strong' },
+  ru: { 'auth.tag': 'FPS-шутер на реальные деньги', 'auth.f1': 'Дуэли 1 на 1 до 3 побед', 'auth.f2': 'Свой кошелёк Solana и вывод на любой адрес', 'auth.f3': 'В игру за несколько секунд',
+    'auth.hiLogin': 'С возвращением', 'auth.subLogin': 'Войди, чтобы играть на ставки и получать выигрыши.', 'auth.hiReg': 'Присоединяйся', 'auth.subReg': 'Создай аккаунт за пару секунд – получишь свой кошелёк SOL.',
+    'auth.google': 'Продолжить с Google', 'auth.or': 'или', 'auth.show': 'Показать пароль', 'auth.noAcc': 'Нет аккаунта?', 'auth.haveAcc': 'Уже есть аккаунт?',
+    'auth.terms': 'Мне есть 18 лет, и я принимаю {t} и {p}.', 'auth.termsT': 'Условия использования', 'auth.termsP': 'Политику конфиденциальности', 'auth.errTerms': 'Подтверди, что тебе 18+ и ты принимаешь условия.',
+    'auth.googleOff': 'Вход через Google работает, когда игра подключена к серверу.', 'auth.googleErr': 'Не удалось войти через Google.', 'auth.pw1': 'Слабый', 'auth.pw2': 'Средний', 'auth.pw3': 'Хороший', 'auth.pw4': 'Сильный' },
+  es: { 'auth.tag': 'Shooter FPS con apuestas de dinero real', 'auth.f1': 'Duelos 1v1 al mejor de 3 rondas', 'auth.f2': 'Tu propia cartera Solana y retiros a cualquier dirección', 'auth.f3': 'Entra a jugar en segundos',
+    'auth.hiLogin': 'Bienvenido de nuevo', 'auth.subLogin': 'Inicia sesión para jugar con apuestas y cobrar tus ganancias.', 'auth.hiReg': 'Únete al juego', 'auth.subReg': 'Crea una cuenta en segundos – recibes tu propia cartera SOL.',
+    'auth.google': 'Continuar con Google', 'auth.or': 'o', 'auth.show': 'Mostrar contraseña', 'auth.noAcc': '¿No tienes cuenta?', 'auth.haveAcc': '¿Ya tienes cuenta?',
+    'auth.terms': 'Tengo 18 años o más y acepto los {t} y la {p}.', 'auth.termsT': 'Términos del servicio', 'auth.termsP': 'Política de privacidad', 'auth.errTerms': 'Confirma que tienes 18+ y aceptas los términos.',
+    'auth.googleOff': 'El inicio con Google funciona cuando el juego está conectado al servidor.', 'auth.googleErr': 'No se pudo iniciar sesión con Google.', 'auth.pw1': 'Débil', 'auth.pw2': 'Regular', 'auth.pw3': 'Buena', 'auth.pw4': 'Fuerte' },
+};
+for (const l in AUTH_TXT) if (DICT[l]) Object.assign(DICT[l], AUTH_TXT[l]);   // zakładka Business w ustawieniach
 export function t(key, vars) { let s = (DICT[LANG] && DICT[LANG][key]) ?? DICT.pl[key] ?? key; if (vars) for (const k in vars) s = s.replace('{' + k + '}', vars[k]); return s; }
 export function skinName(sk) { return (SKIN_NAMES[LANG] && SKIN_NAMES[LANG][sk.id]) || sk.name; }
 
@@ -211,7 +247,10 @@ const MAP_ART = {
 };
 const DUEL_MAPS = ['Oaza', 'Magazyn', 'Baza'];
 // zrzuty map z lotu ptaka (wyrenderowane z gry); SVG pod spodem zostaje jako zapas, gdyby obrazek się nie wczytał
-const MAP_IMG = { Oaza: new URL('./maps/oaza.jpg', import.meta.url).href, Magazyn: new URL('./maps/magazyn.jpg', import.meta.url).href, Baza: new URL('./maps/baza.jpg', import.meta.url).href };
+// ujęcia z map (z poziomu gracza) do pokazu w oknie logowania
+const SHOTS = [['Oaza', new URL('./maps/shot-oaza-1.jpg', import.meta.url).href], ['Magazyn', new URL('./maps/shot-magazyn-1.jpg', import.meta.url).href], ['Baza', new URL('./maps/shot-baza-1.jpg', import.meta.url).href],
+  ['Oaza', new URL('./maps/shot-oaza-2.jpg', import.meta.url).href], ['Magazyn', new URL('./maps/shot-magazyn-2.jpg', import.meta.url).href], ['Baza', new URL('./maps/shot-baza-2.jpg', import.meta.url).href]];
+export const MAP_IMG = { Oaza: new URL('./maps/oaza.jpg', import.meta.url).href, Magazyn: new URL('./maps/magazyn.jpg', import.meta.url).href, Baza: new URL('./maps/baza.jpg', import.meta.url).href };
 Object.values(MAP_IMG).forEach(src => { const im = new Image(); im.src = src; });
 export const HOUSE_FEE = 0.10;                          // prowizja od puli (2 × stawka)
 const r2 = v => Math.round(v * 100) / 100;
@@ -225,15 +264,16 @@ export function initLobbyUI(ctx) {
 
   // ---- ustawienia ----
   const defBinds = Object.fromEntries(ACTIONS);
-  let S = { lang: 'en', volume: 80, vMenu: 70, vGame: 100, fov: 78, binds: { ...defBinds } };
+  let S = { lang: 'en', volume: 80, vMenu: 70, vGame: 100, fov: 78, sens: 1, sensAds: 1, binds: { ...defBinds } };
   try { const v = JSON.parse(ls.get('fasolka-settings') || 'null'); if (v) S = { ...S, ...v, binds: { ...defBinds, ...(v.binds || {}) } }; } catch {}
-  if (!S.langPicked || !DICT[S.lang]) S.lang = 'en';   // domyślnie angielski, dopóki gracz sam nie wybierze języka
+  if (!S.langPicked || !DICT[S.lang]) S.lang = 'en';
+  S.fov = 78;   // pole widzenia stałe – takie samo dla wszystkich graczy (bez ustawienia)   // domyślnie angielski, dopóki gracz sam nie wybierze języka
   LANG = S.lang;
   let pushT = 0;
   const pushSettings = () => { ls.set('fasolka-settings', JSON.stringify(S)); clearTimeout(pushT);
     pushT = setTimeout(sendSettings, 30); applyUiVol(); };
   // gra dostaje głośność = ogólna × dźwięki w grze; dźwięki menu gra lobby (ogólna × menu)
-  const sendSettings = () => dispatchEvent(new CustomEvent('fasolka:settings', { detail: { volume: (S.volume / 100) * (S.vGame / 100), fov: S.fov } }));
+  const sendSettings = () => dispatchEvent(new CustomEvent('fasolka:settings', { detail: { volume: (S.volume / 100) * (S.vGame / 100), fov: S.fov, sens: +S.sens || 1, sensAds: +S.sensAds || 1 } }));
   setTimeout(sendSettings, 0);
   // zmiany z menu pauzy w grze trafiają do tego samego stanu (lobby nie nadpisze ich starą wartością)
   addEventListener('fasolka:settings-set', e => { S = { ...S, ...(e.detail || {}) }; pushSettings(); try { renderSettings(); } catch {} });
@@ -349,13 +389,17 @@ export function initLobbyUI(ctx) {
     r.addEventListener('change', () => preview(k));
     row.querySelector('.lb-vic').addEventListener('click', () => { S[k] = S[k] ? 0 : last.v; renderVol(); pushSettings(); if (S[k]) preview(k); });
     row.querySelector('.lb-vplay').addEventListener('click', () => preview(k)); });
+  ui.querySelectorAll('.lb-srow').forEach(row => { const k = row.dataset.k, r = row.querySelector('input');
+    r.addEventListener('input', () => { S[k] = +r.value; renderSens(); pushSettings(); }); });
+  function renderSens() { ui.querySelectorAll('.lb-srow').forEach(row => { const k = row.dataset.k, r = row.querySelector('input'); r.value = +S[k] || 1; fillRange(r);
+    row.querySelector('.lb-vval').textContent = (+S[k] || 1).toFixed(2); }); }
   function renderVol() { ui.querySelectorAll('.lb-vrow').forEach(row => { const k = row.dataset.k, r = row.querySelector('input'); r.value = S[k]; fillRange(r);
     row.querySelector('.lb-vval').textContent = S[k] + '%'; row.classList.toggle('muted', !S[k]); }); }
   const wedge = $('lb-fov-wedge');
-  function renderFov() { fovR.value = S.fov; fillRange(fovR); $('lb-fov-v').textContent = S.fov + '°';
+  function renderFov() { if (!fovR) return; fovR.value = S.fov; fillRange(fovR); $('lb-fov-v').textContent = S.fov + '°';
     const h = S.fov / 2 * Math.PI / 180, R = 52, x1 = 60 - R * Math.sin(h), x2 = 60 + R * Math.sin(h), y = 58 - R * Math.cos(h);
     wedge.setAttribute('d', `M60 58L${x1.toFixed(1)} ${y.toFixed(1)}A${R} ${R} 0 0 1 ${x2.toFixed(1)} ${y.toFixed(1)}Z`); }
-  fovR.addEventListener('input', () => { S.fov = +fovR.value; renderFov(); pushSettings(); });
+  if (fovR) fovR.addEventListener('input', () => { S.fov = +fovR.value; renderFov(); pushSettings(); });
   $('lb-bind-reset').addEventListener('click', () => { S.binds = { ...defBinds }; buildRemap(); pushSettings(); renderSettings(); });
   const finishRebind = code => { const id = rebinding; rebinding = null;
     if (code !== 'Escape') {
@@ -413,9 +457,9 @@ export function initLobbyUI(ctx) {
     const a = keyActs(code)[0]; if (a && a.id && !a.alt) { rebinding = a.id; renderSettings(); } });
 
   function renderSettings() {
-    renderLangPick();
+    renderLangPick(); renderBiz();
     langBox.querySelectorAll('.lb-seg').forEach(b => b.classList.toggle('on', b.dataset.lang === S.lang));
-    renderVol(); renderFov();
+    renderVol(); renderFov(); renderSens();
     bindBox.innerHTML = '';
     for (const [id, def] of ACTIONS) { const row = document.createElement('button'); row.type = 'button'; row.dataset.id = id;
       row.className = 'lb-bind c-' + CAT[id] + (rebinding === id ? ' wait' : '');
@@ -433,6 +477,23 @@ export function initLobbyUI(ctx) {
   const API = walletApi();
   const W = API ? createWallet({ api: API, root: ui, getLang: () => LANG, toast, onChange: a => { acct = a; acctId = a ? a.username.toLowerCase() : null; renderAll(); } }) : null;
   let activeMatch = null;
+  // profil (karta konta w menu): zapis przez serwer portfeli albo konto lokalne
+  const localSave = async patch => {
+    if (patch.username && patch.username.toLowerCase() !== acctId) {
+      const nid = patch.username.toLowerCase(); if (await accGet(nid)) throw new Error(t('auth.errExists'));
+      const old = acctId; Object.assign(acct, patch); await accSet(nid, acct); acctId = nid; ls.set('fasolka-session', nid);
+      ls.del('fasolka-acc:' + old); const db = await dbP; if (db) { try { await db.doc('accounts/' + old).delete(); } catch {} }
+    } else { Object.assign(acct, patch); await saveAcct(); }
+    renderAll();
+  };
+  const localPw = async (oldP, newP) => { const h = await hashPw(oldP, acct.salt); if (h.hash !== acct.hash) throw Object.assign(new Error('old'), { code: 'oldpass' }); const n = await hashPw(newP); acct.salt = n.salt; acct.hash = n.hash; await saveAcct(); };
+  var P = createProfile({ root: ui, getLang: () => LANG, toast, adapter: {
+    get acct() { return acct; },
+    save: patch => W ? W.profile(patch) : localSave(patch),
+    password: (o, n) => W ? W.password(o, n) : localPw(o, n),
+    earnings: async () => W ? W.earnings() : pointsFromHistory(acct && acct.history),
+    logout: () => logout(),
+  } });
   const saveAcct = async () => { if (acct) await accSet(acctId, acct); };
   const setErr = (id, msg) => { const el = $(id); el.textContent = msg || ''; el.hidden = !msg; };
   $('lb-login-form').addEventListener('submit', async e => { e.preventDefault(); setErr('lb-login-err');
@@ -449,6 +510,7 @@ export function initLobbyUI(ctx) {
     if (!/^[a-z0-9_]{3,16}$/i.test(u)) return setErr('lb-reg-err', t('auth.errUser'));
     if (p.length < 6) return setErr('lb-reg-err', t('auth.errPass'));
     if (p !== p2) return setErr('lb-reg-err', t('auth.errMatch'));
+    if (!$('lb-r-terms').checked) return setErr('lb-reg-err', t('auth.errTerms'));
     const btn = e.submitter || e.target.querySelector('[type=submit]'); btn.disabled = true;
     if (W) { try { await W.register(u, p); ['lb-r-pass', 'lb-r-pass2'].forEach(k => $(k).value = ''); closeAll(); toast(t('auth.created', { u }), 'ok'); }
       catch (err) { setErr('lb-reg-err', err.code === 'exists' ? t('auth.errExists') : err.message || t('auth.errDb')); } finally { btn.disabled = false; } return; }
@@ -458,7 +520,51 @@ export function initLobbyUI(ctx) {
     catch (err) { setErr('lb-reg-err', err === 'exists' ? t('auth.errExists') : t('auth.errDb')); } finally { btn.disabled = false; } });
   $('lb-logout').addEventListener('click', () => logout());
   function logout() { if (W) W.logout(); acct = null; acctId = null; ls.del('fasolka-session'); closeAll(); renderAll(); }
+  // ---- okno logowania: nagłówek zależny od zakładki, pokaż hasło, siła hasła, zgoda 18+, Google ----
+  const authBox = $('lb-auth');
+  // tło lewego panelu: zmieniające się ujęcia z map gry (co ~4 s, płynne przejście i lekki najazd)
+  const show = $('lb-abg');
+  show.innerHTML = SHOTS.map(([, src], i) => `<img src="${src}" alt="" decoding="async"${i ? ' loading="lazy"' : ''}>`).join('');
+  let shotI = 0, shotT = 0;
+  const shotGo = i => { shotI = (i + SHOTS.length) % SHOTS.length;
+    show.querySelectorAll('img').forEach((im, k) => { if (k === shotI) { im.classList.remove('on'); void im.offsetWidth; im.classList.add('on'); } else im.classList.remove('on'); }); };
+  shotGo(0);
+  new MutationObserver(() => { clearInterval(shotT); if (!authBox.hidden) { shotGo(shotI); shotT = setInterval(() => shotGo(shotI + 1), 4200); } }).observe(authBox, { attributes: true, attributeFilter: ['hidden'] });
+  function renderAuthHead() {
+    const reg = !$('lb-reg-form').hidden; $('lb-auth-h').textContent = t(reg ? 'auth.hiReg' : 'auth.hiLogin'); $('lb-auth-sub').textContent = t(reg ? 'auth.subReg' : 'auth.subLogin');
+    const e = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+    $('lb-terms-txt').innerHTML = e(t('auth.terms')).replace('{t}', `<a data-doc="terms">${e(t('auth.termsT'))}</a>`).replace('{p}', `<a data-doc="privacy">${e(t('auth.termsP'))}</a>`);
+  }
+  new MutationObserver(renderAuthHead).observe($('lb-reg-form'), { attributes: true, attributeFilter: ['hidden'] });
+  authBox.addEventListener('click', e => {
+    const g = e.target.closest('[data-goto]'); if (g) { showTab('lb-auth', g.dataset.goto); return; }
+    const d = e.target.closest('a[data-doc]'); if (d) { e.preventDefault(); closeAll(); openModal('lb-set'); showTab('lb-set', 'biz'); bizDoc = d.dataset.doc; renderBiz(); return; }
+    const y = e.target.closest('[data-eye]'); if (y) { const i = $(y.dataset.eye), show = i.type === 'password'; i.type = show ? 'text' : 'password'; y.classList.toggle('on', show); }
+  });
+  $('lb-r-pass').addEventListener('input', () => {
+    const p = $('lb-r-pass').value; let sc = 0;
+    if (p.length >= 6) sc++; if (p.length >= 10) sc++; if (/[A-Z]/.test(p) && /[a-z]/.test(p)) sc++; if (/\d/.test(p) && /[^A-Za-z0-9]/.test(p)) sc++;
+    const m = $('lb-pwm'), s = p ? Math.max(1, sc) : 0; m.dataset.s = s; m.querySelector('em').textContent = s ? t('auth.pw' + s) : '';
+  });
+  let gId = null;
+  const googleId = async () => { if (gId !== null) return gId; if (!API) return (gId = ''); try { gId = (await (await fetch(API + '/api/config')).json()).googleClientId || ''; } catch { gId = ''; } return gId; };
+  const loadGis = () => new Promise((ok, no) => { if (window.google && google.accounts && google.accounts.oauth2) return ok(); const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true; sc.onload = () => ok(); sc.onerror = no; document.head.appendChild(sc); });
+  $('lb-google').addEventListener('click', async () => {
+    const id = await googleId(); if (!W || !id) return toast(t('auth.googleOff'));
+    const btn = $('lb-google'); btn.disabled = true;
+    try {
+      await loadGis();
+      google.accounts.oauth2.initTokenClient({ client_id: id, scope: 'openid email profile', error_callback: () => { btn.disabled = false; },
+        callback: async r => {
+          if (!r || r.error) { btn.disabled = false; return toast(t('auth.googleErr'), 'err'); }
+          try { const j = await W.google(r.access_token); closeAll(); toast(t(j.created ? 'auth.created' : 'auth.welcome', { u: j.account.username }), 'ok'); }
+          catch (er) { toast(er.message || t('auth.googleErr'), 'err'); }
+          btn.disabled = false;
+        } }).requestAccessToken();
+    } catch { btn.disabled = false; toast(t('auth.googleErr'), 'err'); }
+  });
   function renderAuth() {
+    renderAuthHead();
     const inBox = $('lb-auth-in'), outBox = $('lb-auth-out');
     inBox.hidden = !acct; outBox.hidden = !!acct;
     if (acct) { $('lb-me-av').textContent = acct.username[0].toUpperCase(); $('lb-me-name').textContent = acct.username; $('lb-me-since').textContent = new Date(acct.createdAt).toLocaleDateString(LANG); }
@@ -518,19 +624,19 @@ export function initLobbyUI(ctx) {
   // ---- pasek górny ----
   function renderTop() {
     $('lb-acct-name').textContent = acct ? acct.username : t('top.signin');
-    $('lb-acct-av').textContent = acct ? acct.username[0].toUpperCase() : '?';
-    $('lb-bal').textContent = acct ? usd(acct.balance) : '—';
+    if (acct) paintAvatar($('lb-acct-av'), acct); else { $('lb-acct-av').textContent = '?'; $('lb-acct-av').style.background = ''; }
+    $('lb-bal').textContent = usd(acct ? acct.balance : 0);   // bez konta: $0,00
     ctx.setName(acct ? acct.username : t('top.guest'));
     menu.querySelector('[data-act="auth"] span').textContent = acct ? t('menu.account') : t('menu.login');
     $('lb-acct').hidden = $('lb-acct-hr').hidden = !acct; menu.querySelector('[data-act="auth"]').hidden = !!acct;   // konto w menu: karta po zalogowaniu, „Zaloguj się” bez konta
     menu.querySelector('[data-act="logout"]').hidden = !acct;
     const hr = menu.querySelector('hr'); if (hr) hr.hidden = !acct;
   }
-  $('lb-acct').addEventListener('click', () => { openMenu(false); openModal('lb-auth'); if (!acct) showTab('lb-auth', 'login'); });
+  $('lb-acct').addEventListener('click', () => { openMenu(false); if (acct) { closeAll(); P.open(); return; } openModal('lb-auth'); showTab('lb-auth', 'login'); });
   $('lb-walletchip').addEventListener('click', () => openWallet());
 
   // ---- stawka ----
-  let stakeSel = ls.get('fasolka-stake-sel') || '10', stakeCustom = +(ls.get('fasolka-stake-custom') || 50);
+  let stakeSel = ls.get('fasolka-stake-sel') || '5', stakeCustom = +(ls.get('fasolka-stake-custom') || 50);
   const stakeBox = $('lb-stake'), customIn = $('lb-stake-in');
   stakeBox.querySelectorAll('[data-stake]').forEach(b => b.addEventListener('click', () => { stakeSel = b.dataset.stake; ls.set('fasolka-stake-sel', stakeSel); renderStake(); if (stakeSel === 'custom') customIn.focus(); }));
   customIn.addEventListener('input', () => { stakeCustom = Math.floor(+customIn.value); ls.set('fasolka-stake-custom', String(stakeCustom)); renderStake(true); });
@@ -538,13 +644,19 @@ export function initLobbyUI(ctx) {
   function renderStake(keepInput) {
     const duel = ctx.getMode() === '1v1';
     $('lb-stake-wrap').classList.toggle('off', !duel);
-    $('lb-stake-free').hidden = duel; stakeBox.hidden = !duel;
-    stakeBox.querySelectorAll('[data-stake]').forEach(b => b.classList.toggle('on', b.dataset.stake === stakeSel));
-    $('lb-stake-custom').hidden = stakeSel !== 'custom'; if (!keepInput) customIn.value = stakeCustom || '';
+    // strzelnica: stawki widoczne, ale szare i nieaktywne; prowizja i wygrana $0,00
+    $('lb-stake-free').hidden = true; stakeBox.hidden = false;
+    stakeBox.querySelectorAll('[data-stake]').forEach(b => { b.classList.toggle('on', duel && b.dataset.stake === stakeSel); b.disabled = !duel; });
+    $('lb-stake-custom').hidden = !duel || stakeSel !== 'custom'; if (!keepInput) customIn.value = stakeCustom || '';
     const s = getStake(), ok = s >= 1 && s <= 1000;
-    $('lb-stake-win').textContent = duel ? (ok ? usd(payout(s)) : '—') : '';
-    $('lb-stake-fee').textContent = duel && ok ? '−' + usd(feeOf(s)) : '—';
-    $('lb-stake-winrow').hidden = !duel; $('lb-stake-feerow').hidden = !duel;
+    $('lb-stake-win').textContent = duel ? (ok ? usd(payout(s)) : '—') : usd(0);
+    $('lb-stake-fee').textContent = duel ? (ok ? '−' + usd(feeOf(s)) : '—') : usd(0);
+    $('lb-stake-winrow').hidden = false; $('lb-stake-feerow').hidden = false; $('lb-stake-slip').hidden = false;
+    // równowartość w SOL (kurs z serwera portfeli); bez kursu – sam znak SOL
+    const px = acct && acct.price, sol = v => (v / px).toLocaleString(LANG === 'en' ? 'en-US' : LANG, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+    stakeBox.querySelectorAll('[data-sol]').forEach(el => { el.textContent = px ? '≈ ' + sol(+el.dataset.sol) + ' SOL' : 'SOL'; });
+    $('lb-stake-sol').innerHTML = duel && ok && px && stakeSel === 'custom' ? '≈ <b>' + sol(s) + ' SOL</b>' : '';   // własna kwota: SOL obok etykiety (gotowe kwoty mają SOL na kafelku)
+    $('lb-stake-x').textContent = duel && ok ? '×' + (payout(s) / s).toFixed(2) : '';
     $('lb-play-sub').textContent = ''; $('lb-play-sub').hidden = true;   // sam duży napis – stawka jest opisana wyżej
     $('lb-play').querySelector('.lb-pl').textContent = acct ? t('play') : t('play.login');   // bez konta: LOG IN
   }
@@ -604,7 +716,43 @@ export function initLobbyUI(ctx) {
     activeStake = lastStake; addTx(-lastStake, 'stake');
   });
 
-  function renderAll() { renderTop(); renderStake(); renderAuth(); renderWallet(); }
+  function renderAll() { renderTop(); renderStake(); renderAuth(); renderWallet(); if (P) P.render(); }
+  // ---- zakładka Business (ustawienia): e-mail do zapytań biznesowych, regulamin, polityka prywatności ----
+  var bizDoc = null, bizEmail = OPERATOR.businessEmail, BIZ_IC = {
+    mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
+    copy: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>', brief: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/></svg>',
+    doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h6"/></svg>',
+    lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>' };
+  function renderBiz() {
+    const box = $('lb-biz'); if (!box || !BIZ_IC) return; const L = LEGAL_TXT[LANG] || LEGAL_TXT.en, m = bizEmail, e = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+    if (bizDoc) { box.innerHTML = `<button type="button" class="lb-bizback" data-biz="back">${e(L.back)}</button><div class="lb-doc">${legalDoc(bizDoc, LANG)}</div>`; return; }
+    box.innerHTML = `<div class="lb-bizcard"><div class="lb-bizglow"></div><div class="lb-bizic">${BIZ_IC.brief}</div><h4>${e(L.biz)}</h4><p>${e(L.bizD)}</p>
+      <div class="lb-mailbox${m ? '' : ' none'}"><i>${BIZ_IC.mail}</i><span><small>${e(L.mailL)}</small><b>${m ? e(m) : e(L.soon)}</b></span>
+        ${m ? `<button type="button" class="lb-bizbtn" data-biz="copy">${BIZ_IC.copy}${e(L.copy)}</button><a class="lb-bizbtn pri" href="mailto:${e(m)}?subject=${encodeURIComponent(OPERATOR.brand + ' – business')}">${e(L.write)} ›</a>` : ''}</div></div>
+      <h5 class="lb-sec lb-docsh">${e(L.docs)}</h5>
+      <div class="lb-docs"><button type="button" class="lb-docbtn t" data-biz="terms"><i>${BIZ_IC.doc}</i><span><b>${e(L.terms)}</b><small>${e(L.termsD)}</small></span><em>›</em></button>
+      <button type="button" class="lb-docbtn p" data-biz="privacy"><i>${BIZ_IC.lock}</i><span><b>${e(L.privacy)}</b><small>${e(L.privacyD)}</small></span><em>›</em></button></div>`;
+  }
+  // e-mail biznesowy ustawia admin (panel admina): serwer portfeli, baza artefaktu albo – lokalnie – ta przeglądarka
+  (async () => { try {
+    if (API) { const j = await (await fetch(API + '/api/config')).json(); if (j.businessEmail != null) bizEmail = j.businessEmail; }
+    else { const db = await dbP; if (db) { const sn = await db.doc('config/business').get(); if (sn.exists) bizEmail = sn.data().email || ''; } else bizEmail = ls.get('fasolka-biz-email') || bizEmail; }
+  } catch {} renderBiz(); })();
+  addEventListener('fasolka:biz-email', e => { bizEmail = e.detail || ''; renderBiz(); });
+  // hasła w lewym panelu okna logowania – admin może je zmienić (panel admina), osobno dla każdego języka
+  const applyAuthTexts = o => { for (const l in AUTH_TXT) for (const k of ['tag', 'f1', 'f2', 'f3']) { const v = o && o[l] && o[l][k]; DICT[l]['auth.' + k] = v || AUTH_TXT[l]['auth.' + k]; } applyI18n(); };
+  (async () => { try {
+    let o = null;
+    if (API) { const c = await (await fetch(API + '/api/config')).json(); o = c.authTexts || null; }
+    else { const db = await dbP;
+      if (db) { const sn = await db.doc('config/auth').get(); if (sn.exists) o = sn.data().texts || null; }
+      else o = JSON.parse(ls.get('fasolka-auth-texts') || 'null'); }
+    if (o) applyAuthTexts(o);
+  } catch {} })();
+  addEventListener('fasolka:auth-texts', e => applyAuthTexts(e.detail));
+  $('lb-biz').addEventListener('click', async ev => { const b = ev.target.closest('[data-biz]'); if (!b) return; const k = b.dataset.biz;
+    if (k === 'copy') { try { await navigator.clipboard.writeText(bizEmail); toast((LEGAL_TXT[LANG] || LEGAL_TXT.en).copied, 'ok'); } catch {} return; }
+    bizDoc = k === 'back' ? null : k; renderBiz(); const d = $('lb-biz').querySelector('.lb-doc'); if (d) d.scrollTop = 0; });
   // ---- bez konta: każda interakcja w lobby (poza wyborem języka) otwiera logowanie ----
   const askLogin = () => { closeAll(); openModal('lb-auth'); showTab('lb-auth', 'login'); };
   const GATED = 'button,a,input,select,textarea,label,[role=button],[role=menuitem],[data-act],.lb-tile,.lb-skin,.lb-key';

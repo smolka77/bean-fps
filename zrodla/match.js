@@ -178,8 +178,10 @@ body canvas{transition:filter .4s ease}
 `;
 
 // moneta Solany (płatność w SOL, kwoty w USD) jak w portfelu lobby
-const COIN = '<svg class="mt-coin" viewBox="0 0 20 20" aria-hidden="true"><defs><linearGradient id="mtusdt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9945ff"/><stop offset="1" stop-color="#14f195"/></linearGradient></defs>'
-  + '<circle cx="10" cy="10" r="9.2" fill="url(#mtusdt)"/><text x="10" y="14.3" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="11.5" fill="#fff">◎</text></svg>';
+const COIN = '<svg class="mt-coin" viewBox="0 0 20 20" aria-hidden="true"><defs><linearGradient id="mtusdt" x1="361" y1="-37" x2="141" y2="383" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#00ffa3"/><stop offset="1" stop-color="#dc1fff"/></linearGradient></defs>'
+  + '<circle cx="10" cy="10" r="9.4" fill="#0d1019" stroke="rgba(255,255,255,.18)" stroke-width=".8"/><g transform="translate(4.6 5.7) scale(.0272)" fill="url(#mtusdt)">'
+  + '<path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/>'
+  + '<path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1z"/></g></svg>';   // logo Solany
 const BEAN = visor => `<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="13" y="4" width="22" height="40" rx="11" fill="#fff6dc"/>`
   + `<rect x="17" y="13" width="14" height="7.5" rx="3.75" fill="${visor}"/><ellipse cx="19" cy="10.5" rx="2.4" ry="3.6" fill="#fff" opacity=".7"/></svg>`;
 

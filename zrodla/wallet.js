@@ -1,7 +1,8 @@
-// Portfel gry BEENLADEN połączony z serwerem portfeli (serwer/): konto, własny adres depozytu SOL,
+// Portfel gry BEANLADEN połączony z serwerem portfeli (serwer/): konto, własny adres depozytu SOL,
 // wpłaty z dowolnego portfela, wypłaty na dowolny adres, historia i zakładka Zarobki (wykres zysku w dolarach).
 // Saldo domyślnie w dolarach, pod spodem małym szarym drukiem ilość SOL; strzałki zamieniają kolejność.
 import qrcode from 'qrcode-generator';
+import { renderEarnings } from './earnings.js';
 
 const TXT = {
   pl: { title: 'Portfel', bal: 'Saldo', dep: 'Wpłać', wd: 'Wypłać', hist: 'Historia', earn: 'Zarobki', swap: 'Zamień dolary i SOL', rate: '1 SOL = {p}',
@@ -111,19 +112,6 @@ const CSS = `
 #bl-w .bw-list .v small{font-weight:600}
 #bl-w .pos{color:var(--bw-ok)}#bl-w .neg{color:var(--bw-bad)}
 #bl-w .bw-empty{padding:26px 10px;text-align:center;color:var(--bw-mut);font-size:13px}
-#bl-w .bw-kpis{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:8px}
-#bl-w .bw-kpi{padding:12px;border-radius:13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
-#bl-w .bw-kpi small{display:block;font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--bw-mut)}
-#bl-w .bw-kpi b{display:block;margin-top:7px;font:800 18px/1 Inter,sans-serif;font-variant-numeric:tabular-nums}
-#bl-w .bw-kpi.big b{font-size:24px}
-#bl-w .bw-rng{display:flex;gap:4px;margin:14px 0 8px}
-#bl-w .bw-rng button{height:28px;padding:0 10px;border-radius:8px;border:1px solid var(--bw-line);background:none;font:600 12px/1 Inter,sans-serif;color:var(--bw-mut)}
-#bl-w .bw-rng button.on{color:#fff;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2)}
-#bl-w .bw-chart{position:relative;height:190px;border-radius:14px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.05)}
-#bl-w .bw-chart svg{width:100%;height:100%;display:block}
-#bl-w .bw-chart .ax text{font:600 10px Inter,sans-serif;fill:#7d889c}
-#bl-w .bw-tip{position:absolute;transform:translate(-50%,-115%);pointer-events:none;padding:7px 10px;border-radius:10px;background:#0b111e;border:1px solid rgba(255,255,255,.16);font:700 12px/1.3 Inter,sans-serif;white-space:nowrap;box-shadow:0 8px 20px rgba(0,0,0,.4)}
-#bl-w .bw-tip small{display:block;font-weight:600;color:var(--bw-mut)}
 @media (max-width:460px){#bl-w .bw-main{font-size:32px}#bl-w .bw-qr{flex-direction:column;align-items:stretch}#bl-w .bw-qrimg{margin:0 auto}#bl-w .bw-tabs button span{display:none}}
 @media (prefers-reduced-motion:reduce){#bl-w .bw{animation:none}#bl-w .bw-swap{transition:none}}
 `;
@@ -145,7 +133,7 @@ export function createWallet({ api, root, getLang, toast, onChange }) {
   const fmtUsd = v => (v < 0 ? '−' : '') + '$' + Math.abs(v).toLocaleString(loc(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtSol = (s, d = 4) => s.toLocaleString(loc(), { minimumFractionDigits: 2, maximumFractionDigits: d }) + ' SOL';
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-  let token = null, acct = null, hist = [], earn = null, solFirst = false, online = true, tab = 'dep', range = 'all', pollT = 0;
+  let token = null, acct = null, hist = [], earn = null, solFirst = false, online = true, tab = 'dep', pollT = 0;
   try { token = localStorage.getItem('bl-token'); solFirst = localStorage.getItem('bl-solfirst') === '1'; } catch {}
 
   async function call(method, p, body) {
@@ -155,7 +143,7 @@ export function createWallet({ api, root, getLang, toast, onChange }) {
     online = true; return j;
   }
   function setSession(tok) { token = tok; try { tok ? localStorage.setItem('bl-token', tok) : localStorage.removeItem('bl-token'); } catch {} if (!tok) { acct = null; hist = []; earn = null; emit(); } }
-  const toLobby = () => acct && { username: acct.username, createdAt: acct.createdAt, balance: acct.balance, wallet: acct.address, address: acct.address, sol: acct.sol, lamports: acct.lamports,
+  const toLobby = () => acct && { username: acct.username, email: acct.email || '', avatar: acct.avatar || '', createdAt: acct.createdAt, balance: acct.balance, wallet: acct.address, address: acct.address, sol: acct.sol, lamports: acct.lamports,
     price: acct.price, cluster: acct.cluster, admin: acct.admin, stats: acct.stats, history: hist };
   function emit() { onChange(toLobby()); render(); }
   function take(j) { if (j.account) acct = j.account; if (j.history) hist = j.history; emit(); return toLobby(); }
@@ -163,6 +151,7 @@ export function createWallet({ api, root, getLang, toast, onChange }) {
   const api$ = {
     get on() { return true; }, get acct() { return toLobby(); }, get token() { return token; }, api,
     async register(username, password) { const j = await call('POST', '/register', { username, password }); setSession(j.token); return take(j); },
+    async google(accessToken) { const j = await call('POST', '/google', { accessToken }); setSession(j.token); take(j); return j; },
     async login(username, password) { const j = await call('POST', '/login', { username, password }); setSession(j.token); return take(j); },
     async restore() { if (!token) return null; try { return take(await call('GET', '/me')); } catch (e) { if (e.status !== 401) online = false; return null; } },
     async logout() { try { await call('POST', '/logout'); } catch {} setSession(null); },
@@ -170,6 +159,9 @@ export function createWallet({ api, root, getLang, toast, onChange }) {
     async startMatch(stakeUsd) { const j = await call('POST', '/match/start', { stakeUsd }); take(j); return j.matchId; },
     async endMatch(matchId, won, forfeit, map) { const j = await call('POST', '/match/end', { matchId, won, forfeit, map }); earn = null; take(j); },
     async stats(o) { try { await call('POST', '/stats', o); } catch {} },
+    async earnings() { try { earn = (await call('GET', '/earnings')).points; } catch { earn = earn || []; } return earn; },
+    async profile(body) { const j = await call('POST', '/profile', body); return take(j); },
+    async password(oldPassword, newPassword) { await call('POST', '/password', { oldPassword, newPassword }); },
     open, close,
   };
   // co 12 s świeże saldo (wpłaty wykrywa serwer); przy otwartym portfelu – co 8 s z wymuszeniem skanu
@@ -194,9 +186,7 @@ export function createWallet({ api, root, getLang, toast, onChange }) {
       <div class="bw-calc"><span id="bw-get"></span><span data-t="feeNote"></span></div>
       <button class="bw-btn pri" type="submit" id="bw-send" style="width:100%" data-t="send"></button><div id="bw-wdmsg"></div></form>
     <div class="bw-pane" data-pane="hist"><ul class="bw-list" id="bw-hist"></ul></div>
-    <div class="bw-pane" data-pane="earn"><div class="bw-kpis" id="bw-kpis"></div>
-      <div class="bw-rng" id="bw-rng"><button type="button" data-r="7" data-t="d7"></button><button type="button" data-r="30" data-t="d30"></button><button type="button" data-r="all" data-t="all"></button></div>
-      <div class="bw-chart" id="bw-chart"></div></div></div>`;
+    <div class="bw-pane" data-pane="earn"><div id="bw-earn"></div></div></div>`;
   root.appendChild(wrap);
   const $ = id => wrap.querySelector('#' + id);
   wrap.addEventListener('click', e => { if (e.target === wrap || e.target.closest('[data-x]')) close(); });
@@ -230,7 +220,6 @@ export function createWallet({ api, root, getLang, toast, onChange }) {
     catch (er) { msg.innerHTML = `<div class="bw-err">${esc(er.message)}</div>`; }
     b.disabled = false; b.textContent = T('send');
   });
-  $('bw-rng').addEventListener('click', e => { const b = e.target.closest('[data-r]'); if (b) { range = b.dataset.r; renderEarn(); } });
 
   function open(t = 'dep') { tab = t === 'deposit' ? 'dep' : t === 'withdraw' ? 'wd' : t === 'history' ? 'hist' : t; wrap.hidden = false; render(); api$.refresh(true); if (tab === 'earn') loadEarn(); loop(); }
   function close() { wrap.hidden = true; loop(); }
@@ -273,46 +262,8 @@ export function createWallet({ api, root, getLang, toast, onChange }) {
     if (tab === 'earn') renderEarn();
   }
 
-  function renderEarn() {
-    const pts0 = earn || [], now = Date.now(), from = range === 'all' ? 0 : now - (+range) * 86400e3;
-    const pts = pts0.filter(p => p.t >= from), base = pts0.filter(p => p.t < from).reduce((a, p) => a + p.net, 0);
-    wrap.querySelectorAll('#bw-rng [data-r]').forEach(b => b.classList.toggle('on', b.dataset.r === range));
-    const won = pts.filter(p => p.net > 0).reduce((a, p) => a + p.net, 0), lost = -pts.filter(p => p.net < 0).reduce((a, p) => a + p.net, 0), net = won - lost, wins = pts.filter(p => p.won).length;
-    $('bw-kpis').innerHTML = `<div class="bw-kpi big"><small>${esc(T('net'))}</small><b class="${net > 0 ? 'pos' : net < 0 ? 'neg' : ''}">${net > 0 ? '+' : ''}${fmtUsd(net)}</b></div>
-      <div class="bw-kpi"><small>${esc(T('won'))}</small><b class="pos">+${fmtUsd(won)}</b></div><div class="bw-kpi"><small>${esc(T('lost'))}</small><b class="neg">${fmtUsd(-lost)}</b></div>`;
-    const el = $('bw-chart');
-    if (!pts.length) { el.innerHTML = `<div class="bw-empty" style="height:100%;display:grid;place-items:center">${esc(earn ? T('noGames') : T('checking'))}</div>`; return; }
-    const W = 440, H = 190, pl = 46, pr = 10, pt = 14, pb = 22;
-    const series = [{ t: pts[0].t - 1, cum: base }, ...pts.map(p => ({ t: p.t, cum: p.cum, p }))];
-    let lo = Math.min(0, ...series.map(s => s.cum)), hi = Math.max(0, ...series.map(s => s.cum)); if (hi - lo < 1) { hi += .5; lo -= .5; }
-    const pad = (hi - lo) * .12; hi += pad; lo -= pad;
-    const x = i => pl + (W - pl - pr) * (series.length === 1 ? .5 : i / (series.length - 1)), y = v => pt + (H - pt - pb) * (hi - v) / (hi - lo), y0 = y(0);
-    const line = series.map((s, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(s.cum).toFixed(1)}`).join('');
-    const area = `${line}L${x(series.length - 1).toFixed(1)} ${y0}L${x(0).toFixed(1)} ${y0}Z`;
-    const ticks = [hi - pad, 0, lo + pad].filter((v, i, a) => a.findIndex(w => Math.abs(w - v) < (hi - lo) * .08) === i);
-    const fmtK = v => (v < 0 ? '−' : '') + '$' + (Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toFixed(1) + 'k' : Math.abs(v).toFixed(Math.abs(v) < 10 ? 2 : 0));
-    const last = series[series.length - 1].cum, col = last >= base ? '#2fd27a' : '#ff6b5e';
-    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(T('earn'))}"><defs>
-      <linearGradient id="bw-gu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2fd27a" stop-opacity=".38"/><stop offset="1" stop-color="#2fd27a" stop-opacity="0"/></linearGradient>
-      <linearGradient id="bw-gd" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff6b5e" stop-opacity=".38"/><stop offset="1" stop-color="#ff6b5e" stop-opacity="0"/></linearGradient>
-      <clipPath id="bw-cu"><rect x="0" y="0" width="${W}" height="${y0}"/></clipPath><clipPath id="bw-cd"><rect x="0" y="${y0}" width="${W}" height="${H - y0}"/></clipPath></defs>
-      <g class="ax">${ticks.map(v => `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(255,255,255,${v === 0 ? .22 : .07})" ${v === 0 ? 'stroke-dasharray="3 4"' : ''}/><text x="${pl - 8}" y="${y(v) + 3}" text-anchor="end">${fmtK(v)}</text>`).join('')}</g>
-      <path d="${area}" fill="url(#bw-gu)" clip-path="url(#bw-cu)"/><path d="${area}" fill="url(#bw-gd)" clip-path="url(#bw-cd)"/>
-      <path d="${line}" fill="none" stroke="#2fd27a" stroke-width="2.2" stroke-linejoin="round" clip-path="url(#bw-cu)" vector-effect="non-scaling-stroke"/>
-      <path d="${line}" fill="none" stroke="#ff6b5e" stroke-width="2.2" stroke-linejoin="round" clip-path="url(#bw-cd)" vector-effect="non-scaling-stroke"/>
-      <circle id="bw-dot" r="4" fill="${col}" stroke="#0b111e" stroke-width="2" cx="${x(series.length - 1)}" cy="${y(last)}"/>
-      <rect x="${pl}" y="0" width="${W - pl - pr}" height="${H}" fill="transparent" id="bw-hit"/></svg><div class="bw-tip" id="bw-tip" hidden></div>`;
-    const svg = el.querySelector('svg'), tip = $('bw-tip'), dot = el.querySelector('#bw-dot');
-    svg.addEventListener('pointermove', e => {
-      const r = svg.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width * W;
-      let i = Math.round((fx - pl) / (W - pl - pr) * (series.length - 1)); if (!Number.isFinite(i)) return; i = Math.max(1, Math.min(series.length - 1, i)); const s = series[i]; if (!s || !s.p) return;
-      dot.setAttribute('cx', x(i)); dot.setAttribute('cy', y(s.cum)); dot.setAttribute('fill', s.p.net >= 0 ? '#2fd27a' : '#ff6b5e');
-      tip.innerHTML = `<small>${esc(T('match', { n: pts0.indexOf(s.p) + 1 }))} · ${new Date(s.t).toLocaleString(loc(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>
-        <span class="${s.p.net >= 0 ? 'pos' : 'neg'}">${s.p.net >= 0 ? '+' : ''}${fmtUsd(s.p.net)}</span> · ${esc(T('net'))} ${s.cum >= 0 ? '+' : ''}${fmtUsd(s.cum)}`;
-      tip.style.left = (x(i) / W * r.width) + 'px'; tip.style.top = (y(s.cum) / H * r.height) + 'px'; tip.hidden = false;
-    });
-    svg.addEventListener('pointerleave', () => { tip.hidden = true; dot.setAttribute('cx', x(series.length - 1)); dot.setAttribute('cy', y(last)); dot.setAttribute('fill', col); });
-  }
+  const earnState = {};
+  function renderEarn() { renderEarnings($('bw-earn'), earn, getLang(), earnState); }
 
   loop();
   return api$;
