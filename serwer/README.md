@@ -21,7 +21,7 @@ cd serwer && npm install
 ```
 
 ```bash
-ADMIN_USERS=twojanazwa node serwer.mjs
+node serwer.mjs
 ```
 
 Serwer podaje też zbudowaną grę (`../index.html`) pod tym samym adresem: wejdź na `http://localhost:8787`.
@@ -38,8 +38,6 @@ Testowe SOL na devnecie: <https://faucet.solana.com> (wklej adres z zakładki **
 | `SOLANA_CLUSTER` | `devnet` | `devnet`, `testnet` albo `mainnet-beta` (zablokowany, patrz niżej) |
 | `SOLANA_RPC_URL` | publiczny RPC sieci | własny RPC (Helius, QuickNode…) – zalecany przy większym ruchu |
 | `WALLET_MNEMONIC` | — | fraza 24 słów. Bez niej (tylko sieć testowa) serwer tworzy ją raz w `dane/fraza.txt` |
-| `ADMIN_USERS` | — | nazwy kont z dostępem do panelu admina, po przecinku. Przy starcie przypinane na stałe do ID istniejących kont (zmiana nicku nie odbiera uprawnień); nicków z listy nie da się założyć |
-| `ADMIN_IDS` | — | ID kont adminów, po przecinku (ma pierwszeństwo przed `ADMIN_USERS`) |
 | `HOST` | `127.0.0.1` | adres nasłuchu: tylko ta maszyna (nginx przed serwerem). `0.0.0.0` wystawia port 8787 do internetu – niezalecane |
 | `SESSION_DAYS` | `30` | po tylu dniach sesja gracza wygasa |
 | `WITHDRAW_DAILY_USD` | `500` | limit wypłat jednego konta w ciągu 24 h |
@@ -56,9 +54,10 @@ Wymagany Node.js 22.5 lub nowszy (wbudowany `node:sqlite`).
 
 ## Panel admina i bezpieczeństwo kont
 
-- **2FA (TOTP)**: panel admina wymaga kodu z aplikacji (Google Authenticator, Authy, 1Password). Przy pierwszym wejściu
-  panel prosi o hasło konta, pokazuje kod QR i klucz, a potem kod kontrolny. Kolejne wejścia: tylko kod. Sesja admina
-  wygasa po 30 min bez ruchu (najwyżej 12 h) i jest tylko w tej karcie przeglądarki.
+- **Panel admina ma własne konta** (tabela `admins`), niezależne od kont graczy: login + hasło + kod 2FA (TOTP: Google
+  Authenticator, Authy, 1Password). Konto zakłada się na serwerze: `node admin.mjs dodaj NAZWA` (na VPS: `bash beanladen-admin.sh dodaj NAZWA`),
+  narzędzie pokazuje losowe hasło jeden raz. Przy pierwszym logowaniu panel pokazuje kod QR. Sesja panelu wygasa po 30 min bez ruchu (najwyżej 12 h)
+  i jest tylko w tej karcie przeglądarki. `ADMIN_USERS` / `ADMIN_IDS` nie są już używane.
 - **Dziennik admina** (tabela `audit`): logowania adminów, 2FA, zmiany ustawień, decyzje o wypłatach – widać go w panelu.
 - **Wypłaty**: dzienny limit na konto, duże wypłaty czekają na akceptację (panel → „Wypłaty do akceptacji”), blokada po zmianie hasła/e-maila.
 - **Hasła**: scrypt (N=2^14, r=8, p=5); nowe hasła min. 10 znaków. Starsze hashe są przepisywane przy logowaniu.
@@ -66,8 +65,8 @@ Wymagany Node.js 22.5 lub nowszy (wbudowany `node:sqlite`).
 - **WebSocket**: gra łączy się z `/ws?k=BILET` (jednorazowy, 30 s, z `POST /api/ws-ticket`), token sesji nie trafia do adresu.
 - Kod: `ochrona.mjs` (hasła, TOTP, limity, bilety, zastrzeżone nicki).
 
-Zgubiony telefon z 2FA: zatrzymaj serwer i wyczyść 2FA w bazie, np.
-`sqlite3 dane/portfele.db "UPDATE users SET totp=NULL, totp_step=NULL WHERE id=1"` – przy następnym wejściu panel poprosi o włączenie 2FA od nowa.
+Narzędzie `admin.mjs`: `lista`, `dodaj NAZWA`, `haslo NAZWA` (nowe losowe hasło), `reset-2fa NAZWA` (zgubiony telefon – przy następnym
+logowaniu nowy kod QR), `usun NAZWA`. Działa przy włączonym serwerze, bez restartu.
 
 ## Logowanie przez Google
 
@@ -83,7 +82,7 @@ Każdy hosting Node z trwałym dyskiem, np. Railway (wolumen), Fly.io (volume), 
 
 1. Ustaw `npm install` jako komendę budowania i `node serwer.mjs` jako komendę startu, katalog `serwer/`.
 2. Podłącz trwały dysk i ustaw `DATA_DIR` na jego ścieżkę.
-3. Ustaw `ADMIN_USERS` i `CORS_ORIGINS`. `WALLET_MNEMONIC` ustaw jako sekret: wygeneruj frazę i zapisz jej kopię w bezpiecznym miejscu.
+3. Ustaw `CORS_ORIGINS` i załóż konto panelu (`node admin.mjs dodaj NAZWA`). `WALLET_MNEMONIC` ustaw jako sekret: wygeneruj frazę i zapisz jej kopię w bezpiecznym miejscu.
 4. Wpisz adres serwera w `zrodla/wallet-config.js` i przebuduj grę.
 
 **Fraza = wszystkie środki.** Kto ją zna, ma dostęp do skarbca i wszystkich adresów depozytów.

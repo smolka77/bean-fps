@@ -10,12 +10,12 @@ import qrcode from 'qrcode-generator';
 // serwer portfeli (gdy ustawiony): prawdziwe konta, adresy depozytów i salda SOL wszystkich graczy
 const SRV = walletApi();
 const srvToken = () => { try { return localStorage.getItem('bl-token'); } catch { return null; } };
-// sesja admina po kodzie 2FA (30 min bez ruchu, max 12 h): tylko w tej karcie (sessionStorage), wysyłana w nagłówku X-Admin-Token
+// sesja panelu po logowaniu login + hasło + kod 2FA (30 min bez ruchu, max 12 h): tylko w tej karcie (sessionStorage), wysyłana w nagłówku X-Admin-Token
 const admTok = {
   get() { try { return sessionStorage.getItem('bl-admin') || ''; } catch { return ''; } },
   set(v) { try { v ? sessionStorage.setItem('bl-admin', v) : sessionStorage.removeItem('bl-admin'); } catch {} },
 };
-const AH = () => ({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + srvToken(), 'X-Admin-Token': admTok.get() });
+const AH = () => ({ 'Content-Type': 'application/json', 'X-Admin-Token': admTok.get() });   // panel ma własne konta – bez tokenu gracza
 async function srvPost(p, body) {
   const r = await fetch(SRV + p, { method: 'POST', headers: AH(), body: JSON.stringify(body || {}) }); const j = await r.json().catch(() => ({}));
   if (!r.ok) { const e = new Error(j.message || 'Błąd serwera'); e.code = j.error; throw e; } return j;
@@ -199,7 +199,6 @@ export async function openAdmin({ onClose } = {}) {
   if (SRV) {
     const deny = msg => { root.innerHTML = `<div class="fa-wrap"><div class="fa-deny"><h2>Brak dostępu</h2><p>${esc(msg)}</p><button class="fa-btn pri" type="button" data-close>Wróć do gry</button></div></div>`; root.querySelector('[data-close]').addEventListener('click', close); };
     lastOpts = { onClose };
-    if (!srvToken()) return deny('Zaloguj się w grze kontem admina, potem otwórz panel ponownie.');
     if (!(await unlockAdmin(deny, close))) return;
     if (!root) return; buildDashboard(null, close); return;
   }
@@ -216,8 +215,8 @@ export async function openAdmin({ onClose } = {}) {
   buildDashboard(db, close);
 }
 
-// Odblokowanie panelu na serwerze portfeli: konto z listy adminów + kod 2FA (TOTP). Pierwsze wejście = włączenie 2FA
-// (hasło konta, potem klucz do aplikacji uwierzytelniającej i kontrolny kod). Zwraca true, gdy sesja admina jest ważna.
+// Logowanie do panelu na serwerze portfeli: osobne konto admina (login + hasło + kod 2FA), niezależne od konta w grze.
+// Pierwsze logowanie konta bez 2FA: serwer zwraca klucz – panel pokazuje kod QR i prosi o kod kontrolny. Zwraca true, gdy sesja jest ważna.
 async function unlockAdmin(deny, close) {
   let st;
   try { const r = await fetch(SRV + '/api/admin/status', { headers: AH() }); st = await r.json().catch(() => ({})); if (!r.ok) { deny(st.message || 'Serwer portfeli odmówił dostępu.'); return false; } }
@@ -229,27 +228,29 @@ async function unlockAdmin(deny, close) {
       if (!root) return done(false);
       root.innerHTML = `<div class="fa-wrap"><div class="fa-deny">${inner}<p class="fa-msg" data-m style="margin:4px 0 14px"></p><button class="fa-btn" type="button" data-close>Wróć do gry</button></div></div>`;
       root.querySelector('[data-close]').addEventListener('click', () => { close(); done(false); });
-      const f = root.querySelector('form'), m = root.querySelector('[data-m]'), b = f.querySelector('button');
+      const f = root.querySelector('form'), m = root.querySelector('[data-m]'), b = f.querySelector('button.pri');
       f.querySelector('input').focus();
       f.addEventListener('submit', async e => {
         e.preventDefault(); b.disabled = true; m.className = 'fa-msg'; m.textContent = '';
         try { await onSubmit(new FormData(f)); } catch (er) { m.className = 'fa-msg err'; m.textContent = er.message; b.disabled = false; }
       });
     };
-    const codeInput = '<input class="fa-q" name="c" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required placeholder="123456">';
+    const codeInput = (req = true) => `<input class="fa-q" name="c" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}"${req ? ' required' : ''} placeholder="kod 2FA (6 cyfr)">`;
     const ok = j => { admTok.set(j.adminToken); done(true); };
-    const askCode = () => screen(`<h2>Panel admina</h2><p>Wpisz 6-cyfrowy kod z aplikacji uwierzytelniającej (BEANLADEN: ${esc(st.username)}).</p>
-      <form class="fa-2f">${codeInput}<button class="fa-btn pri">Odblokuj</button></form>`, async d => ok(await srvPost('/api/admin/login', { code: d.get('c') })));
     const qrSvg = uri => { try { const qr = qrcode(0, 'M'); qr.addData(uri); qr.make(); return qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); } catch { return ''; } };
-    const setupKey = j => screen(`<h2>Dodaj klucz 2FA</h2><p>Zeskanuj kod aplikacją (Google Authenticator, Authy, 1Password…) albo wybierz „Wpisz klucz konfiguracji”: nazwa BEANLADEN, klucz poniżej, oparty na czasie.</p>
+    const setupKey = j => screen(`<h2>Włącz 2FA</h2><p>Pierwsze logowanie: zeskanuj kod aplikacją (Google Authenticator, Authy, 1Password…) albo wybierz „Wpisz klucz konfiguracji”: nazwa BEANLADEN, klucz poniżej, oparty na czasie.</p>
       <div class="fa-qr">${qrSvg(j.uri)}</div>
       <p><span class="fa-key">${esc(j.secret.match(/.{1,4}/g).join(' '))}</span></p><p><a href="${esc(j.uri)}">Otwórz w aplikacji na tym urządzeniu</a></p>
-      <p>Zapisz klucz w bezpiecznym miejscu (menedżer haseł albo kartka). Bez niego po utracie telefonu nie wejdziesz do panelu. Potem wpisz kod z aplikacji:</p>
-      <form class="fa-2f">${codeInput}<button class="fa-btn pri">Włącz 2FA</button></form>`, async d => ok(await srvPost('/api/admin/2fa/enable', { code: d.get('c') })));
-    const setupPass = () => screen(`<h2>Włącz 2FA</h2><p>Panel admina wymaga kodu z aplikacji uwierzytelniającej. Potwierdź hasłem konta ${esc(st.username)}.</p>
-      <form class="fa-2f"><input class="fa-q" name="p" type="password" autocomplete="current-password" required placeholder="Hasło konta"><button class="fa-btn pri">Dalej</button></form>`,
-      async d => setupKey(await srvPost('/api/admin/2fa/setup', { password: d.get('p') })));
-    st.totp ? askCode() : setupPass();
+      <p>Zapisz klucz w bezpiecznym miejscu (menedżer haseł albo kartka). Potem wpisz kod z aplikacji (masz 10 minut):</p>
+      <form class="fa-2f">${codeInput()}<button class="fa-btn pri">Włącz 2FA</button></form>`, async d => ok(await srvPost('/api/admin/2fa/enable', { setupToken: j.setupToken, code: d.get('c') })));
+    // login + hasło + kod; pole kodu można zostawić puste tylko przy pierwszym logowaniu (2FA jeszcze nie ustawione)
+    screen(`<h2>Panel admina</h2><p>Zaloguj się kontem admina (to nie jest konto z gry). Przy pierwszym logowaniu zostaw kod pusty – panel pokaże kod QR.</p>
+      <form class="fa-login" style="display:grid;gap:8px;max-width:280px;margin:0 auto 6px">
+        <input class="fa-q" name="u" autocomplete="username" spellcheck="false" autocapitalize="off" required placeholder="Login admina" style="width:100%">
+        <input class="fa-q" name="p" type="password" autocomplete="current-password" required placeholder="Hasło" style="width:100%">
+        ${codeInput(false).replace('class="fa-q"', 'class="fa-q" style="width:100%;letter-spacing:.12em"')}
+        <button class="fa-btn pri" style="justify-content:center">Zaloguj</button></form>`,
+      async d => { const j = await srvPost('/api/admin/login', { username: d.get('u'), password: d.get('p'), code: d.get('c') }); j.setup ? setupKey(j) : ok(j); });
   });
 }
 // sesja admina wygasła w trakcie pracy: panel od nowa (prośba o kod)
@@ -258,7 +259,7 @@ function relockAdmin() { admTok.set(''); cleanup.forEach(f => { try { f(); } cat
 function buildDashboard(db, close) {
   root.innerHTML = `<div class="fa-wrap">
     <div class="fa-head"><div class="fa-brand"><b>BEAN<i>LADEN</i></b><span>Panel admina</span></div><span class="fa-live" id="fa-live">Łączenie…</span><div class="fa-sp"></div>
-      ${SRV ? '<button class="fa-btn" type="button" id="fa-lock" title="Kończy sesję admina – następne wejście wymaga kodu 2FA">Zablokuj panel</button>' : ''}
+      ${SRV ? '<button class="fa-btn" type="button" id="fa-lock" title="Kończy sesję panelu – następne wejście wymaga loginu, hasła i kodu 2FA">Wyloguj z panelu</button>' : ''}
       <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div>
     <p class="fa-note" id="fa-note" hidden></p>
     <section class="fa-kpis" id="fa-kpis" aria-label="Liczby ogólne"></section>
@@ -317,8 +318,8 @@ function buildDashboard(db, close) {
     };
     pull(); const iv = setInterval(pull, 10000); cleanup.push(() => clearInterval(iv));
     // wypłaty powyżej progu czekają tutaj; dziennik: logowania, 2FA, zmiany ustawień, decyzje o wypłatach
-    const AUD = { login: 'Logowanie hasłem', login_fail: 'Nieudane logowanie hasłem', admin_login: 'Odblokowanie panelu (2FA)', admin_login_fail: 'Zły kod 2FA',
-      '2fa_setup': 'Nowy klucz 2FA', '2fa_setup_fail': 'Nieudane ustawianie 2FA', '2fa_on': 'Włączenie 2FA', config: 'Zmiana ustawień', password: 'Zmiana hasła',
+    const AUD = { admin_login: 'Logowanie do panelu', admin_login_fail: 'Nieudane logowanie do panelu', admin_add: 'Nowe konto admina (serwer)', admin_password: 'Nowe hasło admina (serwer)',
+      admin_2fa_reset: 'Reset 2FA (serwer)', admin_delete: 'Usunięte konto admina (serwer)', '2fa_setup': 'Pierwsze logowanie – klucz 2FA', '2fa_on': 'Włączenie 2FA', config: 'Zmiana ustawień',
       wd_approve: 'Wypłata zaakceptowana', wd_reject: 'Wypłata odrzucona' };
     const renderSrv = () => {
       if (!srv || !$('fa-wd')) return;

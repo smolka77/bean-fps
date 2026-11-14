@@ -25,7 +25,6 @@ const PORT = +(env.PORT || 8787);
 const CLUSTER = env.SOLANA_CLUSTER || 'devnet';                       // devnet | testnet | mainnet-beta
 const RPC_URL = env.SOLANA_RPC_URL || clusterApiUrl(CLUSTER);
 const DATA_DIR = path.resolve(env.DATA_DIR || path.join(path.dirname(new URL(import.meta.url).pathname), 'dane'));
-const ADMIN_USERS = new Set((env.ADMIN_USERS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
 const ORIGINS = (env.CORS_ORIGINS || '*').split(',').map(s => s.trim()).filter(Boolean);
 const HOUSE_FEE = +(env.HOUSE_FEE || 0.10);                             // prowizja od puli (2 × stawka)
 const SCAN_MS = +(env.SCAN_MS || 15000);
@@ -35,7 +34,7 @@ const TX_FEE = 5000;
 const GOOGLE_CLIENT_ID = (env.GOOGLE_CLIENT_ID || '').trim();   // logowanie przez Google (OAuth, typ: aplikacja internetowa)
 const HOST = env.HOST || '127.0.0.1';                                   // tylko ta maszyna (nginx); 0.0.0.0 = cały internet (niezalecane)
 const SESSION_MS = +(env.SESSION_DAYS || 30) * 864e5;                   // sesja gracza wygasa po tylu dniach
-const ADMIN_IDLE_MS = 30 * 60e3, ADMIN_MAX_MS = 12 * 3600e3;            // sesja admina (po kodzie 2FA): 30 min bez ruchu, najwyżej 12 h
+const ADMIN_IDLE_MS = 30 * 60e3, ADMIN_MAX_MS = 12 * 3600e3;            // sesja panelu admina: 30 min bez ruchu, najwyżej 12 h
 const WD_DAILY_USD = +(env.WITHDRAW_DAILY_USD || 500);                  // limit wypłat na konto w ciągu 24 h
 const WD_REVIEW_USD = +(env.WITHDRAW_REVIEW_USD || 100);                // wypłata powyżej tej kwoty czeka na akceptację admina
 const SEC_HOLD_MS = +(env.SECURITY_HOLD_HOURS || 24) * 3600e3;          // blokada wypłat po zmianie hasła albo e-maila
@@ -62,7 +61,7 @@ const conn = new Connection(RPC_URL, 'confirmed');
 
 // ---------------- baza ----------------
 const db = new DatabaseSync(path.join(DATA_DIR, 'portfele.db'));
-db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
+db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=3000;
 CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE COLLATE NOCASE, pass TEXT NOT NULL, created INTEGER NOT NULL,
   idx INTEGER NOT NULL UNIQUE, address TEXT NOT NULL UNIQUE, lamports INTEGER NOT NULL DEFAULT 0, last_sig TEXT, last_active INTEGER, stats TEXT NOT NULL DEFAULT '{}');
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, created INTEGER NOT NULL);
@@ -74,12 +73,12 @@ CREATE TABLE IF NOT EXISTS matches(id INTEGER PRIMARY KEY, user_id INTEGER NOT N
   price REAL NOT NULL, state TEXT NOT NULL DEFAULT 'open', payout_lamports INTEGER NOT NULL DEFAULT 0, fee_lamports INTEGER NOT NULL DEFAULT 0, map TEXT, forfeit INTEGER NOT NULL DEFAULT 0, ended INTEGER);
 CREATE INDEX IF NOT EXISTS matches_t ON matches(t DESC);
 CREATE TABLE IF NOT EXISTS config(key TEXT PRIMARY KEY, value TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS admin_sessions(token TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, created INTEGER NOT NULL, last INTEGER NOT NULL, ip TEXT);
 CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, t INTEGER NOT NULL, user_id INTEGER, ip TEXT, action TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS withdrawals(id INTEGER PRIMARY KEY, tx_id INTEGER NOT NULL, user_id INTEGER NOT NULL REFERENCES users(id), to_addr TEXT NOT NULL, lamports INTEGER NOT NULL,
   usd REAL NOT NULL, t INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'review', decided INTEGER, decided_by INTEGER);`);
 // profil: e-mail i awatar; 2FA admina (totp, ostatni użyty krok, sekret w trakcie włączania); czas ostatniej zmiany hasła/e-maila
 for (const c of ['email TEXT', 'avatar TEXT', 'google_sub TEXT', 'totp TEXT', 'totp_step INTEGER', 'totp_pending TEXT', 'sec_changed INTEGER']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + c); } catch {} }
+OCH.adminSchema(db);                                                    // konta panelu admina (osobne od graczy) i ich sesje
 const q = sql => db.prepare(sql);
 const tx = fn => { db.exec('BEGIN IMMEDIATE'); try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; } };
 const STAT_KEYS = ['shots', 'hits', 'heads', 'kills', 'deaths'];
@@ -105,26 +104,17 @@ function userFromReq(req) {
   return q('SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.created>?').get(sha(m[1]), Date.now() - SESSION_MS) || null;
 }
 // stare sesje (gracz po SESSION_DAYS, admin po 12 h) i bilety znikają same
-const purgeSessions = () => { try { q('DELETE FROM sessions WHERE created<?').run(Date.now() - SESSION_MS); q('DELETE FROM admin_sessions WHERE created<? OR last<?').run(Date.now() - ADMIN_MAX_MS, Date.now() - ADMIN_IDLE_MS); } catch (e) { console.warn('[sesje]', e.message); } };
+const purgeSessions = () => { try { q('DELETE FROM sessions WHERE created<?').run(Date.now() - SESSION_MS); q('DELETE FROM admin_tokens WHERE created<? OR last<?').run(Date.now() - ADMIN_MAX_MS, Date.now() - ADMIN_IDLE_MS); } catch (e) { console.warn('[sesje]', e.message); } };
 purgeSessions(); setInterval(purgeSessions, 3600e3).unref();
 
 // ---------------- admini ----------------
-// Admin to konkretne konto (ID), nie nick: zmiana nicku nie odbiera uprawnień i nikt nie przejmie ich, zakładając konto o tej nazwie.
-// ADMIN_IDS=1,2 w .env ma pierwszeństwo. Bez niego: nicki z ADMIN_USERS są przy starcie przypinane na stałe do ID istniejących kont
-// (config.adminPins). Nick z listy, którego konto jeszcze nie istnieje, nie daje nic – a takiej nazwy nie da się już założyć (zastrzeżona).
-const cfgGet = k => { const r = q('SELECT value FROM config WHERE key=?').get(k); return r ? r.value : ''; };
+// Panel admina ma własne konta (tabela admins: login, hasło, 2FA), niezależne od kont graczy. Zakłada się je na serwerze:
+// bash beanladen-admin.sh dodaj NAZWA (albo node admin.mjs dodaj NAZWA). Dawne ADMIN_USERS / ADMIN_IDS nie są już używane.
 const cfgPut = (k, v) => q('INSERT INTO config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(k, v);
-const ADMIN_SET = (() => {
-  const ids = (env.ADMIN_IDS || '').split(',').map(s => +s.trim()).filter(n => n > 0);
-  if (ids.length) return new Set(ids);
-  let pins = {}; try { pins = JSON.parse(cfgGet('adminPins') || '{}'); } catch {}
-  for (const n of ADMIN_USERS) if (!pins[n]) { const u = q('SELECT id FROM users WHERE username=?').get(n); if (u) pins[n] = u.id; }
-  cfgPut('adminPins', JSON.stringify(pins));
-  return new Set([...ADMIN_USERS].map(n => pins[n]).filter(Boolean));
-})();
-for (const id of ADMIN_SET) { const u = q('SELECT username, totp FROM users WHERE id=?').get(id); console.log(`[admin] konto id=${id}: ${u ? u.username + (u.totp ? ' (2FA włączone)' : ' (2FA jeszcze nie włączone)') : 'NIE ISTNIEJE'}`); }
-const isAdmin = u => !!u && ADMIN_SET.has(u.id);
-const audit = (uid, ip, action, detail = '') => { try { q('INSERT INTO audit(t,user_id,ip,action,detail) VALUES(?,?,?,?,?)').run(Date.now(), uid ?? null, ip || '', action, String(detail).slice(0, 300)); } catch {} };
+{ const a = q('SELECT username, totp FROM admins ORDER BY id').all();
+  console.log(a.length ? `[admin] konta panelu: ${a.map(x => x.username + (x.totp ? ' (2FA)' : ' (2FA przy pierwszym logowaniu)')).join(', ')}` : '[admin] brak konta panelu admina – dodaj je: bash beanladen-admin.sh dodaj NAZWA');
+  if (env.ADMIN_USERS || env.ADMIN_IDS) console.log('[admin] ADMIN_USERS / ADMIN_IDS w .env nie są już używane (panel ma własne konta)'); }
+const audit = (who, ip, action, detail = '') => { try { q('INSERT INTO audit(t,who,ip,action,detail) VALUES(?,?,?,?,?)').run(Date.now(), who ?? null, ip || '', action, String(detail).slice(0, 300)); } catch {} };
 function totals(uid) {
   const m = q(`SELECT COUNT(*) n, SUM(state='won') w, SUM(state='lost') l, COALESCE(SUM(stake_usd),0) staked,
     COALESCE(SUM(CASE WHEN state='won' THEN payout_lamports/1e9*price END),0) won, COALESCE(SUM(CASE WHEN state='won' THEN fee_lamports/1e9*price END),0) fees
@@ -135,7 +125,7 @@ function totals(uid) {
 }
 function publicUser(u) {
   return { username: u.username, email: u.email || '', avatar: u.avatar || '', createdAt: new Date(u.created).toISOString(), address: u.address, lamports: u.lamports, sol: u.lamports / LAMPORTS_PER_SOL,
-    balance: toUsd(u.lamports), price: PRICE, cluster: CLUSTER, admin: isAdmin(u),
+    balance: toUsd(u.lamports), price: PRICE, cluster: CLUSTER, admin: false,
     stats: { ...Object.fromEntries(STAT_KEYS.map(k => [k, 0])), ...JSON.parse(u.stats || '{}'), ...totals(u.id), lastActive: u.last_active || u.created } };
 }
 const histOf = (uid, n = 60) => q('SELECT t,type,lamports,usd,fee_usd,note,sig,status FROM txs WHERE user_id=? ORDER BY t DESC, id DESC LIMIT ?').all(uid, n)
@@ -203,19 +193,20 @@ const fresh = id => q('SELECT * FROM users WHERE id=?').get(id);
 const explorer = sig => `https://explorer.solana.com/tx/${sig}${CLUSTER === 'mainnet-beta' ? '' : '?cluster=' + CLUSTER}`;
 const PASS_MSG = `Hasło: co najmniej ${OCH.PASS_MIN} znaków`, NEWPASS_MSG = `Nowe hasło: co najmniej ${OCH.PASS_MIN} znaków`;
 const RESERVED_MSG = 'Ta nazwa jest zastrzeżona';
-const reserved = n => OCH.reservedName(n, [...ADMIN_USERS]);
+const reserved = n => OCH.reservedName(n);
 
-// panel admina: zwykła sesja konta z listy adminów + osobna, krótka sesja admina otwierana kodem 2FA (nagłówek X-Admin-Token)
-function adminOnly(user) { need(user); if (!isAdmin(user)) throw new E('admin', 'Brak dostępu do panelu admina', 403); return user; }
-function adminGate(user, req) {
-  adminOnly(user);
-  const tok = String(req.headers['x-admin-token'] || ''), now = Date.now();
-  const s = tok && q('SELECT * FROM admin_sessions WHERE token=?').get(sha(tok));
-  if (!s || s.user_id !== user.id || s.created < now - ADMIN_MAX_MS || s.last < now - ADMIN_IDLE_MS) throw new E('admin2fa', 'Potwierdź dostęp kodem 2FA', 401);
-  q('UPDATE admin_sessions SET last=? WHERE token=?').run(now, s.token);
-  return user;
+// panel admina: sesja z logowania login + hasło + kod 2FA, w nagłówku X-Admin-Token
+function adminFromReq(req) {
+  const tok = String(req.headers['x-admin-token'] || ''), now = Date.now(); if (!tok) return null;
+  const s = q('SELECT t.token, t.created, t.last, a.id, a.username FROM admin_tokens t JOIN admins a ON a.id=t.admin_id WHERE t.token=?').get(sha(tok));
+  if (!s || s.created < now - ADMIN_MAX_MS || s.last < now - ADMIN_IDLE_MS) return null;
+  q('UPDATE admin_tokens SET last=? WHERE token=?').run(now, s.token);
+  return { id: s.id, username: s.username };
 }
-function newAdminSession(uid, ip) { const tok = crypto.randomBytes(32).toString('base64url'), now = Date.now(); q('INSERT INTO admin_sessions(token,user_id,created,last,ip) VALUES(?,?,?,?,?)').run(sha(tok), uid, now, now, ip || ''); return tok; }
+function adminGate(req) { const a = adminFromReq(req); if (!a) throw new E('admin2fa', 'Zaloguj się do panelu admina', 401); return a; }
+function newAdminToken(adminId, ip) { const tok = crypto.randomBytes(32).toString('base64url'), now = Date.now(); q('INSERT INTO admin_tokens(token,admin_id,created,last,ip) VALUES(?,?,?,?,?)').run(sha(tok), adminId, now, now, ip || ''); return tok; }
+const adminSetups = new Map();                                         // pierwsze logowanie: token -> {id, secret, exp} (10 min na zeskanowanie kodu QR)
+const ADMIN_BAD = 'Zły login, hasło lub kod 2FA';
 
 // wypłata ze skarbca dla zapisanej operacji (txs.id); błąd = zwrot na saldo
 async function payout(txId, userId, to, lam) {
@@ -257,10 +248,9 @@ const routes = {
     if (limited('login:' + ip) || limited('u:' + name.toLowerCase(), 20, 15 * 60e3)) throw new E('rate', 'Za dużo prób – odczekaj minutę', 429);
     const u = q('SELECT * FROM users WHERE username=?').get(name);
     if (!u) { await OCH.fakeCheck(pw); throw new E('creds', 'Zła nazwa lub hasło', 401); }
-    if (!(await checkPass(pw, u.pass))) { if (isAdmin(u)) audit(u.id, ip, 'login_fail'); throw new E('creds', 'Zła nazwa lub hasło', 401); }
+    if (!(await checkPass(pw, u.pass))) throw new E('creds', 'Zła nazwa lub hasło', 401);
     if (OCH.needsRehash(u.pass)) q('UPDATE users SET pass=? WHERE id=?').run(await hashPass(pw), u.id);   // mocniejszy hash przy okazji logowania
     q('UPDATE users SET last_active=? WHERE id=?').run(Date.now(), u.id);
-    if (isAdmin(u)) audit(u.id, ip, 'login');
     scanUser(u).catch(() => {});
     return { token: newSession(u.id), account: publicUser(fresh(u.id)), history: histOf(u.id) };
   },
@@ -362,49 +352,49 @@ const routes = {
     q('UPDATE users SET last_active=? WHERE id=?').run(Date.now(), u.id);
     return { token: newSession(u.id), account: publicUser(fresh(u.id)), history: histOf(u.id), created };
   },
-  // ---- panel admina: 2FA (TOTP) ----
-  // stan: czy konto jest adminem, czy ma włączone 2FA i czy sesja admina (X-Admin-Token) jest ważna
-  'GET /api/admin/status': async ({ user, req }) => {
-    adminOnly(user); let unlocked = true; try { adminGate(user, req); } catch { unlocked = false; }
-    return { admin: true, totp: !!fresh(user.id).totp, unlocked, username: user.username };
+  // ---- panel admina: osobne konta (login + hasło + kod 2FA) ----
+  'GET /api/admin/status': async ({ req }) => { const a = adminFromReq(req); return { unlocked: !!a, username: a ? a.username : '' }; },
+  // logowanie: login + hasło + kod. Konto bez 2FA (pierwsze logowanie) dostaje klucz do zeskanowania i token na 10 min do /2fa/enable.
+  'POST /api/admin/login': async ({ body, ip }) => {
+    const name = String(body.username || '').trim(), pw = String(body.password || '');
+    if (limited('adm:' + ip, 8, 5 * 60e3) || limited('admu:' + name.toLowerCase(), 10, 15 * 60e3)) throw new E('rate', 'Za dużo prób – odczekaj chwilę', 429);
+    const a = OCH.ADMIN_NAME.test(name) ? q('SELECT * FROM admins WHERE username=?').get(name) : null;
+    if (!a) { await OCH.fakeCheck(pw); audit(name.slice(0, 32), ip, 'admin_login_fail', 'nieznany login'); throw new E('creds', ADMIN_BAD, 401); }
+    if (!(await checkPass(pw, a.pass))) { audit(a.username, ip, 'admin_login_fail', 'hasło'); throw new E('creds', ADMIN_BAD, 401); }
+    if (OCH.needsRehash(a.pass)) q('UPDATE admins SET pass=? WHERE id=?').run(await hashPass(pw), a.id);
+    if (!a.totp) {
+      const secret = OCH.totpSecret(), setupToken = crypto.randomBytes(24).toString('base64url');
+      for (const [k, v] of adminSetups) if (v.exp < Date.now() || v.id === a.id) adminSetups.delete(k);
+      adminSetups.set(setupToken, { id: a.id, secret, exp: Date.now() + 10 * 60e3 });
+      audit(a.username, ip, '2fa_setup');
+      return { setup: true, setupToken, secret, uri: OCH.totpUri(secret, a.username) };
+    }
+    const st = OCH.totpCheck(a.totp, body.code, a.totp_step);
+    if (!st) { audit(a.username, ip, 'admin_login_fail', 'kod 2FA'); throw new E('creds', ADMIN_BAD, 401); }
+    q('UPDATE admins SET totp_step=?, last_login=? WHERE id=?').run(st, Date.now(), a.id);
+    audit(a.username, ip, 'admin_login');
+    return { adminToken: newAdminToken(a.id, ip), username: a.username };
   },
-  // włączenie 2FA: wymaga hasła konta (sama skradziona sesja nie wystarczy); ponowne ustawienie – dodatkowo obecnego kodu
-  'POST /api/admin/2fa/setup': async ({ user, body, ip }) => {
-    adminOnly(user); if (limited('adm:' + ip, 8, 5 * 60e3)) throw new E('rate', 'Za dużo prób – odczekaj chwilę', 429);
-    const u = fresh(user.id);
-    if (!(await checkPass(String(body.password || ''), u.pass))) { audit(u.id, ip, '2fa_setup_fail', 'hasło'); throw new E('oldpass', 'Obecne hasło jest nieprawidłowe', 400); }
-    if (u.totp) { const st = OCH.totpCheck(u.totp, body.code, u.totp_step); if (!st) { audit(u.id, ip, '2fa_setup_fail', 'kod'); throw new E('code', 'Zły kod 2FA', 400); } q('UPDATE users SET totp_step=? WHERE id=?').run(st, u.id); }
-    const secret = OCH.totpSecret(); q('UPDATE users SET totp_pending=? WHERE id=?').run(secret, u.id);
-    audit(u.id, ip, '2fa_setup');
-    return { secret, uri: OCH.totpUri(secret, u.username) };
+  'POST /api/admin/2fa/enable': async ({ body, ip }) => {
+    if (limited('adm:' + ip, 8, 5 * 60e3)) throw new E('rate', 'Za dużo prób – odczekaj chwilę', 429);
+    const key = String(body.setupToken || ''), s = adminSetups.get(key);
+    if (!s || s.exp < Date.now()) throw new E('setup', 'Czas na włączenie 2FA minął – zaloguj się jeszcze raz', 400);
+    const st = OCH.totpCheck(s.secret, body.code, 0); if (!st) throw new E('code', 'Zły kod 2FA', 400);
+    adminSetups.delete(key);
+    const ch = q('UPDATE admins SET totp=?, totp_step=?, last_login=? WHERE id=? AND totp IS NULL').run(s.secret, st, Date.now(), s.id);
+    if (!ch.changes) throw new E('setup', '2FA jest już włączone – zaloguj się kodem', 409);
+    const a = q('SELECT username FROM admins WHERE id=?').get(s.id);
+    audit(a.username, ip, '2fa_on'); console.log(`[admin] ${a.username}: 2FA włączone`);
+    return { adminToken: newAdminToken(s.id, ip), username: a.username };
   },
-  'POST /api/admin/2fa/enable': async ({ user, body, ip }) => {
-    adminOnly(user); if (limited('adm:' + ip, 8, 5 * 60e3)) throw new E('rate', 'Za dużo prób – odczekaj chwilę', 429);
-    const u = fresh(user.id); if (!u.totp_pending) throw new E('code', 'Najpierw wygeneruj klucz 2FA', 400);
-    const st = OCH.totpCheck(u.totp_pending, body.code, 0); if (!st) throw new E('code', 'Zły kod 2FA', 400);
-    q('UPDATE users SET totp=totp_pending, totp_pending=NULL, totp_step=? WHERE id=?').run(st, u.id);
-    q('DELETE FROM admin_sessions WHERE user_id=?').run(u.id);
-    audit(u.id, ip, '2fa_on'); console.log(`[admin] ${u.username}: 2FA włączone`);
-    return { adminToken: newAdminSession(u.id, ip) };
-  },
-  'POST /api/admin/login': async ({ user, body, ip }) => {
-    adminOnly(user);
-    if (limited('adm:' + ip, 8, 5 * 60e3) || limited('admu:' + user.id, 10, 15 * 60e3)) throw new E('rate', 'Za dużo prób – odczekaj chwilę', 429);
-    const u = fresh(user.id); if (!u.totp) throw new E('no2fa', 'Najpierw włącz 2FA', 400);
-    const st = OCH.totpCheck(u.totp, body.code, u.totp_step);
-    if (!st) { audit(u.id, ip, 'admin_login_fail'); throw new E('code', 'Zły kod 2FA', 400); }
-    q('UPDATE users SET totp_step=? WHERE id=?').run(st, u.id);
-    audit(u.id, ip, 'admin_login');
-    return { adminToken: newAdminSession(u.id, ip) };
-  },
-  'POST /api/admin/logout': async ({ req }) => { const t = String(req.headers['x-admin-token'] || ''); if (t) q('DELETE FROM admin_sessions WHERE token=?').run(sha(t)); return { ok: true }; },
+  'POST /api/admin/logout': async ({ req }) => { const t = String(req.headers['x-admin-token'] || ''); if (t) q('DELETE FROM admin_tokens WHERE token=?').run(sha(t)); return { ok: true }; },
   // wypłata czekająca na akceptację: approve=true wysyła ze skarbca, false oddaje środki na saldo gracza
-  'POST /api/admin/withdraw': async ({ user, body, req, ip }) => {
-    adminGate(user, req);
+  'POST /api/admin/withdraw': async ({ body, req, ip }) => {
+    const adm = adminGate(req);
     const w = q("SELECT * FROM withdrawals WHERE id=? AND state='review'").get(+body.id); if (!w) throw new E('wd', 'Nie ma takiej wypłaty do akceptacji', 404);
-    const ch = q("UPDATE withdrawals SET state=?, decided=?, decided_by=? WHERE id=? AND state='review'").run(body.approve ? 'sending' : 'rejected', Date.now(), user.id, w.id);
+    const ch = q("UPDATE withdrawals SET state=?, decided=?, decided_by=? WHERE id=? AND state='review'").run(body.approve ? 'sending' : 'rejected', Date.now(), adm.id, w.id);
     if (!ch.changes) throw new E('wd', 'Tę wypłatę ktoś już rozpatrzył', 409);   // dwa kliknięcia naraz nie wypłacą dwa razy
-    audit(user.id, ip, body.approve ? 'wd_approve' : 'wd_reject', `#${w.id} user=${w.user_id} $${w.usd} -> ${w.to_addr}`);
+    audit(adm.username, ip, body.approve ? 'wd_approve' : 'wd_reject', `#${w.id} user=${w.user_id} $${w.usd} -> ${w.to_addr}`);
     if (!body.approve) {
       tx(() => { q('UPDATE users SET lamports=lamports+? WHERE id=?').run(w.lamports, w.user_id); q("UPDATE txs SET status='rejected', note=note||' · zwrot' WHERE id=?").run(w.tx_id); });
       return { ok: true, state: 'rejected' };
@@ -414,8 +404,8 @@ const routes = {
     q('UPDATE withdrawals SET state=? WHERE id=?').run(sig ? 'sent' : 'failed', w.id);
     return { ok: !!sig, state: sig ? 'sent' : 'failed', url: sig ? explorer(sig) : '' };
   },
-  'POST /api/admin/config': async ({ user, body, req, ip }) => {
-    adminGate(user, req); audit(user.id, ip, 'config', Object.keys(body || {}).join(','));
+  'POST /api/admin/config': async ({ body, req, ip }) => {
+    const adm = adminGate(req); audit(adm.username, ip, 'config', Object.keys(body || {}).join(','));
     const put = cfgPut, out = {};
     if (body.businessEmail !== undefined) {
       const m = String(body.businessEmail ?? '').trim();
@@ -458,7 +448,6 @@ const routes = {
     if (!(await checkPass(String(body.oldPassword || ''), u.pass))) throw new E('oldpass', 'Obecne hasło jest nieprawidłowe', 400);
     if (np.length < OCH.PASS_MIN || np.length > 128) throw new E('pass', NEWPASS_MSG);
     q('UPDATE users SET pass=?, sec_changed=? WHERE id=?').run(await hashPass(np), Date.now(), u.id);
-    if (isAdmin(u)) audit(u.id, ip, 'password');
     const m = /^Bearer (.+)$/.exec(user._auth || ''); q('DELETE FROM sessions WHERE user_id=? AND token!=?').run(u.id, m ? sha(m[1]) : '');   // wyloguj inne urządzenia
     return { ok: true };
   },
@@ -467,8 +456,8 @@ const routes = {
     for (const k of STAT_KEYS) { const v = Math.floor(+body[k] || 0); if (v > 0 && v < 10000) st[k] = (st[k] || 0) + v; }
     q('UPDATE users SET stats=?, last_active=? WHERE id=?').run(JSON.stringify(st), Date.now(), u.id); return { ok: true };
   },
-  'GET /api/admin/overview': async ({ user, req }) => {
-    adminGate(user, req);
+  'GET /api/admin/overview': async ({ req }) => {
+    adminGate(req);
     const accounts = q('SELECT * FROM users ORDER BY id').all().map(u => ({ id: String(u.id), ...publicUser(u), wallet: u.address, history: histOf(u.id, 40) }));
     const names = Object.fromEntries(accounts.map(a => [a.id, a.username]));
     const matches = q("SELECT * FROM matches WHERE state!='open' ORDER BY COALESCE(ended,t) DESC LIMIT 1000").all().map(m => ({ id: String(m.id), u: String(m.user_id), name: names[m.user_id],
@@ -481,7 +470,7 @@ const routes = {
       // wypłaty do akceptacji i dziennik admina (logowania, 2FA, zmiany ustawień, decyzje o wypłatach)
       withdrawals: q("SELECT w.*, u.username FROM withdrawals w JOIN users u ON u.id=w.user_id WHERE w.state='review' ORDER BY w.t").all()
         .map(w => ({ id: w.id, name: w.username, u: String(w.user_id), to: w.to_addr, usd: w.usd, sol: w.lamports / LAMPORTS_PER_SOL, t: w.t })),
-      audit: q('SELECT a.t, a.ip, a.action, a.detail, u.username FROM audit a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT 50').all(),
+      audit: q('SELECT a.t, a.ip, a.action, a.detail, COALESCE(a.who, u.username) username FROM audit a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT 50').all(),
       limits: { dailyUsd: WD_DAILY_USD, reviewUsd: WD_REVIEW_USD } };
   },
 };
@@ -677,7 +666,6 @@ const server = http.createServer(async (req, res) => {
 server.on('upgrade', onUpgrade);                              // WebSocket /ws: kolejka i mecze 1v1
 server.listen(PORT, HOST, () => {
   console.log(`Portfele BEANLADEN: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}  sieć: ${CLUSTER}  skarbiec: ${TREASURY.publicKey.toBase58()}`);
-  if (!ADMIN_SET.size) console.log('Uwaga: brak adminów (ADMIN_IDS albo istniejące konto z ADMIN_USERS) – panel admina nie wpuści nikogo.');
 });
 refreshPrice(); setInterval(refreshPrice, 60000);
 setInterval(scanAll, SCAN_MS); setTimeout(scanAll, 3000);

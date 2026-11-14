@@ -78,3 +78,15 @@ export function useTicket(t) { const x = t && tickets.get(t); if (!x) return 0; 
 // Nie da się ich założyć ani przyjąć zmianą nicku (podszywanie się pod obsługę gry). Konta, które już je mają, zostają.
 const RESERVED = /admin|adm1n|moderat|beanladen|support|wsparcie|pomoc|^(root|system|owner|staff|official|mod|help|serwer|server)\d*$/i;
 export const reservedName = (n, extra = []) => RESERVED.test(n) || extra.includes(String(n).toLowerCase());
+
+// ---------------- konta admina ----------------
+// Osobne od kont graczy: login + hasło + kod 2FA. Zakłada je tylko narzędzie na serwerze (admin.mjs / beanladen-admin.sh),
+// z gry nie da się ich utworzyć. admin_tokens = sesje panelu (30 min bez ruchu, najwyżej 12 h).
+export const ADMIN_SCHEMA = `
+DROP TABLE IF EXISTS admin_sessions;
+CREATE TABLE IF NOT EXISTS admins(id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE COLLATE NOCASE, pass TEXT NOT NULL, totp TEXT, totp_step INTEGER,
+  created INTEGER NOT NULL, last_login INTEGER);
+CREATE TABLE IF NOT EXISTS admin_tokens(token TEXT PRIMARY KEY, admin_id INTEGER NOT NULL REFERENCES admins(id) ON DELETE CASCADE, created INTEGER NOT NULL, last INTEGER NOT NULL, ip TEXT);
+CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, t INTEGER NOT NULL, user_id INTEGER, ip TEXT, action TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '');`;
+export function adminSchema(db) { db.exec(ADMIN_SCHEMA); try { db.exec('ALTER TABLE audit ADD COLUMN who TEXT'); } catch {} }
+export const ADMIN_NAME = /^[a-z0-9_.-]{3,32}$/i;
