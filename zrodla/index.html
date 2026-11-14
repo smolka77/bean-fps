@@ -741,7 +741,7 @@ const shells=createShells(scene);
 // ================= gracz =================
 const player={slide:0,slideT:0,slideSpd:0,slideDir:V3(0,0,-1),slideK:0,fatigue:0,coyote:0,jumpBuf:0,jumpT:0,stepOff:0,pCrouch:false,pJump:false,pos:V3(0,0,-14),vel:V3(),yaw:Math.PI,pitch:0,onGround:true,view:'fps',speed01:0,walkPhase:0,ads:0,recoilP:0,recoilY:0,bobT:0,crouch:0,air:0,run:0,legYaw:0,legDir:1,moveAng:0,land:0,lean:V3()};
 const ME_COLOR=new THREE.Color(0xf0b440);       // Twoja fasolka: jednolity kolor, bez oczu
-const me=makeBean(ME_COLOR,{eyes:false});scene.add(me);
+const me=makeBean(ME_COLOR);scene.add(me);   // oczy widać w widoku z 3. osoby (w FPS cała postać jest schowana)
 const meHolder=new THREE.Group();me.userData.torso.add(meHolder);                    // trzymacz karabinu w 3. osobie (obraca się o pitch)
 meHolder.position.copy(HOLDER_PIVOT);
 // widok z pierwszej osoby: viewmodel przypięty do kamery + własne ręce fasolki
@@ -1695,7 +1695,7 @@ const loadMaps=(async()=>{                         // mapy ładują się w tle, 
 })();
 
 // ================= lobby =================
-const lobbyBean=makeBean(ME_COLOR,{eyes:false});
+const lobbyBean=makeBean(ME_COLOR);   // fasolka w lobby też ma oczy (chowane dla skinów z eyes:false)
 const _lt=V3();
 function lobbyAnimate(b,t,dt,st){
   if(MOBILE_SHOW){mobileAnimate(b,t,dt);return}             // telefon: ekran „coming soon”
@@ -1716,7 +1716,7 @@ const lobby=createLobby({renderer,bean:lobbyBean,animate:lobbyAnimate,
   onPlay:(m,o)=>{o=o||{};if(m==='1v1'){matchLock();lobby.hide();ON.active=false;match.start({stake:o.stake});    // 1v1: kolejka na serwerze, mapę losuje serwer
       NET.queue({matchId:o.matchId,skin:mySkin}).catch(e=>netFail(e.message));return}
     setMode(m,null);lobby.hide();document.body.classList.remove('in-lobby');startPlay()},
-  onSkin:s=>{mySkin=s.id||'';applySkin(me.userData.mats.skin,s);applySkin(me.userData.mats.body,s);applySkin(fpsSkin,s);me.userData.eyes.visible=s.eyes!==false;if(MOBILE_SHOW&&MOBILE_SHOW.skinIt)setTimeout(MOBILE_SHOW.skinIt,0)}});   // skin z lobby także na postaci w grze
+  onSkin:s=>{mySkin=s.id||'';applySkin(me.userData.mats.skin,s);applySkin(me.userData.mats.body,s);applySkin(fpsSkin,s);me.userData.eyes.visible=lobbyBean.userData.eyes.visible=s.eyes!==false;if(MOBILE_SHOW&&MOBILE_SHOW.skinIt)setTimeout(MOBILE_SHOW.skinIt,0)}});   // skin z lobby także na postaci w grze
 $('overlay').addEventListener('click',()=>setTimeout(()=>{setPauseText();if(duel.mapBanner&&oaza.active){duel.mapBanner=false;banner(i18n('mt.map')+': '+mapName(oaza.map.name).toUpperCase(),'#ffe14a')}},0));
 const stakeTxt=v=>'$'+(Math.round(v*100)/100).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2});   // kwota w USD (płatna w SOL)
 const midMatch=()=>match.on&&match.phase!=='final';     // trwa mecz (po zakończeniu wyjście nic nie kosztuje)
