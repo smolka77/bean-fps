@@ -10,7 +10,7 @@ const TXT = {
     copy: 'Kopiuj adres', copied: 'Adres skopiowany', copyManual: 'Zaznaczono adres – naciśnij Ctrl+C', faucet: 'Pobierz testowe SOL', faucetInfo: 'Sieć testowa: darmowe SOL weźmiesz z faucet.solana.com – adres jest już skopiowany, wklej go tam.',
     check: 'Sprawdź wpłaty', checking: 'Sprawdzanie…', to: 'Adres odbiorcy (Solana)', amount: 'Kwota', max: 'MAX', youGet: 'Odbiorca dostanie ≈ {s}', feeNote: 'Opłatę sieci pokrywa gra.',
     send: 'Wypłać', sending: 'Wysyłanie…', sent: 'Wypłata wysłana', view: 'Zobacz w eksploratorze', errAddr: 'Nieprawidłowy adres Solana', errAmt: 'Podaj kwotę', errFunds: 'Za mało środków',
-    empty: 'Brak operacji', pending: 'w toku', failed: 'nieudana', net: 'Wynik', won: 'Wygrane', lost: 'Przegrane', wr: 'Skuteczność', games: 'Mecze', noGames: 'Zagraj mecz o stawkę, a tu zobaczysz swój wynik w czasie.',
+    empty: 'Brak operacji', pending: 'w toku', failed: 'nieudana', review: 'czeka na akceptację', rejected: 'odrzucona – środki wróciły', sentReview: 'Wypłata czeka na akceptację (duże kwoty sprawdzamy ręcznie)', net: 'Wynik', won: 'Wygrane', lost: 'Przegrane', wr: 'Skuteczność', games: 'Mecze', noGames: 'Zagraj mecz o stawkę, a tu zobaczysz swój wynik w czasie.',
     all: 'Wszystko', d7: '7 dni', d30: '30 dni', profit: 'Zysk', loss: 'Strata', live: 'Połączono z siecią Solana', offline: 'Serwer portfeli nie odpowiada',
     tx: { deposit: 'Wpłata', withdraw: 'Wypłata', stake: 'Stawka 1v1', win: 'Wygrana 1v1', loss: 'Przegrana 1v1' }, fee: 'prowizja {a}', match: 'Mecz {n}' },
   en: { demoAddr: 'Test mode – your Solana wallet address appears once the game is connected to its server. Do not send real SOL here.', demoFaucet: 'Add test $50', demoNet: 'TEST', title: 'Wallet', bal: 'Balance', dep: 'Deposit', wd: 'Withdraw', hist: 'History', earn: 'Earnings', swap: 'Swap dollars and SOL', rate: '1 SOL = {p}',
@@ -18,7 +18,7 @@ const TXT = {
     copy: 'Copy address', copied: 'Address copied', copyManual: 'Address selected – press Ctrl+C', faucet: 'Get test SOL', faucetInfo: 'Test network: get free SOL at faucet.solana.com – your address is copied, paste it there.',
     check: 'Check deposits', checking: 'Checking…', to: 'Recipient address (Solana)', amount: 'Amount', max: 'MAX', youGet: 'Recipient gets ≈ {s}', feeNote: 'Network fee is covered by the game.',
     send: 'Withdraw', sending: 'Sending…', sent: 'Withdrawal sent', view: 'View in explorer', errAddr: 'Invalid Solana address', errAmt: 'Enter an amount', errFunds: 'Insufficient funds',
-    empty: 'No transactions', pending: 'pending', failed: 'failed', net: 'Net result', won: 'Won', lost: 'Lost', wr: 'Win rate', games: 'Matches', noGames: 'Play a staked match and your results over time will show up here.',
+    empty: 'No transactions', pending: 'pending', failed: 'failed', review: 'awaiting approval', rejected: 'rejected – funds returned', sentReview: 'Withdrawal awaiting approval (large amounts are checked manually)', net: 'Net result', won: 'Won', lost: 'Lost', wr: 'Win rate', games: 'Matches', noGames: 'Play a staked match and your results over time will show up here.',
     all: 'All', d7: '7 days', d30: '30 days', profit: 'Profit', loss: 'Loss', live: 'Connected to Solana', offline: 'Wallet server is not responding',
     tx: { deposit: 'Deposit', withdraw: 'Withdrawal', stake: '1v1 stake', win: '1v1 win', loss: '1v1 loss' }, fee: 'fee {a}', match: 'Match {n}' },
   ru: { demoAddr: 'Тестовый режим – адрес кошелька Solana появится, когда игра подключится к серверу. Не отправляй сюда настоящие SOL.', demoFaucet: 'Добавить тестовые $50', demoNet: 'TEST', title: 'Кошелёк', bal: 'Баланс', dep: 'Пополнить', wd: 'Вывести', hist: 'История', earn: 'Доход', swap: 'Поменять доллары и SOL', rate: '1 SOL = {p}',
@@ -26,7 +26,7 @@ const TXT = {
     copy: 'Копировать адрес', copied: 'Адрес скопирован', copyManual: 'Адрес выделен – нажмите Ctrl+C', faucet: 'Получить тестовые SOL', faucetInfo: 'Тестовая сеть: бесплатные SOL на faucet.solana.com – адрес уже скопирован, вставь его там.',
     check: 'Проверить пополнения', checking: 'Проверка…', to: 'Адрес получателя (Solana)', amount: 'Сумма', max: 'МАКС', youGet: 'Получатель получит ≈ {s}', feeNote: 'Комиссию сети платит игра.',
     send: 'Вывести', sending: 'Отправка…', sent: 'Вывод отправлен', view: 'Открыть в обозревателе', errAddr: 'Неверный адрес Solana', errAmt: 'Введите сумму', errFunds: 'Недостаточно средств',
-    empty: 'Операций нет', pending: 'в процессе', failed: 'не удалось', net: 'Итог', won: 'Выиграно', lost: 'Проиграно', wr: 'Побед', games: 'Матчи', noGames: 'Сыграй матч на ставку – здесь появится твой результат.',
+    empty: 'Операций нет', pending: 'в процессе', failed: 'не удалось', review: 'ждёт подтверждения', rejected: 'отклонён – средства возвращены', sentReview: 'Вывод ждёт подтверждения (крупные суммы проверяем вручную)', net: 'Итог', won: 'Выиграно', lost: 'Проиграно', wr: 'Побед', games: 'Матчи', noGames: 'Сыграй матч на ставку – здесь появится твой результат.',
     all: 'Всё', d7: '7 дней', d30: '30 дней', profit: 'Прибыль', loss: 'Убыток', live: 'Подключено к Solana', offline: 'Сервер кошельков не отвечает',
     tx: { deposit: 'Пополнение', withdraw: 'Вывод', stake: 'Ставка 1v1', win: 'Победа 1v1', loss: 'Поражение 1v1' }, fee: 'комиссия {a}', match: 'Матч {n}' },
   es: { demoAddr: 'Modo de prueba – la dirección de tu cartera Solana aparece cuando el juego se conecta al servidor. No envíes SOL reales aquí.', demoFaucet: 'Añadir $50 de prueba', demoNet: 'TEST', title: 'Cartera', bal: 'Saldo', dep: 'Depositar', wd: 'Retirar', hist: 'Historial', earn: 'Ganancias', swap: 'Cambiar dólares y SOL', rate: '1 SOL = {p}',
@@ -34,7 +34,7 @@ const TXT = {
     copy: 'Copiar dirección', copied: 'Dirección copiada', copyManual: 'Dirección seleccionada – pulsa Ctrl+C', faucet: 'Obtener SOL de prueba', faucetInfo: 'Red de prueba: SOL gratis en faucet.solana.com – tu dirección ya está copiada, pégala allí.',
     check: 'Comprobar depósitos', checking: 'Comprobando…', to: 'Dirección de destino (Solana)', amount: 'Importe', max: 'MÁX', youGet: 'El destinatario recibe ≈ {s}', feeNote: 'La comisión de red la paga el juego.',
     send: 'Retirar', sending: 'Enviando…', sent: 'Retiro enviado', view: 'Ver en el explorador', errAddr: 'Dirección de Solana no válida', errAmt: 'Introduce un importe', errFunds: 'Fondos insuficientes',
-    empty: 'Sin operaciones', pending: 'en curso', failed: 'fallido', net: 'Resultado', won: 'Ganado', lost: 'Perdido', wr: 'Victorias', games: 'Partidas', noGames: 'Juega una partida con apuesta y aquí verás tu resultado en el tiempo.',
+    empty: 'Sin operaciones', pending: 'en curso', failed: 'fallido', review: 'pendiente de aprobación', rejected: 'rechazado – fondos devueltos', sentReview: 'Retiro pendiente de aprobación (los importes grandes se revisan a mano)', net: 'Resultado', won: 'Ganado', lost: 'Perdido', wr: 'Victorias', games: 'Partidas', noGames: 'Juega una partida con apuesta y aquí verás tu resultado en el tiempo.',
     all: 'Todo', d7: '7 días', d30: '30 días', profit: 'Beneficio', loss: 'Pérdida', live: 'Conectado a Solana', offline: 'El servidor de carteras no responde',
     tx: { deposit: 'Depósito', withdraw: 'Retiro', stake: 'Apuesta 1v1', win: 'Victoria 1v1', loss: 'Derrota 1v1' }, fee: 'comisión {a}', match: 'Partida {n}' },
 };
@@ -157,8 +157,10 @@ const I = {
 const SRV = {
   'Zaloguj się': ['Log in', 'Войди в аккаунт', 'Inicia sesión'],
   'Nazwa: 3–16 znaków (litery, cyfry, _)': ['Name: 3–16 characters (letters, digits, _)', 'Имя: 3–16 символов (буквы, цифры, _)', 'Nombre: 3–16 caracteres (letras, números, _)'],
-  'Hasło: co najmniej 6 znaków': ['Password: at least 6 characters', 'Пароль: минимум 6 символов', 'Contraseña: al menos 6 caracteres'],
-  'Nowe hasło: co najmniej 6 znaków': ['New password: at least 6 characters', 'Новый пароль: минимум 6 символов', 'Nueva contraseña: al menos 6 caracteres'],
+  'Hasło: co najmniej 10 znaków': ['Password: at least 10 characters', 'Пароль: минимум 10 символов', 'Contraseña: al menos 10 caracteres'],
+  'Nowe hasło: co najmniej 10 znaków': ['New password: at least 10 characters', 'Новый пароль: минимум 10 символов', 'Nueva contraseña: al menos 10 caracteres'],
+  'Ta nazwa jest zastrzeżona': ['This name is reserved', 'Это имя зарезервировано', 'Ese nombre está reservado'],
+  'Wypłaty są wstrzymane przez 24 h po zmianie hasła lub e-maila': ['Withdrawals are paused for 24 h after a password or e-mail change', 'Выводы приостановлены на 24 ч после смены пароля или e-mail', 'Los retiros se pausan 24 h tras cambiar la contraseña o el e-mail'],
   'Ta nazwa jest zajęta': ['This name is taken', 'Это имя занято', 'Ese nombre ya está en uso'],
   'Za dużo prób – odczekaj minutę': ['Too many attempts – wait a minute', 'Слишком много попыток – подожди минуту', 'Demasiados intentos – espera un minuto'],
   'Za dużo prób': ['Too many attempts', 'Слишком много попыток', 'Demasiados intentos'],
@@ -301,7 +303,7 @@ export function createWallet({ api, root, getLang, toast, onChange, local = null
     if (l > acct.lamports) return (msg.innerHTML = `<div class="bw-err">${esc(T('errFunds'))}</div>`);
     const b = $('bw-send'); b.disabled = true; b.textContent = T('sending');
     try { const j = await call('POST', '/withdraw', { to, lamports: l }); take(j); $('bw-amt').value = ''; calc();
-      msg.innerHTML = `<div class="bw-ok">✓ ${esc(T('sent'))}${j.url ? ` · <a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(T('view'))} ↗</a>` : ''}</div>`; }
+      msg.innerHTML = `<div class="bw-ok">✓ ${esc(T(j.review ? 'sentReview' : 'sent'))}${j.url ? ` · <a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(T('view'))} ↗</a>` : ''}</div>`; }
     catch (er) { msg.innerHTML = `<div class="bw-err">${esc(er.message)}</div>`; }
     b.disabled = false; b.textContent = T('send');
   });
@@ -341,7 +343,7 @@ export function createWallet({ api, root, getLang, toast, onChange, local = null
     list.innerHTML = hist.length ? hist.map(h => {
       const kind = h.type === 'deposit' ? 'in' : h.type === 'withdraw' ? 'out' : 'game', ic = h.type === 'deposit' ? I.down : h.type === 'withdraw' ? I.up : I.game;
       const sub = [new Date(h.t).toLocaleString(loc(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })];
-      if (h.status === 'pending') sub.push(T('pending')); if (h.status === 'failed') sub.push(T('failed'));
+      if (['pending', 'failed', 'review', 'rejected'].includes(h.status)) sub.push(T(h.status));
       if (h.sig) sub.push(`<a href="https://explorer.solana.com/tx/${esc(h.sig)}${testnet ? '?cluster=' + esc(acct.cluster) : ''}" target="_blank" rel="noopener">${esc(h.sig.slice(0, 6))}… ↗</a>`);
       const note = h.fee ? T('fee', { a: fmtUsd(h.fee) }) : h.note;
       const v = h.amount ? `<span class="${h.amount > 0 ? 'pos' : 'neg'}">${h.amount > 0 ? '+' : ''}${fmtUsd(h.amount)}</span><small>${h.lamports ? (h.lamports > 0 ? '+' : '−') + fmtSol(Math.abs(h.lamports) / 1e9) : ''}</small>` : '<span>—</span>';

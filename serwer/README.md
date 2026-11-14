@@ -38,7 +38,13 @@ Testowe SOL na devnecie: <https://faucet.solana.com> (wklej adres z zakładki **
 | `SOLANA_CLUSTER` | `devnet` | `devnet`, `testnet` albo `mainnet-beta` (zablokowany, patrz niżej) |
 | `SOLANA_RPC_URL` | publiczny RPC sieci | własny RPC (Helius, QuickNode…) – zalecany przy większym ruchu |
 | `WALLET_MNEMONIC` | — | fraza 24 słów. Bez niej (tylko sieć testowa) serwer tworzy ją raz w `dane/fraza.txt` |
-| `ADMIN_USERS` | — | nazwy kont z dostępem do panelu admina, po przecinku |
+| `ADMIN_USERS` | — | nazwy kont z dostępem do panelu admina, po przecinku. Przy starcie przypinane na stałe do ID istniejących kont (zmiana nicku nie odbiera uprawnień); nicków z listy nie da się założyć |
+| `ADMIN_IDS` | — | ID kont adminów, po przecinku (ma pierwszeństwo przed `ADMIN_USERS`) |
+| `HOST` | `127.0.0.1` | adres nasłuchu: tylko ta maszyna (nginx przed serwerem). `0.0.0.0` wystawia port 8787 do internetu – niezalecane |
+| `SESSION_DAYS` | `30` | po tylu dniach sesja gracza wygasa |
+| `WITHDRAW_DAILY_USD` | `500` | limit wypłat jednego konta w ciągu 24 h |
+| `WITHDRAW_REVIEW_USD` | `100` | wypłata powyżej tej kwoty czeka na akceptację w panelu admina |
+| `SECURITY_HOLD_HOURS` | `24` | blokada wypłat po zmianie hasła albo e-maila |
 | `CORS_ORIGINS` | `*` | adresy gry, np. `https://smolka77.github.io` |
 | `DATA_DIR` | `serwer/dane` | baza SQLite i fraza – **musi być na trwałym dysku** |
 | `HOUSE_FEE` | `0.10` | prowizja od puli |
@@ -47,6 +53,21 @@ Testowe SOL na devnecie: <https://faucet.solana.com> (wklej adres z zakładki **
 | `COVER_PASSWORD` | — | hasło bramki: czarny ekran z kotem (`cover.html`, jak na cryptostrike.pl) przed całą stroną i API; puste = bez bramki |
 
 Wymagany Node.js 22.5 lub nowszy (wbudowany `node:sqlite`).
+
+## Panel admina i bezpieczeństwo kont
+
+- **2FA (TOTP)**: panel admina wymaga kodu z aplikacji (Google Authenticator, Authy, 1Password). Przy pierwszym wejściu
+  panel prosi o hasło konta, pokazuje kod QR i klucz, a potem kod kontrolny. Kolejne wejścia: tylko kod. Sesja admina
+  wygasa po 30 min bez ruchu (najwyżej 12 h) i jest tylko w tej karcie przeglądarki.
+- **Dziennik admina** (tabela `audit`): logowania adminów, 2FA, zmiany ustawień, decyzje o wypłatach – widać go w panelu.
+- **Wypłaty**: dzienny limit na konto, duże wypłaty czekają na akceptację (panel → „Wypłaty do akceptacji”), blokada po zmianie hasła/e-maila.
+- **Hasła**: scrypt (N=2^14, r=8, p=5); nowe hasła min. 10 znaków. Starsze hashe są przepisywane przy logowaniu.
+- **Limity prób**: na IP i na nick. `X-Forwarded-For` jest brany pod uwagę tylko z 127.0.0.1 (nginx).
+- **WebSocket**: gra łączy się z `/ws?k=BILET` (jednorazowy, 30 s, z `POST /api/ws-ticket`), token sesji nie trafia do adresu.
+- Kod: `ochrona.mjs` (hasła, TOTP, limity, bilety, zastrzeżone nicki).
+
+Zgubiony telefon z 2FA: zatrzymaj serwer i wyczyść 2FA w bazie, np.
+`sqlite3 dane/portfele.db "UPDATE users SET totp=NULL, totp_step=NULL WHERE id=1"` – przy następnym wejściu panel poprosi o włączenie 2FA od nowa.
 
 ## Logowanie przez Google
 

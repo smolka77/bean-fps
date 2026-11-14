@@ -28,8 +28,8 @@ const DICT = {
     'act.fwd': 'Do przodu', 'act.back': 'Do tyłu', 'act.left': 'W lewo', 'act.right': 'W prawo', 'act.sprint': 'Bieg', 'act.jump': 'Skok', 'act.crouch': 'Kucanie / slide',
     'act.reload': 'Przeładowanie', 'act.inspect': 'Oglądanie broni', 'act.prev': 'Poprzednia broń', 'act.view': 'Zmiana widoku', 'act.mute': 'Wycisz dźwięk',
     'auth.title': 'Konto', 'auth.login': 'Logowanie', 'auth.register': 'Rejestracja', 'auth.user': 'Nazwa użytkownika', 'auth.pass': 'Hasło', 'auth.pass2': 'Powtórz hasło',
-    'auth.doLogin': 'Zaloguj się', 'auth.doRegister': 'Załóż konto', 'auth.userRule': '3–16 znaków: litery, cyfry, _', 'auth.passRule': 'Minimum 6 znaków',
-    'auth.errUser': 'Nazwa: 3–16 znaków (litery, cyfry, _)', 'auth.errPass': 'Hasło musi mieć minimum 6 znaków', 'auth.errMatch': 'Hasła się różnią', 'auth.errExists': 'Ta nazwa jest już zajęta',
+    'auth.doLogin': 'Zaloguj się', 'auth.doRegister': 'Załóż konto', 'auth.userRule': '3–16 znaków: litery, cyfry, _', 'auth.passRule': 'Minimum 10 znaków',
+    'auth.errUser': 'Nazwa: 3–16 znaków (litery, cyfry, _)', 'auth.errPass': 'Hasło musi mieć minimum 10 znaków', 'auth.errMatch': 'Hasła się różnią', 'auth.errExists': 'Ta nazwa jest już zajęta',
     'auth.errCreds': 'Nieprawidłowa nazwa lub hasło', 'auth.errDb': 'Baza danych jest niedostępna – spróbuj ponownie', 'auth.welcome': 'Zalogowano jako {u}', 'auth.created': 'Konto utworzone – witaj, {u}!',
     'auth.loggedAs': 'Zalogowano jako', 'auth.since': 'Konto od', 'auth.logout': 'Wyloguj się', 'auth.note': 'Wersja testowa: bez weryfikacji e-mail. Hasło jest haszowane (PBKDF2).',
     'w.title': 'Portfel', 'w.balance': 'Saldo', 'w.test': 'TRYB TESTOWY – środki są wirtualne, nie są wysyłane żadne prawdziwe transakcje.', 'w.network': 'Sieć Solana · kwoty w dolarach (USD), płatność w SOL po bieżącym kursie',
@@ -59,8 +59,8 @@ const DICT = {
     'act.fwd': 'Forward', 'act.back': 'Back', 'act.left': 'Left', 'act.right': 'Right', 'act.sprint': 'Sprint', 'act.jump': 'Jump', 'act.crouch': 'Crouch / slide',
     'act.reload': 'Reload', 'act.inspect': 'Inspect weapon', 'act.prev': 'Previous weapon', 'act.view': 'Change view', 'act.mute': 'Mute sound',
     'auth.title': 'Account', 'auth.login': 'Log in', 'auth.register': 'Sign up', 'auth.user': 'Username', 'auth.pass': 'Password', 'auth.pass2': 'Repeat password',
-    'auth.doLogin': 'Log in', 'auth.doRegister': 'Create account', 'auth.userRule': '3–16 characters: letters, digits, _', 'auth.passRule': 'At least 6 characters',
-    'auth.errUser': 'Username: 3–16 characters (letters, digits, _)', 'auth.errPass': 'Password must be at least 6 characters', 'auth.errMatch': 'Passwords do not match', 'auth.errExists': 'This username is taken',
+    'auth.doLogin': 'Log in', 'auth.doRegister': 'Create account', 'auth.userRule': '3–16 characters: letters, digits, _', 'auth.passRule': 'At least 10 characters',
+    'auth.errUser': 'Username: 3–16 characters (letters, digits, _)', 'auth.errPass': 'Password must be at least 10 characters', 'auth.errMatch': 'Passwords do not match', 'auth.errExists': 'This username is taken',
     'auth.errCreds': 'Wrong username or password', 'auth.errDb': 'Database unavailable – try again', 'auth.welcome': 'Logged in as {u}', 'auth.created': 'Account created – welcome, {u}!',
     'auth.loggedAs': 'Logged in as', 'auth.since': 'Member since', 'auth.logout': 'Log out', 'auth.note': 'Test version: no e-mail verification. Passwords are hashed (PBKDF2).',
     'w.title': 'Wallet', 'w.balance': 'Balance', 'w.test': 'TEST MODE – funds are virtual, no real transactions are sent.', 'w.network': 'Solana network · amounts in US dollars (USD), paid in SOL at the current rate',
@@ -90,8 +90,8 @@ const DICT = {
     'act.fwd': 'Вперёд', 'act.back': 'Назад', 'act.left': 'Влево', 'act.right': 'Вправо', 'act.sprint': 'Бег', 'act.jump': 'Прыжок', 'act.crouch': 'Присед / подкат',
     'act.reload': 'Перезарядка', 'act.inspect': 'Осмотр оружия', 'act.prev': 'Предыдущее оружие', 'act.view': 'Смена вида', 'act.mute': 'Выключить звук',
     'auth.title': 'Аккаунт', 'auth.login': 'Вход', 'auth.register': 'Регистрация', 'auth.user': 'Имя пользователя', 'auth.pass': 'Пароль', 'auth.pass2': 'Повтори пароль',
-    'auth.doLogin': 'Войти', 'auth.doRegister': 'Создать аккаунт', 'auth.userRule': '3–16 символов: буквы, цифры, _', 'auth.passRule': 'Минимум 6 символов',
-    'auth.errUser': 'Имя: 3–16 символов (буквы, цифры, _)', 'auth.errPass': 'Пароль – минимум 6 символов', 'auth.errMatch': 'Пароли не совпадают', 'auth.errExists': 'Это имя уже занято',
+    'auth.doLogin': 'Войти', 'auth.doRegister': 'Создать аккаунт', 'auth.userRule': '3–16 символов: буквы, цифры, _', 'auth.passRule': 'Минимум 10 символов',
+    'auth.errUser': 'Имя: 3–16 символов (буквы, цифры, _)', 'auth.errPass': 'Пароль – минимум 10 символов', 'auth.errMatch': 'Пароли не совпадают', 'auth.errExists': 'Это имя уже занято',
     'auth.errCreds': 'Неверное имя или пароль', 'auth.errDb': 'База данных недоступна – попробуй ещё раз', 'auth.welcome': 'Вход выполнен: {u}', 'auth.created': 'Аккаунт создан – привет, {u}!',
     'auth.loggedAs': 'Вы вошли как', 'auth.since': 'Аккаунт с', 'auth.logout': 'Выйти', 'auth.note': 'Тестовая версия: без подтверждения e-mail. Пароль хешируется (PBKDF2).',
     'w.title': 'Кошелёк', 'w.balance': 'Баланс', 'w.test': 'ТЕСТОВЫЙ РЕЖИМ – средства виртуальные, реальные транзакции не отправляются.', 'w.network': 'Сеть Solana · суммы в долларах (USD), оплата в SOL по текущему курсу',
@@ -121,8 +121,8 @@ const DICT = {
     'act.fwd': 'Adelante', 'act.back': 'Atrás', 'act.left': 'Izquierda', 'act.right': 'Derecha', 'act.sprint': 'Correr', 'act.jump': 'Saltar', 'act.crouch': 'Agacharse / deslizar',
     'act.reload': 'Recargar', 'act.inspect': 'Inspeccionar arma', 'act.prev': 'Arma anterior', 'act.view': 'Cambiar vista', 'act.mute': 'Silenciar',
     'auth.title': 'Cuenta', 'auth.login': 'Iniciar sesión', 'auth.register': 'Registro', 'auth.user': 'Nombre de usuario', 'auth.pass': 'Contraseña', 'auth.pass2': 'Repite la contraseña',
-    'auth.doLogin': 'Entrar', 'auth.doRegister': 'Crear cuenta', 'auth.userRule': '3–16 caracteres: letras, números, _', 'auth.passRule': 'Mínimo 6 caracteres',
-    'auth.errUser': 'Nombre: 3–16 caracteres (letras, números, _)', 'auth.errPass': 'La contraseña debe tener al menos 6 caracteres', 'auth.errMatch': 'Las contraseñas no coinciden', 'auth.errExists': 'Ese nombre ya está en uso',
+    'auth.doLogin': 'Entrar', 'auth.doRegister': 'Crear cuenta', 'auth.userRule': '3–16 caracteres: letras, números, _', 'auth.passRule': 'Mínimo 10 caracteres',
+    'auth.errUser': 'Nombre: 3–16 caracteres (letras, números, _)', 'auth.errPass': 'La contraseña debe tener al menos 10 caracteres', 'auth.errMatch': 'Las contraseñas no coinciden', 'auth.errExists': 'Ese nombre ya está en uso',
     'auth.errCreds': 'Usuario o contraseña incorrectos', 'auth.errDb': 'Base de datos no disponible – inténtalo de nuevo', 'auth.welcome': 'Sesión iniciada como {u}', 'auth.created': 'Cuenta creada – ¡bienvenido, {u}!',
     'auth.loggedAs': 'Sesión iniciada como', 'auth.since': 'Miembro desde', 'auth.logout': 'Cerrar sesión', 'auth.note': 'Versión de prueba: sin verificación de e-mail. La contraseña se guarda con hash (PBKDF2).',
     'w.title': 'Cartera', 'w.balance': 'Saldo', 'w.test': 'MODO DE PRUEBA – los fondos son virtuales, no se envían transacciones reales.', 'w.network': 'Red Solana · importes en dólares (USD), pago en SOL al cambio actual',
@@ -524,7 +524,7 @@ export function initLobbyUI(ctx) {
   $('lb-reg-form').addEventListener('submit', async e => { e.preventDefault(); setErr('lb-reg-err');
     const u = $('lb-r-user').value.trim(), p = $('lb-r-pass').value, p2 = $('lb-r-pass2').value, id = u.toLowerCase();
     if (!/^[a-z0-9_]{3,16}$/i.test(u)) return setErr('lb-reg-err', t('auth.errUser'));
-    if (p.length < 6) return setErr('lb-reg-err', t('auth.errPass'));
+    if (p.length < 10) return setErr('lb-reg-err', t('auth.errPass'));   // nowe konta: min. 10 znaków (logowanie starszych haseł bez zmian)
     if (p !== p2) return setErr('lb-reg-err', t('auth.errMatch'));
     if (!$('lb-r-terms').checked) return setErr('lb-reg-err', t('auth.errTerms'));
     const btn = e.submitter || e.target.querySelector('[type=submit]'); btn.disabled = true;

@@ -6,9 +6,21 @@
 import { LOBBY_MAPS, BUILTIN_SKINS, SKINS } from './lobby.js';
 import { walletApi } from './wallet-config.js';
 import { AUTH_TXT } from './lobby-ui.js';
+import qrcode from 'qrcode-generator';
 // serwer portfeli (gdy ustawiony): prawdziwe konta, adresy depozytów i salda SOL wszystkich graczy
 const SRV = walletApi();
 const srvToken = () => { try { return localStorage.getItem('bl-token'); } catch { return null; } };
+// sesja admina po kodzie 2FA (30 min bez ruchu, max 12 h): tylko w tej karcie (sessionStorage), wysyłana w nagłówku X-Admin-Token
+const admTok = {
+  get() { try { return sessionStorage.getItem('bl-admin') || ''; } catch { return ''; } },
+  set(v) { try { v ? sessionStorage.setItem('bl-admin', v) : sessionStorage.removeItem('bl-admin'); } catch {} },
+};
+const AH = () => ({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + srvToken(), 'X-Admin-Token': admTok.get() });
+async function srvPost(p, body) {
+  const r = await fetch(SRV + p, { method: 'POST', headers: AH(), body: JSON.stringify(body || {}) }); const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(j.message || 'Błąd serwera'); e.code = j.error; throw e; } return j;
+}
+let lastOpts = {};
 
 const CSS = `
 #fa-admin{--bg:#0a0e17;--card:rgba(255,255,255,.035);--card2:rgba(255,255,255,.06);--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.15);
@@ -106,6 +118,11 @@ const CSS = `
 #fa-admin .fa-deny{max-width:460px;margin:12vh auto 0;text-align:center;padding:28px;border-radius:18px;background:var(--card);border:1px solid var(--line2)}
 #fa-admin .fa-deny h2{margin:0 0 8px;font:700 26px Rajdhani,Oswald,sans-serif;letter-spacing:.06em;text-transform:uppercase}
 #fa-admin .fa-deny p{color:var(--mut);margin:0 0 18px}
+#fa-admin .fa-2f{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:0 0 10px}
+#fa-admin .fa-2f .fa-q{width:200px;text-align:center;letter-spacing:.12em}
+#fa-admin .fa-key{display:inline-block;padding:10px 14px;border-radius:10px;background:rgba(0,0,0,.35);border:1px solid var(--line2);font:600 17px/1.4 ui-monospace,Consolas,monospace;letter-spacing:.06em;color:var(--tx);user-select:all;word-break:break-all}
+#fa-admin .fa-deny a{color:var(--acc)}
+#fa-admin .fa-qr{width:200px;margin:0 auto 14px;background:#fff;border-radius:10px;padding:6px}#fa-admin .fa-qr svg{display:block;width:100%;height:auto}
 @media (max-width:900px){#fa-admin .fa-grid2{grid-template-columns:1fr}#fa-admin .fa-grid2 .fa-card{margin-bottom:0}}
 @media (max-width:520px){#fa-admin .fa-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#fa-admin .fa-kpi{padding:12px}#fa-admin .fa-kpi b{font-size:23px}#fa-admin .fa-kpi b u{display:block;margin:4px 0 0;font-size:10px}#fa-admin .fa-brand b{font-size:25px}#fa-admin .fa-brand span{font-size:16px}}
 #fa-admin .fa-skins{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:12px}
@@ -181,9 +198,9 @@ export async function openAdmin({ onClose } = {}) {
 
   if (SRV) {
     const deny = msg => { root.innerHTML = `<div class="fa-wrap"><div class="fa-deny"><h2>Brak dostępu</h2><p>${esc(msg)}</p><button class="fa-btn pri" type="button" data-close>Wróć do gry</button></div></div>`; root.querySelector('[data-close]').addEventListener('click', close); };
-    if (!srvToken()) return deny('Zaloguj się w grze kontem admina (lista ADMIN_USERS na serwerze portfeli), potem otwórz panel ponownie.');
-    try { const r = await fetch(SRV + '/api/admin/overview', { headers: { Authorization: 'Bearer ' + srvToken() } }); if (!r.ok) { const j = await r.json().catch(() => ({})); return deny(j.message || 'Serwer portfeli odmówił dostępu.'); } }
-    catch { return deny('Serwer portfeli nie odpowiada (' + SRV + ').'); }
+    lastOpts = { onClose };
+    if (!srvToken()) return deny('Zaloguj się w grze kontem admina, potem otwórz panel ponownie.');
+    if (!(await unlockAdmin(deny, close))) return;
     if (!root) return; buildDashboard(null, close); return;
   }
   const use = n => (window.claude && typeof window.claude.use === 'function') ? window.claude.use(n).catch(() => null) : Promise.resolve(null);
@@ -199,12 +216,56 @@ export async function openAdmin({ onClose } = {}) {
   buildDashboard(db, close);
 }
 
+// Odblokowanie panelu na serwerze portfeli: konto z listy adminów + kod 2FA (TOTP). Pierwsze wejście = włączenie 2FA
+// (hasło konta, potem klucz do aplikacji uwierzytelniającej i kontrolny kod). Zwraca true, gdy sesja admina jest ważna.
+async function unlockAdmin(deny, close) {
+  let st;
+  try { const r = await fetch(SRV + '/api/admin/status', { headers: AH() }); st = await r.json().catch(() => ({})); if (!r.ok) { deny(st.message || 'Serwer portfeli odmówił dostępu.'); return false; } }
+  catch { deny('Serwer portfeli nie odpowiada (' + SRV + ').'); return false; }
+  if (st.unlocked) return true;
+  admTok.set('');
+  return new Promise(done => {
+    const screen = (inner, onSubmit) => {
+      if (!root) return done(false);
+      root.innerHTML = `<div class="fa-wrap"><div class="fa-deny">${inner}<p class="fa-msg" data-m style="margin:4px 0 14px"></p><button class="fa-btn" type="button" data-close>Wróć do gry</button></div></div>`;
+      root.querySelector('[data-close]').addEventListener('click', () => { close(); done(false); });
+      const f = root.querySelector('form'), m = root.querySelector('[data-m]'), b = f.querySelector('button');
+      f.querySelector('input').focus();
+      f.addEventListener('submit', async e => {
+        e.preventDefault(); b.disabled = true; m.className = 'fa-msg'; m.textContent = '';
+        try { await onSubmit(new FormData(f)); } catch (er) { m.className = 'fa-msg err'; m.textContent = er.message; b.disabled = false; }
+      });
+    };
+    const codeInput = '<input class="fa-q" name="c" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required placeholder="123456">';
+    const ok = j => { admTok.set(j.adminToken); done(true); };
+    const askCode = () => screen(`<h2>Panel admina</h2><p>Wpisz 6-cyfrowy kod z aplikacji uwierzytelniającej (BEANLADEN: ${esc(st.username)}).</p>
+      <form class="fa-2f">${codeInput}<button class="fa-btn pri">Odblokuj</button></form>`, async d => ok(await srvPost('/api/admin/login', { code: d.get('c') })));
+    const qrSvg = uri => { try { const qr = qrcode(0, 'M'); qr.addData(uri); qr.make(); return qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); } catch { return ''; } };
+    const setupKey = j => screen(`<h2>Dodaj klucz 2FA</h2><p>Zeskanuj kod aplikacją (Google Authenticator, Authy, 1Password…) albo wybierz „Wpisz klucz konfiguracji”: nazwa BEANLADEN, klucz poniżej, oparty na czasie.</p>
+      <div class="fa-qr">${qrSvg(j.uri)}</div>
+      <p><span class="fa-key">${esc(j.secret.match(/.{1,4}/g).join(' '))}</span></p><p><a href="${esc(j.uri)}">Otwórz w aplikacji na tym urządzeniu</a></p>
+      <p>Zapisz klucz w bezpiecznym miejscu (menedżer haseł albo kartka). Bez niego po utracie telefonu nie wejdziesz do panelu. Potem wpisz kod z aplikacji:</p>
+      <form class="fa-2f">${codeInput}<button class="fa-btn pri">Włącz 2FA</button></form>`, async d => ok(await srvPost('/api/admin/2fa/enable', { code: d.get('c') })));
+    const setupPass = () => screen(`<h2>Włącz 2FA</h2><p>Panel admina wymaga kodu z aplikacji uwierzytelniającej. Potwierdź hasłem konta ${esc(st.username)}.</p>
+      <form class="fa-2f"><input class="fa-q" name="p" type="password" autocomplete="current-password" required placeholder="Hasło konta"><button class="fa-btn pri">Dalej</button></form>`,
+      async d => setupKey(await srvPost('/api/admin/2fa/setup', { password: d.get('p') })));
+    st.totp ? askCode() : setupPass();
+  });
+}
+// sesja admina wygasła w trakcie pracy: panel od nowa (prośba o kod)
+function relockAdmin() { admTok.set(''); cleanup.forEach(f => { try { f(); } catch {} }); cleanup = []; if (root) root.remove(); root = null; openAdmin(lastOpts); }
+
 function buildDashboard(db, close) {
   root.innerHTML = `<div class="fa-wrap">
     <div class="fa-head"><div class="fa-brand"><b>BEAN<i>LADEN</i></b><span>Panel admina</span></div><span class="fa-live" id="fa-live">Łączenie…</span><div class="fa-sp"></div>
+      ${SRV ? '<button class="fa-btn" type="button" id="fa-lock" title="Kończy sesję admina – następne wejście wymaga kodu 2FA">Zablokuj panel</button>' : ''}
       <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div>
     <p class="fa-note" id="fa-note" hidden></p>
     <section class="fa-kpis" id="fa-kpis" aria-label="Liczby ogólne"></section>
+    ${SRV ? `<section class="fa-grid2">
+      <div class="fa-card"><div class="fa-ch"><h3>Wypłaty do akceptacji</h3><small id="fa-wd-sum"></small></div><ul class="fa-list" id="fa-wd"><li class="fa-empty">Ładowanie…</li></ul></div>
+      <div class="fa-card"><div class="fa-ch"><h3>Dziennik admina</h3><small>ostatnie 50 zdarzeń</small></div><ul class="fa-list" id="fa-audit" style="max-height:320px;overflow:auto"></ul></div>
+    </section>` : ''}
     <section class="fa-grid2">
       <div class="fa-card"><div class="fa-ch"><h3>Mecze dziennie</h3><small id="fa-ch-m-sum">ostatnie 14 dni</small></div><div class="fa-chart" id="fa-ch-m"></div></div>
       <div class="fa-card"><div class="fa-ch"><h3>Prowizja dziennie</h3><small id="fa-ch-f-sum">USD (płatne w SOL) · ostatnie 14 dni</small></div><div class="fa-chart" id="fa-ch-f"></div></div>
@@ -247,12 +308,37 @@ function buildDashboard(db, close) {
   if (SRV) {
     live.textContent = 'Łączenie…';
     const pull = async () => {
-      try { const r = await fetch(SRV + '/api/admin/overview', { headers: { Authorization: 'Bearer ' + srvToken() } }); if (!r.ok) throw 0;
+      try { const r = await fetch(SRV + '/api/admin/overview', { headers: AH() });
+        if (r.status === 401) { const j = await r.json().catch(() => ({})); if (j.error === 'admin2fa') return relockAdmin(); }
+        if (!r.ok) throw 0;
         srv = await r.json(); accounts = srv.accounts; matches = srv.matches; gotA = gotM = true; note.hidden = true;
-        live.classList.add('on'); live.textContent = 'Na żywo · ' + srv.cluster; schedule(); }
+        live.classList.add('on'); live.textContent = 'Na żywo · ' + srv.cluster; schedule(); renderSrv(); }
       catch { live.classList.remove('on'); live.textContent = 'Rozłączono'; note.hidden = false; note.textContent = 'Serwer portfeli nie odpowiada – ponawiam…'; }
     };
     pull(); const iv = setInterval(pull, 10000); cleanup.push(() => clearInterval(iv));
+    // wypłaty powyżej progu czekają tutaj; dziennik: logowania, 2FA, zmiany ustawień, decyzje o wypłatach
+    const AUD = { login: 'Logowanie hasłem', login_fail: 'Nieudane logowanie hasłem', admin_login: 'Odblokowanie panelu (2FA)', admin_login_fail: 'Zły kod 2FA',
+      '2fa_setup': 'Nowy klucz 2FA', '2fa_setup_fail': 'Nieudane ustawianie 2FA', '2fa_on': 'Włączenie 2FA', config: 'Zmiana ustawień', password: 'Zmiana hasła',
+      wd_approve: 'Wypłata zaakceptowana', wd_reject: 'Wypłata odrzucona' };
+    const renderSrv = () => {
+      if (!srv || !$('fa-wd')) return;
+      const wd = srv.withdrawals || [], lim = srv.limits || {};
+      $('fa-wd-sum').textContent = `powyżej ${usd(lim.reviewUsd || 0)} · limit ${usd(lim.dailyUsd || 0)} na konto / 24 h`;
+      $('fa-wd').innerHTML = wd.length ? wd.map(w => `<li><div><b>${esc(w.name)} · ${esc(usd(w.usd))}</b><small>${new Date(w.t).toLocaleString('pl-PL')} · ${w.sol.toLocaleString('pl-PL', { maximumFractionDigits: 6 })} SOL → <code title="${esc(w.to)}">${esc(w.to.slice(0, 4) + '…' + w.to.slice(-4))}</code></small></div>
+        <span class="r" style="display:flex;gap:6px"><button class="fa-btn pri" type="button" data-wd="${+w.id}" data-ok="1">Wypłać</button><button class="fa-btn" type="button" data-wd="${+w.id}" data-ok="0">Odrzuć</button></span></li>`).join('')
+        : '<li class="fa-empty">Brak wypłat do akceptacji</li>';
+      $('fa-audit').innerHTML = (srv.audit || []).length ? srv.audit.map(a => `<li><div><b>${esc(AUD[a.action] || a.action)}${a.username ? ' · ' + esc(a.username) : ''}</b><small>${new Date(a.t).toLocaleString('pl-PL')} · IP ${esc(a.ip || '—')}${a.detail ? ' · ' + esc(a.detail) : ''}</small></div></li>`).join('')
+        : '<li class="fa-empty">Brak zdarzeń</li>';
+    };
+    $('fa-wd').addEventListener('click', async e => {
+      const b = e.target.closest('[data-wd]'); if (!b) return; const ok = b.dataset.ok === '1';
+      if (!confirm(ok ? 'Wysłać tę wypłatę ze skarbca?' : 'Odrzucić wypłatę i oddać środki na saldo gracza?')) return;
+      b.disabled = true;
+      try { const j = await srvPost('/api/admin/withdraw', { id: +b.dataset.wd, approve: ok }); if (ok && !j.ok) alert('Wypłata nie przeszła – środki wróciły na saldo gracza.'); }
+      catch (er) { if (er.code === 'admin2fa') return relockAdmin(); alert(er.message); }
+      pull();
+    });
+    $('fa-lock').addEventListener('click', async () => { try { await srvPost('/api/admin/logout'); } catch {} admTok.set(''); close(); });
   } else if (db) {
     const timer = setTimeout(() => { if (!gotA) { note.hidden = false; note.textContent = 'Baza danych jeszcze nie odpowiada – dane mogą być niepełne.'; } }, 10000);
     cleanup.push(() => clearTimeout(timer));
@@ -288,7 +374,7 @@ function buildDashboard(db, close) {
   });
 
   // ---------- e-mail do zapytań biznesowych (pokazuje go zakładka Biznes w ustawieniach gry) ----------
-  const bizIn = $('fa-biz'), bizMsg = $('fa-biz-msg'), H = () => ({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + srvToken() });
+  const bizIn = $('fa-biz'), bizMsg = $('fa-biz-msg'), H = AH;
   (async () => { try {
     if (SRV) bizIn.value = (await (await fetch(SRV + '/api/config')).json()).businessEmail || '';
     else if (db) { const sn = await db.doc('config/business').get(); bizIn.value = sn.exists ? sn.data().email || '' : ''; }

@@ -6,19 +6,19 @@ import { renderEarnings } from './earnings.js';
 const TXT = {
   pl: { title: 'Profil', since: 'Gracz od {d}', tProf: 'Profil', tSec: 'Bezpieczeństwo', tStats: 'Statystyki', nick: 'Nick', nickD: '3–16 znaków: litery, cyfry, _', email: 'E-mail', emailD: 'Do kontaktu i odzyskania konta (opcjonalnie)',
     avatar: 'Zdjęcie profilowe', avatarD: 'PNG, JPG lub WebP – przytniemy je do kwadratu', upload: 'Wgraj zdjęcie', change: 'Zmień zdjęcie', remove: 'Usuń', save: 'Zapisz zmiany', saving: 'Zapisywanie…', saved: 'Zapisano', pwOld: 'Obecne hasło', pwNew: 'Nowe hasło', pwNew2: 'Powtórz nowe hasło',
-    pwBtn: 'Zmień hasło', pwOk: 'Hasło zmienione', pwShort: 'Nowe hasło: co najmniej 6 znaków', pwBad: 'Obecne hasło jest nieprawidłowe', pwMatch: 'Hasła nie są takie same', errNick: 'Nick: 3–16 znaków (litery, cyfry, _)', errMail: 'Nieprawidłowy adres e-mail',
+    pwBtn: 'Zmień hasło', pwOk: 'Hasło zmienione', pwShort: 'Nowe hasło: co najmniej 10 znaków', pwBad: 'Obecne hasło jest nieprawidłowe', pwMatch: 'Hasła nie są takie same', errNick: 'Nick: 3–16 znaków (litery, cyfry, _)', errMail: 'Nieprawidłowy adres e-mail',
     errImg: 'Nie udało się wczytać obrazka', matches: 'Mecze', wr: 'Skuteczność', kd: 'K/D', acc: 'Celność', hs: 'W głowę', earn: 'Zarobki', logout: 'Wyloguj', secD: 'Po zmianie hasła inne urządzenia zostaną wylogowane.', wl: '{w} W · {l} P' },
   en: { title: 'Profile', since: 'Player since {d}', tProf: 'Profile', tSec: 'Security', tStats: 'Stats', nick: 'Nickname', nickD: '3–16 characters: letters, digits, _', email: 'E-mail', emailD: 'For contact and account recovery (optional)',
     avatar: 'Profile picture', avatarD: 'PNG, JPG or WebP – we crop it to a square', upload: 'Upload photo', change: 'Change photo', remove: 'Remove', save: 'Save changes', saving: 'Saving…', saved: 'Saved', pwOld: 'Current password', pwNew: 'New password', pwNew2: 'Repeat new password',
-    pwBtn: 'Change password', pwOk: 'Password changed', pwShort: 'New password: at least 6 characters', pwBad: 'Current password is incorrect', pwMatch: 'Passwords do not match', errNick: 'Nickname: 3–16 characters (letters, digits, _)', errMail: 'Invalid e-mail address',
+    pwBtn: 'Change password', pwOk: 'Password changed', pwShort: 'New password: at least 10 characters', pwBad: 'Current password is incorrect', pwMatch: 'Passwords do not match', errNick: 'Nickname: 3–16 characters (letters, digits, _)', errMail: 'Invalid e-mail address',
     errImg: 'Could not load the image', matches: 'Matches', wr: 'Win rate', kd: 'K/D', acc: 'Accuracy', hs: 'Headshots', earn: 'Earnings', logout: 'Log out', secD: 'Changing your password signs out your other devices.', wl: '{w} W · {l} L' },
   ru: { title: 'Профиль', since: 'Игрок с {d}', tProf: 'Профиль', tSec: 'Безопасность', tStats: 'Статистика', nick: 'Ник', nickD: '3–16 символов: буквы, цифры, _', email: 'E-mail', emailD: 'Для связи и восстановления (необязательно)',
     avatar: 'Фото профиля', avatarD: 'PNG, JPG или WebP – обрежем до квадрата', upload: 'Загрузить фото', change: 'Сменить фото', remove: 'Удалить', save: 'Сохранить', saving: 'Сохранение…', saved: 'Сохранено', pwOld: 'Текущий пароль', pwNew: 'Новый пароль', pwNew2: 'Повтори новый пароль',
-    pwBtn: 'Сменить пароль', pwOk: 'Пароль изменён', pwShort: 'Новый пароль: минимум 6 символов', pwBad: 'Текущий пароль неверный', pwMatch: 'Пароли не совпадают', errNick: 'Ник: 3–16 символов (буквы, цифры, _)', errMail: 'Неверный e-mail',
+    pwBtn: 'Сменить пароль', pwOk: 'Пароль изменён', pwShort: 'Новый пароль: минимум 10 символов', pwBad: 'Текущий пароль неверный', pwMatch: 'Пароли не совпадают', errNick: 'Ник: 3–16 символов (буквы, цифры, _)', errMail: 'Неверный e-mail',
     errImg: 'Не удалось загрузить изображение', matches: 'Матчи', wr: 'Побед', kd: 'K/D', acc: 'Точность', hs: 'В голову', earn: 'Доход', logout: 'Выйти', secD: 'После смены пароля другие устройства выйдут из аккаунта.', wl: '{w} П · {l} Пор' },
   es: { title: 'Perfil', since: 'Jugador desde {d}', tProf: 'Perfil', tSec: 'Seguridad', tStats: 'Estadísticas', nick: 'Apodo', nickD: '3–16 caracteres: letras, números, _', email: 'E-mail', emailD: 'Para contacto y recuperar la cuenta (opcional)',
     avatar: 'Foto de perfil', avatarD: 'PNG, JPG o WebP – la recortamos en cuadrado', upload: 'Subir foto', change: 'Cambiar foto', remove: 'Quitar', save: 'Guardar cambios', saving: 'Guardando…', saved: 'Guardado', pwOld: 'Contraseña actual', pwNew: 'Nueva contraseña', pwNew2: 'Repite la nueva contraseña',
-    pwBtn: 'Cambiar contraseña', pwOk: 'Contraseña cambiada', pwShort: 'Nueva contraseña: al menos 6 caracteres', pwBad: 'La contraseña actual no es correcta', pwMatch: 'Las contraseñas no coinciden', errNick: 'Apodo: 3–16 caracteres (letras, números, _)', errMail: 'E-mail no válido',
+    pwBtn: 'Cambiar contraseña', pwOk: 'Contraseña cambiada', pwShort: 'Nueva contraseña: al menos 10 caracteres', pwBad: 'La contraseña actual no es correcta', pwMatch: 'Las contraseñas no coinciden', errNick: 'Apodo: 3–16 caracteres (letras, números, _)', errMail: 'E-mail no válido',
     errImg: 'No se pudo cargar la imagen', matches: 'Partidas', wr: 'Victorias', kd: 'K/D', acc: 'Precisión', hs: 'A la cabeza', earn: 'Ganancias', logout: 'Cerrar sesión', secD: 'Al cambiar la contraseña se cerrará la sesión en otros dispositivos.', wl: '{w} V · {l} D' },
 };
 
@@ -161,7 +161,7 @@ export function createProfile({ root, getLang, toast, adapter }) {
   });
   wrap.querySelector('[data-pane="sec"]').addEventListener('submit', async e => {
     e.preventDefault(); const p0 = $('bp-p0').value, p1 = $('bp-p1').value, p2 = $('bp-p2').value;
-    if (p1.length < 6) return msg('bp-pwmsg', T('pwShort'), 'err'); if (p1 !== p2) return msg('bp-pwmsg', T('pwMatch'), 'err');
+    if (p1.length < 10) return msg('bp-pwmsg', T('pwShort'), 'err'); if (p1 !== p2) return msg('bp-pwmsg', T('pwMatch'), 'err');
     const b = $('bp-pwb'); b.disabled = true;
     try { await adapter.password(p0, p1); ['bp-p0', 'bp-p1', 'bp-p2'].forEach(k => $(k).value = ''); msg('bp-pwmsg', T('pwOk'), 'ok'); toast(T('pwOk'), 'ok'); }
     catch (er) { msg('bp-pwmsg', er.code === 'oldpass' ? T('pwBad') : er.message || String(er), 'err'); }

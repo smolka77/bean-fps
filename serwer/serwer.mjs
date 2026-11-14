@@ -17,6 +17,7 @@ import { derivePath } from 'ed25519-hd-key';
 import * as bip39 from 'bip39';
 import { WebSocketServer } from 'ws';
 import * as MECZ from './mecz.mjs';
+import * as OCH from './ochrona.mjs';
 
 // ---------------- konfiguracja ----------------
 const env = process.env;
@@ -32,6 +33,12 @@ const MIN_WITHDRAW_LAMPORTS = Math.round(+(env.MIN_WITHDRAW_SOL || 0.001) * LAMP
 const STAKE_MIN_USD = 1, STAKE_MAX_USD = 1000;
 const TX_FEE = 5000;
 const GOOGLE_CLIENT_ID = (env.GOOGLE_CLIENT_ID || '').trim();   // logowanie przez Google (OAuth, typ: aplikacja internetowa)
+const HOST = env.HOST || '127.0.0.1';                                   // tylko ta maszyna (nginx); 0.0.0.0 = cały internet (niezalecane)
+const SESSION_MS = +(env.SESSION_DAYS || 30) * 864e5;                   // sesja gracza wygasa po tylu dniach
+const ADMIN_IDLE_MS = 30 * 60e3, ADMIN_MAX_MS = 12 * 3600e3;            // sesja admina (po kodzie 2FA): 30 min bez ruchu, najwyżej 12 h
+const WD_DAILY_USD = +(env.WITHDRAW_DAILY_USD || 500);                  // limit wypłat na konto w ciągu 24 h
+const WD_REVIEW_USD = +(env.WITHDRAW_REVIEW_USD || 100);                // wypłata powyżej tej kwoty czeka na akceptację admina
+const SEC_HOLD_MS = +(env.SECURITY_HOLD_HOURS || 24) * 3600e3;          // blokada wypłat po zmianie hasła albo e-maila
 const GAME_DIR = path.resolve(env.GAME_DIR || path.join(path.dirname(new URL(import.meta.url).pathname), '..'));   // zbudowana gra (index.html) – serwer może ją podawać pod tym samym adresem                                                   // opłata sieci za prosty przelew (lamporty)
 if (CLUSTER === 'mainnet-beta' && env.ALLOW_MAINNET !== 'tak') {
   console.error('Mainnet jest zablokowany: wyniki meczów liczy przeglądarka gracza (do oszukania). Zobacz README – „Przed mainnetem”.');
@@ -66,8 +73,13 @@ CREATE TABLE IF NOT EXISTS deposits(sig TEXT PRIMARY KEY, user_id INTEGER NOT NU
 CREATE TABLE IF NOT EXISTS matches(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), t INTEGER NOT NULL, stake_usd REAL NOT NULL, stake_lamports INTEGER NOT NULL,
   price REAL NOT NULL, state TEXT NOT NULL DEFAULT 'open', payout_lamports INTEGER NOT NULL DEFAULT 0, fee_lamports INTEGER NOT NULL DEFAULT 0, map TEXT, forfeit INTEGER NOT NULL DEFAULT 0, ended INTEGER);
 CREATE INDEX IF NOT EXISTS matches_t ON matches(t DESC);
-CREATE TABLE IF NOT EXISTS config(key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
-for (const c of ['email TEXT', 'avatar TEXT', 'google_sub TEXT']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + c); } catch {} }   // profil: e-mail i awatar (starsze bazy)
+CREATE TABLE IF NOT EXISTS config(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS admin_sessions(token TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, created INTEGER NOT NULL, last INTEGER NOT NULL, ip TEXT);
+CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, t INTEGER NOT NULL, user_id INTEGER, ip TEXT, action TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS withdrawals(id INTEGER PRIMARY KEY, tx_id INTEGER NOT NULL, user_id INTEGER NOT NULL REFERENCES users(id), to_addr TEXT NOT NULL, lamports INTEGER NOT NULL,
+  usd REAL NOT NULL, t INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'review', decided INTEGER, decided_by INTEGER);`);
+// profil: e-mail i awatar; 2FA admina (totp, ostatni użyty krok, sekret w trakcie włączania); czas ostatniej zmiany hasła/e-maila
+for (const c of ['email TEXT', 'avatar TEXT', 'google_sub TEXT', 'totp TEXT', 'totp_step INTEGER', 'totp_pending TEXT', 'sec_changed INTEGER']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + c); } catch {} }
 const q = sql => db.prepare(sql);
 const tx = fn => { db.exec('BEGIN IMMEDIATE'); try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; } };
 const STAT_KEYS = ['shots', 'hits', 'heads', 'kills', 'deaths'];
@@ -85,15 +97,34 @@ async function refreshPrice() {
 const toUsd = l => PRICE ? Math.round(l / LAMPORTS_PER_SOL * PRICE * 100) / 100 : 0;
 
 // ---------------- konta ----------------
-const scryptP = (pw, salt) => new Promise((ok, no) => crypto.scrypt(pw, salt, 64, { N: 16384, r: 8, p: 1 }, (e, k) => e ? no(e) : ok(k)));
-async function hashPass(pw) { const salt = crypto.randomBytes(16); return 'scrypt$' + salt.toString('base64') + '$' + (await scryptP(pw, salt)).toString('base64'); }
-async function checkPass(pw, stored) { const [, s, h] = stored.split('$'); const k = await scryptP(pw, Buffer.from(s, 'base64')); return crypto.timingSafeEqual(k, Buffer.from(h, 'base64')); }
+const { hashPass, checkPass } = OCH;                                    // scrypt (ochrona.mjs); stare hashe przepisywane przy logowaniu
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 function newSession(userId) { const tok = crypto.randomBytes(32).toString('base64url'); q('INSERT INTO sessions(token,user_id,created) VALUES(?,?,?)').run(sha(tok), userId, Date.now()); return tok; }
 function userFromReq(req) {
   const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); if (!m) return null;
-  return q('SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=?').get(sha(m[1])) || null;
+  return q('SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.created>?').get(sha(m[1]), Date.now() - SESSION_MS) || null;
 }
+// stare sesje (gracz po SESSION_DAYS, admin po 12 h) i bilety znikają same
+const purgeSessions = () => { try { q('DELETE FROM sessions WHERE created<?').run(Date.now() - SESSION_MS); q('DELETE FROM admin_sessions WHERE created<? OR last<?').run(Date.now() - ADMIN_MAX_MS, Date.now() - ADMIN_IDLE_MS); } catch (e) { console.warn('[sesje]', e.message); } };
+purgeSessions(); setInterval(purgeSessions, 3600e3).unref();
+
+// ---------------- admini ----------------
+// Admin to konkretne konto (ID), nie nick: zmiana nicku nie odbiera uprawnień i nikt nie przejmie ich, zakładając konto o tej nazwie.
+// ADMIN_IDS=1,2 w .env ma pierwszeństwo. Bez niego: nicki z ADMIN_USERS są przy starcie przypinane na stałe do ID istniejących kont
+// (config.adminPins). Nick z listy, którego konto jeszcze nie istnieje, nie daje nic – a takiej nazwy nie da się już założyć (zastrzeżona).
+const cfgGet = k => { const r = q('SELECT value FROM config WHERE key=?').get(k); return r ? r.value : ''; };
+const cfgPut = (k, v) => q('INSERT INTO config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(k, v);
+const ADMIN_SET = (() => {
+  const ids = (env.ADMIN_IDS || '').split(',').map(s => +s.trim()).filter(n => n > 0);
+  if (ids.length) return new Set(ids);
+  let pins = {}; try { pins = JSON.parse(cfgGet('adminPins') || '{}'); } catch {}
+  for (const n of ADMIN_USERS) if (!pins[n]) { const u = q('SELECT id FROM users WHERE username=?').get(n); if (u) pins[n] = u.id; }
+  cfgPut('adminPins', JSON.stringify(pins));
+  return new Set([...ADMIN_USERS].map(n => pins[n]).filter(Boolean));
+})();
+for (const id of ADMIN_SET) { const u = q('SELECT username, totp FROM users WHERE id=?').get(id); console.log(`[admin] konto id=${id}: ${u ? u.username + (u.totp ? ' (2FA włączone)' : ' (2FA jeszcze nie włączone)') : 'NIE ISTNIEJE'}`); }
+const isAdmin = u => !!u && ADMIN_SET.has(u.id);
+const audit = (uid, ip, action, detail = '') => { try { q('INSERT INTO audit(t,user_id,ip,action,detail) VALUES(?,?,?,?,?)').run(Date.now(), uid ?? null, ip || '', action, String(detail).slice(0, 300)); } catch {} };
 function totals(uid) {
   const m = q(`SELECT COUNT(*) n, SUM(state='won') w, SUM(state='lost') l, COALESCE(SUM(stake_usd),0) staked,
     COALESCE(SUM(CASE WHEN state='won' THEN payout_lamports/1e9*price END),0) won, COALESCE(SUM(CASE WHEN state='won' THEN fee_lamports/1e9*price END),0) fees
@@ -104,7 +135,7 @@ function totals(uid) {
 }
 function publicUser(u) {
   return { username: u.username, email: u.email || '', avatar: u.avatar || '', createdAt: new Date(u.created).toISOString(), address: u.address, lamports: u.lamports, sol: u.lamports / LAMPORTS_PER_SOL,
-    balance: toUsd(u.lamports), price: PRICE, cluster: CLUSTER, admin: ADMIN_USERS.has(u.username.toLowerCase()),
+    balance: toUsd(u.lamports), price: PRICE, cluster: CLUSTER, admin: isAdmin(u),
     stats: { ...Object.fromEntries(STAT_KEYS.map(k => [k, 0])), ...JSON.parse(u.stats || '{}'), ...totals(u.id), lastActive: u.last_active || u.created } };
 }
 const histOf = (uid, n = 60) => q('SELECT t,type,lamports,usd,fee_usd,note,sig,status FROM txs WHERE user_id=? ORDER BY t DESC, id DESC LIMIT ?').all(uid, n)
@@ -156,21 +187,50 @@ async function scanAll() {
 }
 
 // ---------------- HTTP ----------------
-const limits = new Map();                                              // proste ograniczenie prób logowania (IP -> [czas])
-function limited(ip, max = 12, ms = 60000) { const now = Date.now(), a = (limits.get(ip) || []).filter(t => now - t < ms); a.push(now); limits.set(ip, a); return a.length > max; }
+const limited = OCH.makeLimiter();                                     // limity prób: klucz (IP, nick) -> czasy prób w oknie
 function send(res, code, obj, origin) {
   const body = JSON.stringify(obj);
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...cors(origin) }); res.end(body);
 }
 function cors(origin) {
   const ok = ORIGINS.includes('*') ? '*' : (origin && ORIGINS.includes(origin) ? origin : ORIGINS[0]);
-  return { 'Access-Control-Allow-Origin': ok, 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', Vary: 'Origin' };
+  return { 'Access-Control-Allow-Origin': ok, 'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Admin-Token','Access-Control-Allow-Methods': 'GET, POST, OPTIONS', Vary: 'Origin' };
 }
 const readBody = req => new Promise((ok, no) => { let b = ''; req.on('data', c => { b += c; if (b.length > 1e5) { no(new Error('za duże')); req.destroy(); } }); req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch { no(new Error('zły JSON')); } }); });
 class E extends Error { constructor(code, msg, status = 400) { super(msg); this.code = code; this.status = status; } }
 const need = u => { if (!u) throw new E('auth', 'Zaloguj się', 401); return u; };
 const fresh = id => q('SELECT * FROM users WHERE id=?').get(id);
 const explorer = sig => `https://explorer.solana.com/tx/${sig}${CLUSTER === 'mainnet-beta' ? '' : '?cluster=' + CLUSTER}`;
+const PASS_MSG = `Hasło: co najmniej ${OCH.PASS_MIN} znaków`, NEWPASS_MSG = `Nowe hasło: co najmniej ${OCH.PASS_MIN} znaków`;
+const RESERVED_MSG = 'Ta nazwa jest zastrzeżona';
+const reserved = n => OCH.reservedName(n, [...ADMIN_USERS]);
+
+// panel admina: zwykła sesja konta z listy adminów + osobna, krótka sesja admina otwierana kodem 2FA (nagłówek X-Admin-Token)
+function adminOnly(user) { need(user); if (!isAdmin(user)) throw new E('admin', 'Brak dostępu do panelu admina', 403); return user; }
+function adminGate(user, req) {
+  adminOnly(user);
+  const tok = String(req.headers['x-admin-token'] || ''), now = Date.now();
+  const s = tok && q('SELECT * FROM admin_sessions WHERE token=?').get(sha(tok));
+  if (!s || s.user_id !== user.id || s.created < now - ADMIN_MAX_MS || s.last < now - ADMIN_IDLE_MS) throw new E('admin2fa', 'Potwierdź dostęp kodem 2FA', 401);
+  q('UPDATE admin_sessions SET last=? WHERE token=?').run(now, s.token);
+  return user;
+}
+function newAdminSession(uid, ip) { const tok = crypto.randomBytes(32).toString('base64url'), now = Date.now(); q('INSERT INTO admin_sessions(token,user_id,created,last,ip) VALUES(?,?,?,?,?)').run(sha(tok), uid, now, now, ip || ''); return tok; }
+
+// wypłata ze skarbca dla zapisanej operacji (txs.id); błąd = zwrot na saldo
+async function payout(txId, userId, to, lam) {
+  try {
+    const t = new Transaction().add(SystemProgram.transfer({ fromPubkey: TREASURY.publicKey, toPubkey: to, lamports: lam }));
+    const sig = await sendAndConfirmTransaction(conn, t, [TREASURY], { commitment: 'confirmed' });
+    q("UPDATE txs SET status='ok', sig=? WHERE id=?").run(sig, txId);
+    console.log(`[wypłata] użytkownik ${userId}: ${lam / LAMPORTS_PER_SOL} SOL -> ${to.toBase58()}`);
+    return sig;
+  } catch (e) {
+    tx(() => { q('UPDATE users SET lamports=lamports+? WHERE id=?').run(lam, userId); q("UPDATE txs SET status='failed', note=note||' · zwrot' WHERE id=?").run(txId); });
+    console.warn('[wypłata] nieudana', e.message);
+    return null;
+  }
+}
 
 const routes = {
   'GET /api/health': async () => ({ ok: true, cluster: CLUSTER, price: PRICE, treasury: TREASURY.publicKey.toBase58() }),
@@ -179,7 +239,8 @@ const routes = {
     if (limited(ip)) throw new E('rate', 'Za dużo prób – odczekaj minutę', 429);
     const u = String(body.username || '').trim(), p = String(body.password || '');
     if (!/^[a-z0-9_]{3,16}$/i.test(u)) throw new E('user', 'Nazwa: 3–16 znaków (litery, cyfry, _)');
-    if (p.length < 6 || p.length > 128) throw new E('pass', 'Hasło: co najmniej 6 znaków');
+    if (reserved(u)) throw new E('reserved', RESERVED_MSG, 409);
+    if (p.length < OCH.PASS_MIN || p.length > 128) throw new E('pass', PASS_MSG);
     if (q('SELECT 1 FROM users WHERE username=?').get(u)) throw new E('exists', 'Ta nazwa jest zajęta', 409);
     const pass = await hashPass(p);
     const id = tx(() => {
@@ -191,15 +252,22 @@ const routes = {
     return { token: newSession(id), account: publicUser(fresh(id)), history: [] };
   },
   'POST /api/login': async ({ body, ip }) => {
-    if (limited(ip)) throw new E('rate', 'Za dużo prób – odczekaj minutę', 429);
-    const u = q('SELECT * FROM users WHERE username=?').get(String(body.username || '').trim());
-    if (!u || !(await checkPass(String(body.password || ''), u.pass))) throw new E('creds', 'Zła nazwa lub hasło', 401);
+    const name = String(body.username || '').trim(), pw = String(body.password || '');
+    // limit na IP i osobno na nick (zgadywanie hasła jednego konta z wielu adresów)
+    if (limited('login:' + ip) || limited('u:' + name.toLowerCase(), 20, 15 * 60e3)) throw new E('rate', 'Za dużo prób – odczekaj minutę', 429);
+    const u = q('SELECT * FROM users WHERE username=?').get(name);
+    if (!u) { await OCH.fakeCheck(pw); throw new E('creds', 'Zła nazwa lub hasło', 401); }
+    if (!(await checkPass(pw, u.pass))) { if (isAdmin(u)) audit(u.id, ip, 'login_fail'); throw new E('creds', 'Zła nazwa lub hasło', 401); }
+    if (OCH.needsRehash(u.pass)) q('UPDATE users SET pass=? WHERE id=?').run(await hashPass(pw), u.id);   // mocniejszy hash przy okazji logowania
     q('UPDATE users SET last_active=? WHERE id=?').run(Date.now(), u.id);
+    if (isAdmin(u)) audit(u.id, ip, 'login');
     scanUser(u).catch(() => {});
     return { token: newSession(u.id), account: publicUser(fresh(u.id)), history: histOf(u.id) };
   },
   'POST /api/logout': async ({ req }) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); if (m) q('DELETE FROM sessions WHERE token=?').run(sha(m[1])); return { ok: true }; },
   'GET /api/me': async ({ user }) => { need(user); return { account: publicUser(fresh(user.id)), history: histOf(user.id) }; },
+  // jednorazowy bilet (30 s) do połączenia z /ws – token sesji nie trafia do adresu
+  'POST /api/ws-ticket': async ({ user }) => { need(user); return { ticket: OCH.wsTicket(user.id) }; },
   'POST /api/scan': async ({ user }) => { need(user); await scanUser(fresh(user.id)); return { account: publicUser(fresh(user.id)), history: histOf(user.id) }; },
   'GET /api/earnings': async ({ user }) => {
     need(user);
@@ -221,23 +289,25 @@ const routes = {
     let lam = body.lamports != null ? Math.floor(+body.lamports) : body.sol != null ? Math.floor(+body.sol * LAMPORTS_PER_SOL) : body.usd != null && PRICE ? Math.floor(+body.usd / PRICE * LAMPORTS_PER_SOL) : NaN;
     if (!(lam >= MIN_WITHDRAW_LAMPORTS)) throw new E('amount', `Minimalna wypłata: ${MIN_WITHDRAW_LAMPORTS / LAMPORTS_PER_SOL} SOL`);
     const usd = toUsd(lam);
+    if (!PRICE) throw new E('price', 'Brak kursu SOL – spróbuj za chwilę', 503);
+    // po zmianie hasła albo e-maila wypłaty czekają (przejęte konto nie wypłaci od razu)
+    const sc = fresh(user.id).sec_changed || 0;
+    if (Date.now() - sc < SEC_HOLD_MS) throw new E('hold', `Wypłaty są wstrzymane przez ${Math.round(SEC_HOLD_MS / 3600e3)} h po zmianie hasła lub e-maila`, 403);
+    const review = usd > WD_REVIEW_USD;
     const txId = tx(() => {
       const u = fresh(user.id); if (u.lamports < lam) throw new E('funds', 'Za mało środków');
+      const day = -q("SELECT COALESCE(SUM(usd),0) s FROM txs WHERE user_id=? AND type='withdraw' AND status IN ('ok','pending','review') AND t>?").get(u.id, Date.now() - 864e5).s;
+      if (day + usd > WD_DAILY_USD) throw new E('limit', `Dzienny limit wypłat to $${WD_DAILY_USD} – zostało $${Math.max(0, Math.floor((WD_DAILY_USD - day) * 100) / 100)}`, 403);
       q('UPDATE users SET lamports=lamports-? WHERE id=?').run(lam, u.id);
-      addTx(u.id, 'withdraw', -lam, -usd, { note: to.toBase58().slice(0, 4) + '…' + to.toBase58().slice(-4), status: 'pending' });
-      return Number(q('SELECT last_insert_rowid() id').get().id);
+      addTx(u.id, 'withdraw', -lam, -usd, { note: to.toBase58().slice(0, 4) + '…' + to.toBase58().slice(-4), status: review ? 'review' : 'pending' });
+      const id = Number(q('SELECT last_insert_rowid() id').get().id);
+      if (review) q('INSERT INTO withdrawals(tx_id,user_id,to_addr,lamports,usd,t) VALUES(?,?,?,?,?,?)').run(id, u.id, to.toBase58(), lam, usd, Date.now());
+      return id;
     });
-    try {
-      const t = new Transaction().add(SystemProgram.transfer({ fromPubkey: TREASURY.publicKey, toPubkey: to, lamports: lam }));
-      const sig = await sendAndConfirmTransaction(conn, t, [TREASURY], { commitment: 'confirmed' });
-      q("UPDATE txs SET status='ok', sig=? WHERE id=?").run(sig, txId);
-      console.log(`[wypłata] ${user.username} ${lam / LAMPORTS_PER_SOL} SOL -> ${to.toBase58()}`);
-      return { ok: true, sig, url: explorer(sig), account: publicUser(fresh(user.id)), history: histOf(user.id) };
-    } catch (e) {
-      tx(() => { q('UPDATE users SET lamports=lamports+? WHERE id=?').run(lam, user.id); q("UPDATE txs SET status='failed', note=note||' · zwrot' WHERE id=?").run(txId); });
-      console.warn('[wypłata] nieudana', e.message);
-      throw new E('send', 'Wypłata nie przeszła – środki wróciły na saldo. Spróbuj za chwilę.', 502);
-    }
+    if (review) { console.log(`[wypłata] ${user.username} $${usd} czeka na akceptację admina`); return { ok: true, review: true, url: '', account: publicUser(fresh(user.id)), history: histOf(user.id) }; }
+    const sig = await payout(txId, user.id, to, lam);
+    if (!sig) throw new E('send', 'Wypłata nie przeszła – środki wróciły na saldo. Spróbuj za chwilę.', 502);
+    return { ok: true, sig, url: explorer(sig), account: publicUser(fresh(user.id)), history: histOf(user.id) };
   },
   'POST /api/match/start': async ({ user, body }) => {
     need(user); const usd = Math.round(+body.stakeUsd * 100) / 100;
@@ -246,7 +316,8 @@ const routes = {
     const lam = Math.round(usd / PRICE * LAMPORTS_PER_SOL), price = PRICE;
     return tx(() => {
       // poprzedni niezamknięty mecz (np. zamknięta karta) liczy się jako przegrany
-      for (const m of q("SELECT * FROM matches WHERE user_id=? AND state='open'").all(user.id)) q("UPDATE matches SET state='lost', forfeit=1, ended=? WHERE id=?").run(Date.now(), m.id);
+      // (poza meczem, który właśnie czeka w kolejce albo trwa – ten rozliczy serwer meczu)
+      for (const m of q("SELECT * FROM matches WHERE user_id=? AND state='open'").all(user.id)) if (!duelActive(m.id)) q("UPDATE matches SET state='lost', forfeit=1, ended=? WHERE id=?").run(Date.now(), m.id);
       const u = fresh(user.id); if (u.lamports < lam) throw new E('funds', 'Za mało środków na stawkę');
       q('UPDATE users SET lamports=lamports-? WHERE id=?').run(lam, u.id);
       const id = Number(q('INSERT INTO matches(user_id,t,stake_usd,stake_lamports,price,map) VALUES(?,?,?,?,?,?)').run(u.id, Date.now(), usd, lam, price, body.map || null).lastInsertRowid);
@@ -279,6 +350,7 @@ const routes = {
     if (!u) {
       // nowe konto: nick z początku adresu e-mail (litery, cyfry, _), w razie zajętości z dopiskiem cyfr
       let base = email.split('@')[0].replace(/[^a-z0-9_]/gi, '').slice(0, 12) || 'gracz'; if (base.length < 3) base = (base + 'gracz').slice(0, 5);
+      if (reserved(base)) base = 'gracz';                         // admin@… nie dostanie nicku „admin”
       let name = base; for (let i = 0; q('SELECT 1 FROM users WHERE username=?').get(name); i++) name = base + (Math.floor(Math.random() * 9000) + 1000);
       const pass = await hashPass(crypto.randomBytes(24).toString('base64'));   // hasło losowe – logowanie przez Google
       const id = tx(() => {
@@ -290,9 +362,61 @@ const routes = {
     q('UPDATE users SET last_active=? WHERE id=?').run(Date.now(), u.id);
     return { token: newSession(u.id), account: publicUser(fresh(u.id)), history: histOf(u.id), created };
   },
-  'POST /api/admin/config': async ({ user, body }) => {
-    need(user); if (!ADMIN_USERS.has(user.username.toLowerCase())) throw new E('admin', 'Brak dostępu do panelu admina', 403);
-    const put = (k, v) => q('INSERT INTO config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(k, v), out = {};
+  // ---- panel admina: 2FA (TOTP) ----
+  // stan: czy konto jest adminem, czy ma włączone 2FA i czy sesja admina (X-Admin-Token) jest ważna
+  'GET /api/admin/status': async ({ user, req }) => {
+    adminOnly(user); let unlocked = true; try { adminGate(user, req); } catch { unlocked = false; }
+    return { admin: true, totp: !!fresh(user.id).totp, unlocked, username: user.username };
+  },
+  // włączenie 2FA: wymaga hasła konta (sama skradziona sesja nie wystarczy); ponowne ustawienie – dodatkowo obecnego kodu
+  'POST /api/admin/2fa/setup': async ({ user, body, ip }) => {
+    adminOnly(user); if (limited('adm:' + ip, 8, 5 * 60e3)) throw new E('rate', 'Za dużo prób – odczekaj chwilę', 429);
+    const u = fresh(user.id);
+    if (!(await checkPass(String(body.password || ''), u.pass))) { audit(u.id, ip, '2fa_setup_fail', 'hasło'); throw new E('oldpass', 'Obecne hasło jest nieprawidłowe', 400); }
+    if (u.totp) { const st = OCH.totpCheck(u.totp, body.code, u.totp_step); if (!st) { audit(u.id, ip, '2fa_setup_fail', 'kod'); throw new E('code', 'Zły kod 2FA', 400); } q('UPDATE users SET totp_step=? WHERE id=?').run(st, u.id); }
+    const secret = OCH.totpSecret(); q('UPDATE users SET totp_pending=? WHERE id=?').run(secret, u.id);
+    audit(u.id, ip, '2fa_setup');
+    return { secret, uri: OCH.totpUri(secret, u.username) };
+  },
+  'POST /api/admin/2fa/enable': async ({ user, body, ip }) => {
+    adminOnly(user); if (limited('adm:' + ip, 8, 5 * 60e3)) throw new E('rate', 'Za dużo prób – odczekaj chwilę', 429);
+    const u = fresh(user.id); if (!u.totp_pending) throw new E('code', 'Najpierw wygeneruj klucz 2FA', 400);
+    const st = OCH.totpCheck(u.totp_pending, body.code, 0); if (!st) throw new E('code', 'Zły kod 2FA', 400);
+    q('UPDATE users SET totp=totp_pending, totp_pending=NULL, totp_step=? WHERE id=?').run(st, u.id);
+    q('DELETE FROM admin_sessions WHERE user_id=?').run(u.id);
+    audit(u.id, ip, '2fa_on'); console.log(`[admin] ${u.username}: 2FA włączone`);
+    return { adminToken: newAdminSession(u.id, ip) };
+  },
+  'POST /api/admin/login': async ({ user, body, ip }) => {
+    adminOnly(user);
+    if (limited('adm:' + ip, 8, 5 * 60e3) || limited('admu:' + user.id, 10, 15 * 60e3)) throw new E('rate', 'Za dużo prób – odczekaj chwilę', 429);
+    const u = fresh(user.id); if (!u.totp) throw new E('no2fa', 'Najpierw włącz 2FA', 400);
+    const st = OCH.totpCheck(u.totp, body.code, u.totp_step);
+    if (!st) { audit(u.id, ip, 'admin_login_fail'); throw new E('code', 'Zły kod 2FA', 400); }
+    q('UPDATE users SET totp_step=? WHERE id=?').run(st, u.id);
+    audit(u.id, ip, 'admin_login');
+    return { adminToken: newAdminSession(u.id, ip) };
+  },
+  'POST /api/admin/logout': async ({ req }) => { const t = String(req.headers['x-admin-token'] || ''); if (t) q('DELETE FROM admin_sessions WHERE token=?').run(sha(t)); return { ok: true }; },
+  // wypłata czekająca na akceptację: approve=true wysyła ze skarbca, false oddaje środki na saldo gracza
+  'POST /api/admin/withdraw': async ({ user, body, req, ip }) => {
+    adminGate(user, req);
+    const w = q("SELECT * FROM withdrawals WHERE id=? AND state='review'").get(+body.id); if (!w) throw new E('wd', 'Nie ma takiej wypłaty do akceptacji', 404);
+    const ch = q("UPDATE withdrawals SET state=?, decided=?, decided_by=? WHERE id=? AND state='review'").run(body.approve ? 'sending' : 'rejected', Date.now(), user.id, w.id);
+    if (!ch.changes) throw new E('wd', 'Tę wypłatę ktoś już rozpatrzył', 409);   // dwa kliknięcia naraz nie wypłacą dwa razy
+    audit(user.id, ip, body.approve ? 'wd_approve' : 'wd_reject', `#${w.id} user=${w.user_id} $${w.usd} -> ${w.to_addr}`);
+    if (!body.approve) {
+      tx(() => { q('UPDATE users SET lamports=lamports+? WHERE id=?').run(w.lamports, w.user_id); q("UPDATE txs SET status='rejected', note=note||' · zwrot' WHERE id=?").run(w.tx_id); });
+      return { ok: true, state: 'rejected' };
+    }
+    q("UPDATE txs SET status='pending' WHERE id=?").run(w.tx_id);
+    const sig = await payout(w.tx_id, w.user_id, new PublicKey(w.to_addr), w.lamports);
+    q('UPDATE withdrawals SET state=? WHERE id=?').run(sig ? 'sent' : 'failed', w.id);
+    return { ok: !!sig, state: sig ? 'sent' : 'failed', url: sig ? explorer(sig) : '' };
+  },
+  'POST /api/admin/config': async ({ user, body, req, ip }) => {
+    adminGate(user, req); audit(user.id, ip, 'config', Object.keys(body || {}).join(','));
+    const put = cfgPut, out = {};
     if (body.businessEmail !== undefined) {
       const m = String(body.businessEmail ?? '').trim();
       if (m && (m.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(m))) throw new E('email', 'Nieprawidłowy adres e-mail');
@@ -311,13 +435,15 @@ const routes = {
     if (body.username != null && String(body.username).trim() !== u.username) {
       const n = String(body.username).trim();
       if (!/^[a-z0-9_]{3,16}$/i.test(n)) throw new E('user', 'Nazwa: 3–16 znaków (litery, cyfry, _)');
+      if (reserved(n) && n.toLowerCase() !== u.username.toLowerCase()) throw new E('reserved', RESERVED_MSG, 409);
       const other = q('SELECT id FROM users WHERE username=?').get(n); if (other && other.id !== u.id) throw new E('exists', 'Ta nazwa jest zajęta', 409);
       q('UPDATE users SET username=? WHERE id=?').run(n, u.id);
     }
     if (body.email != null) {
       const m = String(body.email).trim().toLowerCase();
       if (m && (m.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(m))) throw new E('email', 'Nieprawidłowy adres e-mail');
-      q('UPDATE users SET email=? WHERE id=?').run(m || null, u.id);
+      // zmiana istniejącego e-maila wstrzymuje wypłaty na SECURITY_HOLD_HOURS (pierwsze dopisanie e-maila nie)
+      if (m !== (u.email || '')) q('UPDATE users SET email=?, sec_changed=CASE WHEN ? THEN ? ELSE sec_changed END WHERE id=?').run(m || null, u.email ? 1 : 0, Date.now(), u.id);
     }
     if (body.avatar != null) {
       const a = String(body.avatar);
@@ -330,8 +456,9 @@ const routes = {
     need(user); if (limited('pw:' + ip, 8)) throw new E('rate', 'Za dużo prób – odczekaj minutę', 429);
     const u = fresh(user.id), np = String(body.newPassword || '');
     if (!(await checkPass(String(body.oldPassword || ''), u.pass))) throw new E('oldpass', 'Obecne hasło jest nieprawidłowe', 400);
-    if (np.length < 6 || np.length > 128) throw new E('pass', 'Nowe hasło: co najmniej 6 znaków');
-    q('UPDATE users SET pass=? WHERE id=?').run(await hashPass(np), u.id);
+    if (np.length < OCH.PASS_MIN || np.length > 128) throw new E('pass', NEWPASS_MSG);
+    q('UPDATE users SET pass=?, sec_changed=? WHERE id=?').run(await hashPass(np), Date.now(), u.id);
+    if (isAdmin(u)) audit(u.id, ip, 'password');
     const m = /^Bearer (.+)$/.exec(user._auth || ''); q('DELETE FROM sessions WHERE user_id=? AND token!=?').run(u.id, m ? sha(m[1]) : '');   // wyloguj inne urządzenia
     return { ok: true };
   },
@@ -340,8 +467,8 @@ const routes = {
     for (const k of STAT_KEYS) { const v = Math.floor(+body[k] || 0); if (v > 0 && v < 10000) st[k] = (st[k] || 0) + v; }
     q('UPDATE users SET stats=?, last_active=? WHERE id=?').run(JSON.stringify(st), Date.now(), u.id); return { ok: true };
   },
-  'GET /api/admin/overview': async ({ user }) => {
-    need(user); if (!ADMIN_USERS.has(user.username.toLowerCase())) throw new E('admin', 'Brak dostępu do panelu admina', 403);
+  'GET /api/admin/overview': async ({ user, req }) => {
+    adminGate(user, req);
     const accounts = q('SELECT * FROM users ORDER BY id').all().map(u => ({ id: String(u.id), ...publicUser(u), wallet: u.address, history: histOf(u.id, 40) }));
     const names = Object.fromEntries(accounts.map(a => [a.id, a.username]));
     const matches = q("SELECT * FROM matches WHERE state!='open' ORDER BY COALESCE(ended,t) DESC LIMIT 1000").all().map(m => ({ id: String(m.id), u: String(m.user_id), name: names[m.user_id],
@@ -350,7 +477,12 @@ const routes = {
     let tre = 0; try { tre = await conn.getBalance(TREASURY.publicKey); } catch {}
     const ledger = q('SELECT COALESCE(SUM(lamports),0) s FROM users').get().s;
     return { accounts, matches, price: PRICE, cluster: CLUSTER, treasury: { address: TREASURY.publicKey.toBase58(), lamports: tre, usd: toUsd(tre) },
-      ledger: { lamports: ledger, usd: toUsd(ledger) }, pendingSweep: q('SELECT COALESCE(SUM(lamports),0) s FROM deposits WHERE swept=0').get().s };
+      ledger: { lamports: ledger, usd: toUsd(ledger) }, pendingSweep: q('SELECT COALESCE(SUM(lamports),0) s FROM deposits WHERE swept=0').get().s,
+      // wypłaty do akceptacji i dziennik admina (logowania, 2FA, zmiany ustawień, decyzje o wypłatach)
+      withdrawals: q("SELECT w.*, u.username FROM withdrawals w JOIN users u ON u.id=w.user_id WHERE w.state='review' ORDER BY w.t").all()
+        .map(w => ({ id: w.id, name: w.username, u: String(w.user_id), to: w.to_addr, usd: w.usd, sol: w.lamports / LAMPORTS_PER_SOL, t: w.t })),
+      audit: q('SELECT a.t, a.ip, a.action, a.detail, u.username FROM audit a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT 50').all(),
+      limits: { dailyUsd: WD_DAILY_USD, reviewUsd: WD_REVIEW_USD } };
   },
 };
 
@@ -376,7 +508,7 @@ function coverOk(req) {
 }
 const coverTries = new Map();                                   // ip -> czasy prób (najwyżej 10 na minutę)
 async function coverLogin(req, res) {
-  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress, now = Date.now();
+  const ip = OCH.clientIp(req), now = Date.now();
   const t = (coverTries.get(ip) || []).filter(x => now - x < 60000); t.push(now); coverTries.set(ip, t);
   if (coverTries.size > 5000) coverTries.clear();
   if (t.length > 10) { res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }); return res.end('Za dużo prób'); }
@@ -391,19 +523,20 @@ function serveCover(res) {
   res.end(fs.readFileSync(new URL('./cover.html', import.meta.url)));
 }
 // ---------------- 1v1 z prawdziwymi graczami: kolejka, pokoje meczowe, przekazywanie ruchu (WebSocket /ws) ----------------
-// Gracz płaci stawkę (/api/match/start), łączy się z /ws?t=TOKEN i wysyła {t:'queue', matchId}. Serwer paruje dwóch różnych
+// Gracz płaci stawkę (/api/match/start), bierze bilet (POST /api/ws-ticket), łączy się z /ws?k=BILET i wysyła {t:'queue', matchId}. Serwer paruje dwóch różnych
 // graczy z tą samą stawką, losuje mapę, a potem przekazuje między nimi stan (ruch, strzały, trafienia). Rundy liczy serwer
 // (z meldunków 'dead' gracza, który zginął) i to on rozlicza stawki obu graczy po meczu. Wyjście z kolejki = zwrot stawki,
 // zerwanie połączenia w trakcie meczu = wygrana przeciwnika.
 const DUEL_MAPS = ['Oaza', 'Magazyn', 'Baza'];
 await MECZ.loadMaps(GAME_DIR, DUEL_MAPS);                       // kolizje map z plików gry (zrodla/*-data.js): serwer sam liczy ruch i strzały
 const rooms = new Set();
+// czy opłacony mecz właśnie czeka w kolejce albo trwa (wtedy rozlicza go wyłącznie serwer meczu)
+const duelActive = matchId => mmQueue.some(x => x.matchId === matchId) || [...rooms].some(r => !r.over && r.p.some(p => p.matchId === matchId));
 const nowS = () => performance.now() / 1000;
 const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 const mmQueue = [];                                             // czekający: {ws, user, matchId, stake, nick, skin}
 let roomSeq = 0;
 const wsSend = (ws, o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
-function userFromToken(tok) { return tok ? q('SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=?').get(sha(tok)) || null : null; }
 
 // anulowane szukanie: stawka wraca, a mecz i pobranie stawki znikają z historii (jakby gry nie było)
 function refundMatch(matchId, userId) {
@@ -509,7 +642,8 @@ setInterval(() => { for (const ws of wss.clients) { if (!ws.alive) { ws.terminat
 function onUpgrade(req, socket, head) {
   const url = new URL(req.url, 'http://x');
   if (url.pathname !== '/ws' || (COVER_PW && !coverOk(req))) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); return socket.destroy(); }
-  const user = userFromToken(url.searchParams.get('t'));
+  const uid = OCH.useTicket(url.searchParams.get('k'));           // jednorazowy bilet z POST /api/ws-ticket (nie token sesji)
+  const user = uid ? fresh(uid) : null;
   if (!user) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); return socket.destroy(); }
   wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req, user));
 }
@@ -530,7 +664,7 @@ const server = http.createServer(async (req, res) => {
   if (!h) return send(res, 404, { error: 'not_found', message: 'Nie ma takiej ścieżki' }, origin);
   try {
     const body = req.method === 'POST' ? await readBody(req) : {};
-    const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress;
+    const ip = OCH.clientIp(req);
     const user = userFromReq(req); if (user) user._auth = req.headers.authorization;
     send(res, 200, await h({ req, body, ip, user }), origin);
   } catch (e) {
@@ -539,9 +673,9 @@ const server = http.createServer(async (req, res) => {
   }
 });
 server.on('upgrade', onUpgrade);                              // WebSocket /ws: kolejka i mecze 1v1
-server.listen(PORT, () => {
-  console.log(`Portfele BEANLADEN: http://localhost:${PORT}  sieć: ${CLUSTER}  skarbiec: ${TREASURY.publicKey.toBase58()}`);
-  if (!ADMIN_USERS.size) console.log('Uwaga: brak ADMIN_USERS – panel admina nie wpuści nikogo.');
+server.listen(PORT, HOST, () => {
+  console.log(`Portfele BEANLADEN: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}  sieć: ${CLUSTER}  skarbiec: ${TREASURY.publicKey.toBase58()}`);
+  if (!ADMIN_SET.size) console.log('Uwaga: brak adminów (ADMIN_IDS albo istniejące konto z ADMIN_USERS) – panel admina nie wpuści nikogo.');
 });
 refreshPrice(); setInterval(refreshPrice, 60000);
 setInterval(scanAll, SCAN_MS); setTimeout(scanAll, 3000);
