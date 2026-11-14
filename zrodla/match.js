@@ -9,6 +9,9 @@
 // Tryb online (g.online() = true): szukanie trwa, aż serwer znajdzie drugiego gracza (match.found), wczytywanie czeka,
 // aż obaj są gotowi (match.oppGo), a wyjście przeciwnika kończy mecz walkowerem (match.oppLeft).
 
+import { loader } from './loader.js';
+import { MAP_IMG } from './lobby-ui.js';
+
 export const ROUNDS_TO_WIN = 3;
 const OPP_NAMES = ['Groszek', 'Bobek_PL', 'Fasolino', 'Cieciorka', 'Soczewica', 'Edamame', 'Pinto', 'Mung', 'Wielki Bób',
   'Fasolada', 'Strączek', 'Kidney', 'BeanSniper', 'ZiarnoX', 'Lima', 'Adzuki', 'Tyczny', 'Szparag'];
@@ -331,6 +334,10 @@ export function createMatch(g) {
       const rme = $('mt-rme'), rop = $('mt-rop'); rme.textContent = S.nick.toUpperCase(); rop.textContent = S.opp.toUpperCase(); rme.className = rop.className = '';
       setTitle('MAPA: ' + esc(S.mapName.toUpperCase()), true);
       oppReadyT = rand(.7, 1.5); curtainT = -1;
+      { const m = S.mapIdx >= 0 ? g.maps()[S.mapIdx] : null;       // ekran wczytywania (loader.js) z mapą w tle
+        loader.show({ title: 'MAPA: ' + S.mapName.toUpperCase(), sub: S.nick + '   VS   ' + S.opp,
+          bg: MAP_IMG[S.mapName] ? `url("${MAP_IMG[S.mapName]}")` : m && m.thumb ? `url("${m.thumb}")` : mapFallback(S.mapName), label: 'WCZYTYWANIE GRACZY' });
+        ldOn = true; }
     },
     intro() {
       frozen = true; mm.hidden = true; g.resetRound();
@@ -413,14 +420,14 @@ export function createMatch(g) {
     },
     load() {
       const M = S.mapIdx >= 0 ? g.maps()[S.mapIdx] : null, mready = !M || M.ready || g.mapsSettled();   // mapa z lobby mogła się jeszcze nie wczytać
-      const p = Math.min(mready ? 1 : .9, t / 1.6); $('mt-bar').style.width = (p * 100).toFixed(1) + '%';
+      const p = Math.min(mready ? 1 : .9, t / 1.6); $('mt-bar').style.width = (p * 100).toFixed(1) + '%'; if (ldOn) loader.set(p * .96, mready ? null : 'WCZYTYWANIE MAPY');
       if (t >= .45 && mready) { $('mt-rme').className = 'ok'; if (online() && !sentReady) { sentReady = true; if (g.localReady) g.localReady(); } }
-      if (online()) { if (oppGo) $('mt-rop').className = 'ok'; else { if (mready) t = Math.min(t, 1.55); return; } }
+      if (online()) { if (oppGo) $('mt-rop').className = 'ok'; else { if (mready) { t = Math.min(t, 1.55); if (ldOn) loader.set(.96, 'CZEKANIE NA PRZECIWNIKA'); } return; } }
       else if (t >= oppReadyT) $('mt-rop').className = 'ok';
       if (!mready) { t = Math.min(t, 1.5); return; }
-      if (t >= Math.max(.45, online() ? 0 : oppReadyT) && t >= 1.6 && !$('mt-lbl').classList.contains('ok')) { $('mt-lbl').textContent = 'OBAJ GRACZE GOTOWI'; $('mt-lbl').classList.add('ok'); }
+      if (t >= Math.max(.45, online() ? 0 : oppReadyT) && t >= 1.6 && !$('mt-lbl').classList.contains('ok')) { $('mt-lbl').textContent = 'OBAJ GRACZE GOTOWI'; $('mt-lbl').classList.add('ok'); if (ldOn) loader.set(1, 'OBAJ GRACZE GOTOWI'); }
       if (t >= 1.9 && curtainT < 0) { curtainT = 0; curtain.classList.add('on'); }
-      if (curtainT >= 0) { curtainT += DT; if (curtainT >= .4) { g.enterGame(S.mapIdx); go('intro'); curtain.classList.remove('on'); } }
+      if (curtainT >= 0) { curtainT += DT; if (curtainT >= .4) { g.enterGame(S.mapIdx); if (ldOn) { ldOn = false; loader.hide(); } go('intro'); curtain.classList.remove('on'); } }
     },
     intro() { if (t >= 4.4) go('count'); },
     count() {
@@ -440,7 +447,7 @@ export function createMatch(g) {
       }
     },
   };
-  let DT = 0, hold = false;
+  let DT = 0, hold = false, ldOn = false;
 
   function update(dt, paused) {
     if (phase === 'idle') return;
@@ -453,6 +460,7 @@ export function createMatch(g) {
   function hideAll() {
     mm.hidden = true; hideStrip(); hud.classList.remove('on'); dim.classList.remove('on'); count.classList.remove('on');
     curtain.classList.remove('on'); root.classList.remove('needclick'); document.body.classList.remove('mt-on');
+    if (ldOn) { ldOn = false; loader.hide(); }
   }
   function abort() { phase = 'idle'; frozen = false; roul = null; hideAll(); }
   const cancelable = () => online() ? phase === 'search' : CANCELABLE.has(phase) && !S.stake;   // online: tylko szukanie (serwer zwraca stawkę)
