@@ -1,5 +1,5 @@
 // Panel admina Fasolki: przegląd graczy, ich statystyki, liczby ogólne (gracze, mecze, stawki, wygrane, prowizja 10%),
-// wykresy aktywności, ostatnie mecze i ustawienie mapy lobby dla wszystkich.
+// wykresy aktywności, ostatnie mecze, ustawienie mapy lobby dla wszystkich i antycheat (mecze do sprawdzenia, powtórki, blokady).
 // Otwierany osobnym linkiem (adres gry z #admin na końcu) albo skrótem Ctrl+Shift+A w lobby – nie ma go w menu.
 // Dostęp ma tylko właściciel artefaktu. Dane: baza artefaktu (accounts/*, matches/*, config/lobby);
 // poza claude.ai – konta z pamięci tej przeglądarki (tryb lokalny).
@@ -145,6 +145,35 @@ const CSS = `
 #fa-admin .fa-gh input:focus{border-color:var(--acc)}
 #fa-kreator{position:fixed;inset:0;z-index:300;background:#1b1e25}
 #fa-kreator iframe{width:100%;height:100%;border:0;display:block}
+#fa-admin .fa-ac-room{border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px;background:rgba(255,255,255,.02)}
+#fa-admin .fa-ac-room.held{border-color:rgba(255,198,41,.55);background:rgba(255,198,41,.05)}
+#fa-admin .fa-ac-h{display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:var(--mut);font-size:13px}
+#fa-admin .fa-ac-h b{color:var(--tx)}
+#fa-admin .fa-ac-hold{margin-top:6px;font-size:13px;color:#ffd38a}
+#fa-admin .fa-ac-pl{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+#fa-admin .fa-ac-p{border-radius:12px;padding:10px 12px;background:rgba(0,0,0,.22);border-left:3px solid #4da3ff;min-width:0}
+#fa-admin .fa-ac-p.s1{border-left-color:#ff7ab6}
+#fa-admin .fa-ac-p h5{margin:0 0 4px;font:700 15px/1.3 Inter,sans-serif;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#fa-admin .fa-ac-p .mut{font-size:12px}
+#fa-admin .fa-risk{font:700 11px/1 Inter,sans-serif;padding:4px 7px;border-radius:6px;white-space:nowrap}
+#fa-admin .fa-risk.r0{background:rgba(52,210,127,.15);color:var(--ok)}#fa-admin .fa-risk.r1{background:rgba(255,198,41,.16);color:var(--acc)}#fa-admin .fa-risk.r2{background:rgba(255,122,107,.18);color:var(--bad)}
+#fa-admin .fa-flags{list-style:none;margin:6px 0 0;padding:0;font-size:12.5px}
+#fa-admin .fa-flags li{display:flex;gap:8px;padding:2px 0}#fa-admin .fa-flags li span:first-child{min-width:36px;flex:none;color:var(--mut);font-variant-numeric:tabular-nums}
+#fa-admin .fa-btn.sm{height:30px;padding:0 10px;font-size:12.5px}
+#fa-admin .fa-btn.bad{border-color:rgba(255,122,107,.5);color:var(--bad)}
+#fa-admin .fa-chk{display:inline-flex;gap:6px;align-items:center;color:var(--mut);font-size:12.5px;cursor:pointer}#fa-admin .fa-chk input{accent-color:#ffc629}
+#fa-admin .fa-rp{position:fixed;inset:0;z-index:3;display:flex;padding:16px;background:rgba(3,6,14,.8);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+#fa-admin .fa-rp>div{margin:auto;width:min(1300px,100%);height:min(860px,100%);display:grid;grid-template-columns:1fr 320px;grid-template-rows:auto 1fr auto;background:#0e1422;border:1px solid var(--line2);border-radius:16px;overflow:hidden}
+#fa-admin .fa-rp-top{grid-column:1/-1;display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line)}
+#fa-admin .fa-rp-top b{font-weight:700}
+#fa-admin .fa-rp-cv{position:relative;min-height:260px;background:#151b28}#fa-admin .fa-rp-cv canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#fa-admin .fa-rp-side{border-left:1px solid var(--line);padding:12px;overflow:auto;font-size:13px}
+#fa-admin .fa-kv{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px solid var(--line);font-size:12.5px}#fa-admin .fa-kv b{font-weight:600;font-variant-numeric:tabular-nums}
+#fa-admin .fa-rp-bar{grid-column:1/-1;display:flex;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid var(--line)}
+#fa-admin .fa-rp-bar input[type=range]{flex:1;accent-color:#ffc629}
+#fa-admin .fa-rp-bar select{height:34px;border-radius:9px;border:1px solid var(--line2);background:rgba(0,0,0,.3);color:var(--tx);padding:0 8px}
+#fa-admin .fa-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+@media (max-width:900px){#fa-admin .fa-ac-pl{grid-template-columns:1fr}#fa-admin .fa-rp>div{grid-template-columns:1fr;grid-template-rows:auto 1fr auto auto}#fa-admin .fa-rp-side{border-left:0;border-top:1px solid var(--line);max-height:220px}}
 `;
 
 const STAT0 = { matches: 0, wins: 0, losses: 0, staked: 0, won: 0, fees: 0, deposits: 0, withdrawn: 0, shots: 0, hits: 0, heads: 0, kills: 0, deaths: 0, lastActive: 0 };
@@ -190,7 +219,8 @@ export async function openAdmin({ onClose } = {}) {
   root = document.createElement('div'); root.id = 'fa-admin'; root.setAttribute('role', 'dialog'); root.setAttribute('aria-label', 'Panel admina');
   document.body.appendChild(root);
   const close = () => { cleanup.forEach(f => { try { f(); } catch {} }); cleanup = []; root.remove(); root = null; if (onClose) onClose(); };
-  const onKey = e => { if (e.key !== 'Escape' || !root) return; const d = root.querySelector('.fa-drw'); if (d && !d.hidden) d.hidden = true; else close(); };
+  const onKey = e => { if (e.key !== 'Escape' || !root) return; const rp = root.querySelector('.fa-rp'), d = root.querySelector('.fa-drw');
+    if (rp && !rp.hidden) rp.querySelector('[data-rpx]').click(); else if (d && !d.hidden) d.hidden = true; else close(); };
   addEventListener('keydown', onKey); cleanup.push(() => removeEventListener('keydown', onKey));
   root.innerHTML = `<div class="fa-wrap"><div class="fa-head"><div class="fa-brand"><b>BEAN<i>LADEN</i></b><span>Panel admina</span></div><div class="fa-sp"></div>
     <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div><p class="fa-empty">Ładowanie danych…</p></div>`;
@@ -253,6 +283,138 @@ async function unlockAdmin(deny, close) {
       async d => { const j = await srvPost('/api/admin/login', { username: d.get('u'), password: d.get('p'), code: d.get('c') }); j.setup ? setupKey(j) : ok(j); });
   });
 }
+// ---------- antycheat: mecze do sprawdzenia (wstrzymane wypłaty, podejrzane mecze), decyzje, blokady i powtórki ----------
+const AC_STATE = { won: 'wygrał', lost: 'przegrał', held: 'wygrał – wypłata czeka', open: 'w grze' };
+const acRisk = r => r == null ? 'r0' : r >= 0.5 ? 'r2' : r >= 0.25 ? 'r1' : 'r0';
+const acPct = v => v == null ? '—' : Math.round(v * 100) + '%';
+async function srvGet(p) {
+  const r = await fetch(SRV + p, { headers: AH() }); const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(j.message || 'Błąd serwera'); e.code = j.error; throw e; } return j;
+}
+function mountAnticheat($) {
+  const box = $('fa-ac'), all = $('fa-ac-all'), rp = mountReplay($);
+  let data = null, last = '';
+  const pull = async () => {
+    try { const j = await srvGet('/api/admin/review' + (all.checked ? '?all=1' : '')), t = JSON.stringify(j); if (t === last) return; last = t; data = j; render(); }
+    catch (e) { if (e.code === 'admin2fa') return relockAdmin(); box.innerHTML = `<p class="fa-empty">${esc(e.message)}</p>`; }
+  };
+  function render() {
+    $('fa-ac-sum').textContent = `${data.held} ${pl(data.held, 'czeka', 'czekają', 'czeka')} na decyzję · ryzyko od ${Math.round(data.holdRisk * 100)}% albo stawka od ${usd(data.reviewStake)}`;
+    if (!data.rooms.length) { box.innerHTML = `<p class="fa-empty">Nic do sprawdzenia.${all.checked ? '' : ' Zaznacz „wszystkie mecze”, żeby zobaczyć ostatnie mecze.'}</p>`; return; }
+    box.innerHTML = data.rooms.map(r => {
+      const held = r.players.some(p => p.state === 'held');
+      const pls = r.players.map((p, i) => `<div class="fa-ac-p s${i}">
+        <h5>${esc(p.name)}<span class="fa-risk ${acRisk(p.risk)}">ryzyko ${acPct(p.risk)}</span><span class="mut">${esc(AC_STATE[p.state] || p.state)}${p.payout ? ' · ' + usd(p.payout) : ''}</span>
+          ${p.banned ? `<span class="fa-risk r2" title="${esc(p.banReason)}">ZABLOKOWANY</span>` : ''}</h5>
+        <div class="mut">podejrzenie konta ${acPct(p.suspicion)} · ${fmtInt(p.matches)} ${pl(p.matches, 'mecz', 'mecze', 'meczów')}${p.linked.length ? ' · powiązane: ' + p.linked.map(l => esc(l.name) + (l.banned ? ' (zablok.)' : '') + ' [' + esc(String(l.kinds).replace('dev', 'urządzenie').replace('wd', 'adres wypłat')) + ']').join(', ') : ''}</div>
+        ${p.flags.length ? `<ul class="fa-flags">${p.flags.map(f => `<li><span>${Math.round(f.score * 100)}%</span><span>${esc(f.text)}</span></li>`).join('')}</ul>` : '<div class="mut" style="margin-top:6px">brak sygnałów</div>'}
+        <div class="fa-row" style="margin-top:8px"><button class="fa-btn sm${p.banned ? '' : ' bad'}" type="button" data-ban="${esc(p.name)}" data-on="${p.banned ? 0 : 1}">${p.banned ? 'Odblokuj konto' : 'Zablokuj konto'}</button></div>
+      </div>`).join('');
+      return `<div class="fa-ac-room${held ? ' held' : ''}">
+        <div class="fa-ac-h"><b>${esc(r.map || '?')}</b><span>${r.t ? new Date(r.t).toLocaleString('pl-PL') : ''}</span><span>stawka <b>${usd(+r.stake || 0)}</b></span><span>wynik <b>${esc(r.score || '—')}</b></span>
+          ${r.review ? `<span class="fa-tag ${r.review === 'rejected' ? 'l' : r.review === 'approved' ? 'w' : 'f'}">${({ held: 'CZEKA', approved: 'WYPŁACONE', rejected: 'ODRZUCONE' })[r.review] || esc(r.review)}</span>` : ''}
+          <span class="fa-sp"></span>${r.replay ? `<button class="fa-btn sm" type="button" data-rp="${esc(r.room)}">Powtórka</button>` : '<span class="mut">bez powtórki</span>'}
+          ${held ? `<button class="fa-btn sm pri" type="button" data-dec="approve" data-room="${esc(r.room)}">Wypłać</button><button class="fa-btn sm bad" type="button" data-dec="reject" data-room="${esc(r.room)}">Odrzuć i zablokuj</button>` : ''}</div>
+        ${r.hold ? `<div class="fa-ac-hold">Wstrzymane: ${esc(r.hold)}</div>` : ''}
+        <div class="fa-ac-pl">${pls}</div></div>`;
+    }).join('');
+  }
+  box.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.rp) return rp.open(b.dataset.rp);
+    try {
+      if (b.dataset.dec) {
+        const r = data.rooms.find(x => x.room === b.dataset.room), w = r && r.players.find(p => p.state === 'held'), l = r && r.players.find(p => p.state !== 'held');
+        if (!confirm(b.dataset.dec === 'approve' ? `Wypłacić wygraną graczowi ${w ? w.name : ''}?`
+          : `Odrzucić wygraną gracza ${w ? w.name : ''}? Pula trafi do ${l ? l.name : 'przeciwnika'}, a ${w ? w.name : 'zwycięzca'} dostanie blokadę konta.`)) return;
+        b.disabled = true; await srvPost('/api/admin/decide', { room: b.dataset.room, decision: b.dataset.dec });
+      } else if (b.dataset.ban) {
+        const on = b.dataset.on === '1'; let reason = '';
+        if (on) { reason = prompt(`Powód blokady konta ${b.dataset.ban}:`, 'oszukiwanie'); if (reason === null) return; } else if (!confirm(`Odblokować konto ${b.dataset.ban}?`)) return;
+        b.disabled = true; await srvPost('/api/admin/ban', { username: b.dataset.ban, banned: on, reason });
+      } else return;
+    } catch (er) { if (er.code === 'admin2fa') return relockAdmin(); alert(er.message); b.disabled = false; return; }
+    last = ''; pull();
+  });
+  all.addEventListener('change', () => { last = ''; pull(); });
+  pull(); const iv = setInterval(pull, 15000); cleanup.push(() => clearInterval(iv));
+}
+// powtórka z góry mapy: bryły (ciemniejsze = wyższe), gracze z kierunkiem kamery i śladem, strzały z ostatnich 0,35 s
+function mountReplay($) {
+  const ov = $('fa-rp'), cv = $('fa-rp-cv'), ctx = cv.getContext('2d'), tl = $('fa-rp-tl'), play = $('fa-rp-play');
+  const C = { floor: '#151b28', b1: '#2a3244', b2: '#3d465c', b3: '#5a6580', p: ['#4da3ff', '#ff7ab6'], hit: '#ff7a6b', tx: '#eef1f7' };
+  let R = null, T = 0, playing = false, lastNow = 0, view = null;
+  const stop = () => { playing = false; play.textContent = '▶'; };
+  ov.querySelector('[data-rpx]').addEventListener('click', () => { ov.hidden = true; stop(); });
+  ov.addEventListener('click', e => { if (e.target === ov) { ov.hidden = true; stop(); } });
+  play.addEventListener('click', () => { if (!R) return; if (T >= R.t1) T = R.t0; playing = !playing; play.textContent = playing ? '❚❚' : '▶'; lastNow = performance.now(); if (playing) requestAnimationFrame(loop); });
+  tl.addEventListener('input', () => { if (!R) return; T = R.t0 + (tl.value / 1000) * (R.t1 - R.t0); draw(); });
+  const onResize = () => { if (!ov.hidden) { resize(); draw(); } }; addEventListener('resize', onResize); cleanup.push(() => removeEventListener('resize', onResize));
+  function loop(now) { if (!playing || !R || ov.hidden) return; T += (now - lastNow) / 1000 * +$('fa-rp-spd').value; lastNow = now; if (T >= R.t1) { T = R.t1; stop(); } draw(); if (playing) requestAnimationFrame(loop); }
+  function resize() { const r = cv.parentElement.getBoundingClientRect(), d = devicePixelRatio || 1; cv.width = Math.max(10, r.width * d); cv.height = Math.max(10, r.height * d); }
+  function at(rows, t) {                                            // stan gracza w chwili t (interpolacja między paczkami ruchu)
+    if (!rows.length) return null; let lo = 0, hi = rows.length - 1; if (t <= rows[0][0]) return rows[0]; if (t >= rows[hi][0]) return rows[hi];
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (rows[m][0] <= t) lo = m; else hi = m; }
+    const a = rows[lo], b = rows[hi]; if (b[0] - a[0] > 0.5) return a; const k = (t - a[0]) / Math.max(1e-6, b[0] - a[0]);
+    const dy = Math.atan2(Math.sin(b[5] - a[5]), Math.cos(b[5] - a[5]));
+    return [t, a[1], a[2] + (b[2] - a[2]) * k, a[3] + (b[3] - a[3]) * k, a[4] + (b[4] - a[4]) * k, a[5] + dy * k, a[6], a[7]];
+  }
+  function draw() {
+    const W = cv.width, H = cv.height, d = devicePixelRatio || 1;
+    ctx.fillStyle = C.floor; ctx.fillRect(0, 0, W, H); if (!R || !view) return;
+    const pad = 20 * d, s = Math.min((W - pad * 2) / (view.x1 - view.x0 || 1), (H - pad * 2) / (view.z1 - view.z0 || 1));
+    const ox = (W - (view.x1 - view.x0) * s) / 2, oz = (H - (view.z1 - view.z0) * s) / 2, X = x => ox + (x - view.x0) * s, Z = z => oz + (z - view.z0) * s;
+    for (const b of R.boxes) { if (b[4] < 0.08) continue; ctx.fillStyle = b[4] < 0.7 ? C.b1 : b[4] < 1.8 ? C.b2 : C.b3; ctx.fillRect(X(b[0]), Z(b[2]), (b[3] - b[0]) * s, (b[5] - b[2]) * s); }
+    for (const sh of R.rec.sh) { const age = T - sh[0]; if (age < 0 || age > 0.35) continue;
+      ctx.globalAlpha = 1 - age / 0.35; ctx.strokeStyle = sh[4] ? C.hit : C.p[sh[1]]; ctx.lineWidth = (sh[4] === 2 ? 3 : 1.4) * d;
+      ctx.beginPath(); ctx.moveTo(X(sh[2][0]), Z(sh[2][2])); ctx.lineTo(X(sh[3][0]), Z(sh[3][2])); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    for (const seat of [0, 1]) {
+      const rows = R.byS[seat], p = at(rows, T); if (!p) continue;
+      ctx.strokeStyle = C.p[seat]; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.5 * d; ctx.beginPath(); let first = true;
+      for (const r of rows) { if (r[0] < T - 3 || r[0] > T) continue; if (first) { ctx.moveTo(X(r[2]), Z(r[4])); first = false; } else ctx.lineTo(X(r[2]), Z(r[4])); }
+      ctx.stroke(); ctx.globalAlpha = 1;
+      const px = X(p[2]), pz = Z(p[4]), L = 3.2 * s;
+      ctx.lineWidth = 2 * d; ctx.beginPath(); ctx.moveTo(px, pz); ctx.lineTo(px - Math.sin(p[5]) * L, pz - Math.cos(p[5]) * L); ctx.stroke();
+      ctx.fillStyle = C.p[seat]; ctx.beginPath(); ctx.arc(px, pz, Math.max(4 * d, 0.32 * s), 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C.tx; ctx.font = `600 ${12 * d}px Inter,system-ui,sans-serif`; ctx.fillText(`${R.players[seat].nick}  ↕${p[3].toFixed(1)} m`, px + 8 * d, pz - 8 * d);
+    }
+    const rd = R.rec.rd.filter(r => r[0] <= T).length;
+    $('fa-rp-tt').textContent = (T - R.t0).toFixed(1).replace('.', ',') + ' s · runda ' + Math.min(rd + 1, R.rec.rd.length + 1);
+    tl.value = Math.round((T - R.t0) / Math.max(1e-6, R.t1 - R.t0) * 1000);
+  }
+  async function open(room) {
+    ov.hidden = false; stop(); R = null; view = null; $('fa-rp-title').textContent = 'Wczytuję powtórkę…'; $('fa-rp-info').textContent = ''; $('fa-rp-side').innerHTML = ''; resize(); draw();
+    try { R = await srvGet('/api/admin/replay?room=' + encodeURIComponent(room)); }
+    catch (e) { if (e.code === 'admin2fa') return relockAdmin(); $('fa-rp-title').textContent = e.message; return; }
+    const st = R.rec.st; R.byS = [[], []]; for (const row of st) R.byS[row[1]].push(row);
+    R.t0 = st.length ? st[0][0] : 0; R.t1 = Math.max(R.t0 + 0.1, st.length ? st[st.length - 1][0] : 0, R.rec.sh.length ? R.rec.sh[R.rec.sh.length - 1][0] : 0); T = R.t0;
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const b of R.boxes || []) { x0 = Math.min(x0, b[0]); x1 = Math.max(x1, b[3]); z0 = Math.min(z0, b[2]); z1 = Math.max(z1, b[5]); }
+    for (const row of st) { x0 = Math.min(x0, row[2]); x1 = Math.max(x1, row[2]); z0 = Math.min(z0, row[4]); z1 = Math.max(z1, row[4]); }
+    view = { x0, x1, z0, z1 }; R.boxes = (R.boxes || []).slice().sort((a, b) => a[4] - b[4]);
+    $('fa-rp-title').textContent = `${R.map} · ${R.players.map(p => p.nick).join(' vs ')} · ${R.score.join(':')}`;
+    $('fa-rp-info').textContent = `stawka ${usd(R.stake)} · ${({ score: 'koniec po rundach', left: 'walkower', cheat: 'wyrzucony za ruch' })[R.reason] || R.reason}`;
+    $('fa-rp-lg0').textContent = R.players[0].nick; $('fa-rp-lg1').textContent = R.players[1].nick;
+    const kv = (k, v) => `<div class="fa-kv"><span class="mut">${k}</span><b>${v}</b></div>`;
+    $('fa-rp-side').innerHTML = R.players.map((p, i) => { const s = R.stats[i] || {}, m = p.summary || {};
+      return `<h4 style="color:${C.p[i]};margin-top:${i ? 18 : 0}px">${esc(p.nick)} – ryzyko ${acPct(p.risk)}</h4>
+        ${kv('celność', `${acPct(m.acc)} (${m.hits || 0}/${m.shots || 0})`)}${kv('w głowę (cała sylwetka widoczna)', acPct(m.hsOpen))}
+        ${kv('mediana reakcji', m.reaction != null ? Math.round(m.reaction * 1000) + ' ms' : '—')}${kv('śledzenie celu', s.track && s.track.n ? acPct(s.track.on / s.track.n) : '—')}
+        ${kv('strzały z celownikiem na celu', s.shotsSeen ? acPct(s.shotsOn / s.shotsSeen) : '—')}${kv('snapy / silent aim', `${m.snaps || 0} / ${(m.mismatch || 0) + (m.spikes || 0)}`)}
+        ${kv('przerwy w paczkach', m.gaps || 0)}${kv('ping', Math.round((m.rtt || 0) * 1000) + ' ms')}
+        ${p.flags.length ? `<ul class="fa-flags">${p.flags.map(f => `<li><span>${Math.round(f.score * 100)}%</span><span>${esc(f.text)}</span></li>`).join('')}</ul>` : '<p class="mut" style="margin:6px 0 0">brak sygnałów</p>'}`; }).join('') +
+      `<h4>Rundy</h4><p class="mut" style="margin:0">${R.rec.rd.map(r => `${(r[0] - R.t0).toFixed(1).replace('.', ',')} s: ${esc(R.players[r[1]].nick)}`).join('<br>') || '—'}</p>
+       <h4>Jak czytać</h4><p class="mut" style="margin:0">Kółko = gracz, kreska = kierunek kamery, cienkie linie = strzały (czerwone = trafienie, grubsze = w głowę). Ciemniejsze bryły są wyższe.
+       Na wolnym tempie widać, czy celownik „przykleja się” do przeciwnika albo skacze na niego zza ściany. Spacja = start/pauza, strzałki = ±0,1 s.</p>`;
+    resize(); draw();
+  }
+  const onKey = e => { if (ov.hidden || !R) return; if (e.key === ' ') { e.preventDefault(); play.click(); }
+    if (e.key === 'ArrowRight') { T = Math.min(R.t1, T + 0.1); draw(); } if (e.key === 'ArrowLeft') { T = Math.max(R.t0, T - 0.1); draw(); } };
+  addEventListener('keydown', onKey); cleanup.push(() => removeEventListener('keydown', onKey));
+  return { open };
+}
+
 // sesja admina wygasła w trakcie pracy: panel od nowa (prośba o kod)
 function relockAdmin() { admTok.set(''); cleanup.forEach(f => { try { f(); } catch {} }); cleanup = []; if (root) root.remove(); root = null; openAdmin(lastOpts); }
 
@@ -266,7 +428,11 @@ function buildDashboard(db, close) {
     ${SRV ? `<section class="fa-grid2">
       <div class="fa-card"><div class="fa-ch"><h3>Wypłaty do akceptacji</h3><small id="fa-wd-sum"></small></div><ul class="fa-list" id="fa-wd"><li class="fa-empty">Ładowanie…</li></ul></div>
       <div class="fa-card"><div class="fa-ch"><h3>Dziennik admina</h3><small>ostatnie 50 zdarzeń</small></div><ul class="fa-list" id="fa-audit" style="max-height:320px;overflow:auto"></ul></div>
-    </section>` : ''}
+    </section>
+    <section class="fa-card"><div class="fa-ch"><h3>Antycheat – mecze do sprawdzenia</h3><small id="fa-ac-sum"></small><label class="fa-chk"><input type="checkbox" id="fa-ac-all"> wszystkie mecze</label></div>
+      <p class="fa-msg" style="margin:0 0 12px">Wygrana czeka tutaj, gdy serwer ocenił ryzyko oszustwa zwycięzcy wysoko, konto jest pod obserwacją, ta sama para gra ze sobą za często,
+        konta są powiązane albo stawka jest wysoka. <b>Wypłać</b> = pieniądze trafiają do zwycięzcy. <b>Odrzuć i zablokuj</b> = pula przechodzi na przeciwnika, a oszust traci grę o stawki i wypłaty.</p>
+      <div id="fa-ac"><p class="fa-empty">Ładowanie…</p></div></section>` : ''}
     <section class="fa-grid2">
       <div class="fa-card"><div class="fa-ch"><h3>Mecze dziennie</h3><small id="fa-ch-m-sum">ostatnie 14 dni</small></div><div class="fa-chart" id="fa-ch-m"></div></div>
       <div class="fa-card"><div class="fa-ch"><h3>Prowizja dziennie</h3><small id="fa-ch-f-sum">USD (płatne w SOL) · ostatnie 14 dni</small></div><div class="fa-chart" id="fa-ch-f"></div></div>
@@ -297,7 +463,17 @@ function buildDashboard(db, close) {
       </details>
     </section>
   </div>
-  <div class="fa-drw" id="fa-drw" hidden><div id="fa-drw-in" role="dialog" aria-label="Szczegóły gracza"></div></div>`;
+  <div class="fa-drw" id="fa-drw" hidden><div id="fa-drw-in" role="dialog" aria-label="Szczegóły gracza"></div></div>
+  ${SRV ? `<div class="fa-rp" id="fa-rp" hidden><div role="dialog" aria-label="Powtórka meczu">
+    <div class="fa-rp-top"><b id="fa-rp-title">Powtórka</b><span class="mut" id="fa-rp-info"></span><span class="fa-sp"></span>
+      <span class="mut"><i class="fa-dot" style="background:#4da3ff"></i><span id="fa-rp-lg0"></span></span><span class="mut"><i class="fa-dot" style="background:#ff7ab6"></i><span id="fa-rp-lg1"></span></span>
+      <span class="mut">— strzał</span><span style="color:var(--bad)">— trafienie</span><button class="fa-btn sm" type="button" data-rpx>Zamknij</button></div>
+    <div class="fa-rp-cv"><canvas id="fa-rp-cv"></canvas></div>
+    <div class="fa-rp-side" id="fa-rp-side"></div>
+    <div class="fa-rp-bar"><button class="fa-btn sm" type="button" id="fa-rp-play" aria-label="Odtwórz">▶</button>
+      <select id="fa-rp-spd" aria-label="Tempo"><option value="0.25">0,25×</option><option value="0.5">0,5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+      <input type="range" id="fa-rp-tl" min="0" max="1000" value="0" step="1" aria-label="Czas meczu"><span class="mut" id="fa-rp-tt" style="min-width:110px;text-align:right">0,0 s</span></div>
+  </div></div>` : ''}`;
   const $ = id => root.querySelector('#' + id);
   root.querySelector('[data-close]').addEventListener('click', close);
   const live = $('fa-live'), note = $('fa-note');
@@ -320,7 +496,8 @@ function buildDashboard(db, close) {
     // wypłaty powyżej progu czekają tutaj; dziennik: logowania, 2FA, zmiany ustawień, decyzje o wypłatach
     const AUD = { admin_login: 'Logowanie do panelu', admin_login_fail: 'Nieudane logowanie do panelu', admin_add: 'Nowe konto admina (serwer)', admin_password: 'Nowe hasło admina (serwer)',
       admin_2fa_reset: 'Reset 2FA (serwer)', admin_delete: 'Usunięte konto admina (serwer)', '2fa_setup': 'Pierwsze logowanie – klucz 2FA', '2fa_on': 'Włączenie 2FA', config: 'Zmiana ustawień',
-      wd_approve: 'Wypłata zaakceptowana', wd_reject: 'Wypłata odrzucona' };
+      wd_approve: 'Wypłata zaakceptowana', wd_reject: 'Wypłata odrzucona', match_approve: 'Antycheat: wygrana wypłacona', match_reject: 'Antycheat: wygrana odrzucona',
+      ban: 'Blokada konta gracza', unban: 'Odblokowanie konta gracza' };
     const renderSrv = () => {
       if (!srv || !$('fa-wd')) return;
       const wd = srv.withdrawals || [], lim = srv.limits || {};
@@ -340,6 +517,7 @@ function buildDashboard(db, close) {
       pull();
     });
     $('fa-lock').addEventListener('click', async () => { try { await srvPost('/api/admin/logout'); } catch {} admTok.set(''); close(); });
+    mountAnticheat($);
   } else if (db) {
     const timer = setTimeout(() => { if (!gotA) { note.hidden = false; note.textContent = 'Baza danych jeszcze nie odpowiada – dane mogą być niepełne.'; } }, 10000);
     cleanup.push(() => clearTimeout(timer));
@@ -603,7 +781,7 @@ function buildDashboard(db, close) {
     // ostatnie mecze
     const rc = matches.slice(0, 25);
     $('fa-rc-sum').textContent = matches.length ? `${fmtInt(matches.length)} w zapisie` : '';
-    $('fa-recent').innerHTML = rc.length ? rc.map(m => `<li><div><b>${esc(m.name || m.u)}${m.forfeit ? '<span class="fa-tag f">PODDANY</span>' : m.won ? '<span class="fa-tag w">WYGRANA</span>' : '<span class="fa-tag l">PRZEGRANA</span>'}</b>
+    $('fa-recent').innerHTML = rc.length ? rc.map(m => `<li><div><b>${esc(m.name || m.u)}${m.held ? '<span class="fa-tag f">CZEKA NA ADMINA</span>' : m.forfeit ? '<span class="fa-tag f">PODDANY</span>' : m.won ? '<span class="fa-tag w">WYGRANA</span>' : '<span class="fa-tag l">PRZEGRANA</span>'}</b>
       <small>${new Date(m.t).toLocaleString('pl-PL')}${m.map ? ' · ' + esc(m.map) : ''} · stawka ${usd(m.stake || 0)}</small></div>
       <span class="r">${m.won ? `<span class="pos">+${fmtMoney(m.payout || 0)}</span><small>prowizja ${fmtMoney(m.fee || 0)}</small>` : `<span class="neg">−${fmtMoney(m.stake || 0)}</span>`}</span></li>`).join('')
       : `<li class="fa-empty">${gotM ? 'Brak zapisanych meczów. Mecze o stawkę zapisują się od tej wersji gry.' : 'Ładowanie…'}</li>`;

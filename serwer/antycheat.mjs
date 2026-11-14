@@ -2,7 +2,7 @@
 // Wejście: statystyki gracza z serwera meczu (mecz.mjs → playerStats). Wyjście: ryzyko 0..1 i lista sygnałów z opisem dla admina.
 //
 // Zasada: jeden sygnał rzadko przesądza, bo ludzie też miewają świetne mecze. Ryzyko łączy sygnały (1 − Π(1 − s)).
-// Wysokie ryzyko nie banuje automatycznie: wstrzymuje wypłatę do decyzji admina, który ogląda powtórkę meczu (admin-mecze.html).
+// Wysokie ryzyko nie banuje automatycznie: wstrzymuje wypłatę do decyzji admina, który ogląda powtórkę meczu (panel admina w grze, sekcja Antycheat).
 // Progi są ustawione ostrożnie: dobry gracz bez cheatów nie powinien ich przekraczać, a gdy przekroczy, traci tylko czas
 // (wypłata czeka), a nie pieniądze.
 

@@ -626,10 +626,6 @@ async function coverLogin(req, res) {
   const secure = req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : '';
   res.writeHead(204, { 'Set-Cookie': `bl_cover=${coverToken()}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}${secure}`, 'Cache-Control': 'no-store' }); res.end();
 }
-function serveAdminPage(res) {
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' });
-  res.end(fs.readFileSync(new URL('./admin-mecze.html', import.meta.url)));
-}
 function serveCover(res) {
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' });
   res.end(fs.readFileSync(new URL('./cover.html', import.meta.url)));
@@ -809,7 +805,6 @@ const server = http.createServer(async (req, res) => {
     }
   }
   const url = new URL(req.url, 'http://x'), key = req.method + ' ' + url.pathname, h = routes[key];
-  if (req.method === 'GET' && url.pathname === '/admin-mecze') return serveAdminPage(res);
   if (!h && req.method === 'GET' && !url.pathname.startsWith('/api/')) return serveGame(url.pathname, res);
   if (!h) return send(res, 404, { error: 'not_found', message: 'Nie ma takiej ścieżki' }, origin);
   try {

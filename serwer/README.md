@@ -46,7 +46,7 @@ Testowe SOL na devnecie: <https://faucet.solana.com> (wklej adres z zakładki **
 | `CORS_ORIGINS` | `*` | adresy gry, np. `https://smolka77.github.io` |
 | `DATA_DIR` | `serwer/dane` | baza SQLite i fraza – **musi być na trwałym dysku** |
 | `HOUSE_FEE` | `0.10` | prowizja od puli |
-| `REVIEW_STAKE_USD` | `250` | od takiej stawki każda wygrana czeka na sprawdzenie w `/admin-mecze` |
+| `REVIEW_STAKE_USD` | `250` | od takiej stawki każda wygrana czeka na sprawdzenie w panelu admina (sekcja Antycheat) |
 | `REPLAY_DAYS` | `60` | ile dni serwer trzyma powtórki (wstrzymane i odrzucone mecze zawsze) |
 | `MIN_WITHDRAW_SOL` | `0.001` | minimalna wypłata |
 | `GOOGLE_CLIENT_ID` | — | identyfikator klienta OAuth Google (logowanie „Kontynuuj z Google”) |
@@ -123,7 +123,7 @@ Jeden sygnał rzadko przesądza, więc serwer łączy je w jedno ryzyko. Progi s
 pre-aim) mają 0%, a rage aimbot, wygładzony aimbot, aimbot na tułów z ludzką reakcją, triggerbot i trzy odmiany silent aim
 od 72% do 100%. To symulacja, nie dane z prawdziwych meczów: progi warto poprawić po pierwszych tygodniach gry.
 
-## Wstrzymane wypłaty, powtórki i panel `/admin-mecze`
+## Wstrzymane wypłaty, powtórki i sekcja Antycheat w panelu admina
 
 Wygrana nie trafia na saldo, tylko czeka na decyzję admina (w historii gracza jest „w toku”), gdy:
 
@@ -134,7 +134,8 @@ Wygrana nie trafia na saldo, tylko czeka na decyzję admina (w historii gracza j
 - stawka jest wysoka (od `REVIEW_STAKE_USD`, domyślnie $250).
 
 Serwer zapisuje powtórkę każdego meczu (`dane/powtorki`, gzip): ruch obu graczy, kierunek kamery, strzały, rundy i statystyki.
-Panel `/admin-mecze` (konto panelu admina: login, hasło i kod 2FA – to samo co w panelu admina w grze) pokazuje mecze do sprawdzenia, sygnały, powiązane konta i powtórkę z góry mapy.
+Panel admina w grze ma sekcję **Antycheat – mecze do sprawdzenia**: mecze z wstrzymaną wypłatą i z ryzykiem od 30% (albo wszystkie
+ostatnie), sygnały obu graczy, powiązane konta, blokowanie i odblokowanie kont oraz powtórkę meczu z góry mapy.
 **Wypłać** dopisuje wygraną zwycięzcy. **Odrzuć i zablokuj** oddaje pulę przeciwnikowi i blokuje oszusta.
 
 Zablokowane konto nie gra o stawki i nie wypłaca. Nowe konto z tego samego urządzenia albo z tym samym adresem wypłat jest
