@@ -9,6 +9,7 @@
 // range.update(dt, playing) w każdej klatce, range.press() przy kliknięciu (true = kliknięcie poszło w tablicę),
 // range.onShot() przy każdym strzale i range.onHit(wróg, głowa, zabity) przy trafieniu. Haki opisane przy createRange.
 import * as THREE from 'three';
+import { t as tr } from './lobby-ui.js';   // słownik i aktualny język gry (PL/EN/RU/ES)
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const rnd = (a = 0, b = 1) => a + Math.random() * (b - a);
@@ -27,7 +28,7 @@ export function createRange(g) {
   const api = { active: false };
   const cfg = { zone: 'all', count: 3, pace: 'normal', rate: 'normal', moving: true };
   const stats = {};
-  let enabled = true, spots = [], panel = null, t = 0, nextSpawn = 0, hover = -2, dirty = true, frozen = false, lastPress = 0;
+  let langSig = '', enabled = true, spots = [], panel = null, t = 0, nextSpawn = 0, hover = -2, dirty = true, frozen = false, lastPress = 0;
   const recent = [];
 
   // ------------------------------------------------------------- niebo, mgła i światło jak w lobby (zachód słońca)
@@ -192,22 +193,22 @@ export function createRange(g) {
     if (document.fonts && document.fonts.load) document.fonts.load('40px Anton').then(() => { dirty = true; }).catch(() => {});
 
     const ROWS = [
-      ['Zakres celów', 'zone', [['Wszystkie', 'all'], ['Blisko', 'near'], ['Średnio', 'mid'], ['Daleko', 'far']]],
-      ['Fasolek naraz', 'count', [['1', 1], ['2', 2], ['3', 3], ['5', 5]]],
-      ['Pojawianie się', 'rate', [['Wolno', 'slow'], ['Normalnie', 'normal'], ['Szybko', 'fast']]],
-      ['Czas na trafienie', 'pace', [['Długi', 'slow'], ['Normalny', 'normal'], ['Krótki', 'fast']]],
-      ['Ruchome cele', 'moving', [['Tak', true], ['Nie', false]]],
-      ['Dźwięk', 'sound', [['Tak', true], ['Nie', false]]],
+      ['rg.zone', 'zone', [['rg.all', 'all'], ['rg.near', 'near'], ['rg.mid', 'mid'], ['rg.far', 'far']]],
+      ['rg.count', 'count', [['1', 1], ['2', 2], ['3', 3], ['5', 5]]],
+      ['rg.rate', 'rate', [['rg.rate.slow', 'slow'], ['rg.rate.normal', 'normal'], ['rg.rate.fast', 'fast']]],
+      ['rg.pace', 'pace', [['rg.pace.slow', 'slow'], ['rg.pace.normal', 'normal'], ['rg.pace.fast', 'fast']]],
+      ['rg.moving', 'moving', [['rg.yes', true], ['rg.no', false]]],
+      ['rg.sound', 'sound', [['rg.yes', true], ['rg.no', false]]],
     ];
     const btns = [];
     const rowY0 = 182, pitch = 74, bh = 56, bx0 = 568, bw = 205, gap = 12;
     ROWS.forEach(([, key, opts], r) => opts.forEach(([txt, val], i) => btns.push({
-      x: bx0 + i * (bw + gap), y: rowY0 + r * pitch, w: bw, h: bh, label: () => txt,
+      x: bx0 + i * (bw + gap), y: rowY0 + r * pitch, w: bw, h: bh, label: () => tr(txt),
       on: () => (key === 'sound' ? g.isSound() === val : cfg[key] === val),
       act: () => (key === 'sound' ? g.setSound(val) : setCfg(key, val)),
     })));
-    btns.push({ x: 60, y: 640, w: 440, h: 66, label: () => 'Zeruj statystyki', on: () => false, act: resetAll });
-    btns.push({ x: 530, y: 640, w: 500, h: 66, label: () => (enabled ? 'Trening: włączony' : 'Trening: wyłączony'), on: () => enabled, act: toggleTraining, warn: true });
+    btns.push({ x: 60, y: 640, w: 440, h: 66, label: () => tr('rg.reset'), on: () => false, act: resetAll });
+    btns.push({ x: 530, y: 640, w: 500, h: 66, label: () => tr(enabled ? 'rg.on' : 'rg.off'), on: () => enabled, act: toggleTraining, warn: true });
 
     const para = (x, y, w, h, s = 0.06) => {      // równoległobok jak clip-path w grze: polygon(6% 0,100% 0,94% 100%,0 100%)
       c.beginPath(); c.moveTo(x + w * s, y); c.lineTo(x + w, y); c.lineTo(x + w * (1 - s), y + h); c.lineTo(x, y + h); c.closePath();
@@ -215,10 +216,10 @@ export function createRange(g) {
     const vgrad = (y, h, stops) => { const gr = c.createLinearGradient(0, y, 0, y + h); stops.forEach(([p, col]) => gr.addColorStop(p, col)); return gr; };
     const YELLOW = [[0, '#fff7a8'], [0.38, '#ffe437'], [0.7, '#ffc800'], [1, '#f5ad00']];
     const RED = [[0, '#ff9a88'], [0.45, '#ee4d38'], [1, '#b92a1e']];
-    const text = (s, x, y, font, color, align = 'left', ls = 0) => {
+    const text = (s, x, y, font, color, align = 'left', ls = 0, maxW = 0) => {
       c.font = font; c.fillStyle = color; c.textAlign = align; c.textBaseline = 'middle';
       if ('letterSpacing' in c) c.letterSpacing = ls + 'px';
-      c.fillText(s, x, y);
+      if (maxW) c.fillText(s, x, y, maxW); else c.fillText(s, x, y);
       if ('letterSpacing' in c) c.letterSpacing = '0px';
     };
     const skewed = (fn) => { c.save(); c.transform(1, 0, -0.14, 1, 0, 0); fn(); c.restore(); };   // skewX(-8deg)
@@ -233,22 +234,22 @@ export function createRange(g) {
         c.fillStyle = gl; c.fillRect(60, y - 2, W - 120, 4);
       }
       c.fillStyle = '#ffe14a'; para(60, 30, 236, 38, 0.1); c.fill();
-      text('STRZELNICA', 60 + 118, 50, `800 21px ${FS}`, '#1d1400', 'center', 4);
+      text(tr('rg.tag'), 60 + 118, 50, `800 21px ${FS}`, '#1d1400', 'center', 4, 210);
       skewed(() => {
         const ty = 122, tx = 60 + 0.14 * ty;
-        text('USTAWIENIA TRENINGU', tx, ty + 8, `400 72px ${FD}`, '#6e4c00', 'left', 3);
-        text('USTAWIENIA TRENINGU', tx, ty + 4, `400 72px ${FD}`, '#a87400', 'left', 3);
-        text('USTAWIENIA TRENINGU', tx, ty, `400 72px ${FD}`, '#ffe14a', 'left', 3);
+        text(tr('rg.title'), tx, ty + 8, `400 72px ${FD}`, '#6e4c00', 'left', 3, 840);
+        text(tr('rg.title'), tx, ty + 4, `400 72px ${FD}`, '#a87400', 'left', 3, 840);
+        text(tr('rg.title'), tx, ty, `400 72px ${FD}`, '#ffe14a', 'left', 3, 840);
       });
       const acc = stats.shots ? Math.round((stats.hits / stats.shots) * 100) : 0;
-      [['TRAFIONE', String(stats.hits)], ['CELNOŚĆ', acc + '%']].forEach(([lab, val], i) => {
+      [[tr('rg.hits'), String(stats.hits)], [tr('rg.acc'), acc + '%']].forEach(([lab, val], i) => {
         const cx = W - 60 - 2 * 250 - 12 + i * 262;
         c.fillStyle = 'rgba(10,22,48,0.9)'; para(cx, 46, 250, 66, 0.06); c.fill();
         c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = 3; para(cx, 46, 250, 66, 0.06); c.stroke();
-        text(lab, cx + 28, 79, `700 21px ${FS}`, '#9fc2ff', 'left', 3);
+        text(lab, cx + 28, 79, `700 21px ${FS}`, '#9fc2ff', 'left', 3, 140);
         text(val, cx + 232, 80, `400 40px ${FD}`, '#ffffff', 'right', 1);
       });
-      ROWS.forEach(([label], r) => text(label.toUpperCase(), 60, rowY0 + r * pitch + bh / 2 + 3, `400 33px ${FD}`, '#cfe0ff', 'left', 2));
+      ROWS.forEach(([label], r) => text(tr(label).toUpperCase(), 60, rowY0 + r * pitch + bh / 2 + 3, `400 33px ${FD}`, '#cfe0ff', 'left', 2, 490));
       btns.forEach((b, i) => {
         const on = b.on(), hov = i === hv, red = b.warn && !on;
         if (on || red) {
@@ -259,9 +260,9 @@ export function createRange(g) {
           c.strokeStyle = 'rgba(255,255,255,0.3)'; c.lineWidth = 3; para(b.x + 2, b.y + 2, b.w - 4, b.h - 4); c.stroke();
         }
         if (hov) { c.strokeStyle = '#ffffff'; c.lineWidth = 5; para(b.x, b.y, b.w, b.h); c.stroke(); }
-        text(b.label().toUpperCase(), b.x + b.w / 2, b.y + b.h / 2 + 3, `400 ${b.h > 60 ? 36 : 34}px ${FD}`, red ? '#ffffff' : on ? '#2a1c00' : '#ffffff', 'center', 2);
+        text(b.label().toUpperCase(), b.x + b.w / 2, b.y + b.h / 2 + 3, `400 ${b.h > 60 ? 36 : 34}px ${FD}`, red ? '#ffffff' : on ? '#2a1c00' : '#ffffff', 'center', 2, b.w - 40);
       });
-      text('CELUJ W PRZYCISK I KLIKNIJ  ·  ODWRÓĆ SIĘ DO POLA, ŻEBY WRÓCIĆ DO STRZELANIA', 60, 750, `700 21px ${FS}`, '#9fc2ff', 'left', 3);
+      text(tr('rg.hint').toUpperCase(), 60, 750, `700 21px ${FS}`, '#9fc2ff', 'left', 3, 1400);
       tex.needsUpdate = true;
     }
     const btnAt = (px, py) => btns.findIndex((b) => px >= b.x - 6 && px <= b.x + b.w + 6 && py >= b.y - 6 && py <= b.y + b.h + 6);
@@ -310,6 +311,8 @@ export function createRange(g) {
   };
   api.update = (dt, playing) => {
     if (!api.active) return;
+    const sig = tr('rg.title');   // zmiana języka w ustawieniach lobby: przerysuj tablicę
+    if (sig !== langSig) { langSig = sig; dirty = true; }
     frozen = -Math.cos(player.yaw) > 0.3;            // gracz patrzy w tył (na tablicę): trening stoi, nic nie ucieka
     step(dt, playing);
     if (panel) {
