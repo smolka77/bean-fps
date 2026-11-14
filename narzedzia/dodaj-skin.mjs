@@ -12,10 +12,16 @@ const HEAD = '// Skiny zrobione w kreatorze skinów (kreator-skinow/index.html),
 const args = process.argv.slice(2);
 if (!args.length) { console.log('Użycie: node dodaj-skin.mjs skin-abc.json [...]   |   node dodaj-skin.mjs --usun <id>'); process.exit(1); }
 
-// obecne skiny: każda linia między "export default [" a "];" to jeden obiekt JSON z przecinkiem
-const src = fs.existsSync(dataFile) ? fs.readFileSync(dataFile, 'utf8') : HEAD + '];\n';
-const body = src.slice(src.indexOf('export default [') + 16, src.lastIndexOf('];'));
-const skins = body.split('\n').map((l) => l.trim().replace(/,$/, '')).filter(Boolean).map((l) => JSON.parse(l));
+// obecne skiny: źródłem jest skins.json w katalogu repo (tam zapisuje też panel admina); skins-data.js to tylko zapas wbudowany w grę
+const jsonFile = path.join(here, '..', 'skins.json');
+let skins;
+if (fs.existsSync(jsonFile)) skins = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
+else {   // stare repo bez skins.json: każda linia między "export default [" a "];" w skins-data.js to jeden obiekt JSON
+  const src = fs.existsSync(dataFile) ? fs.readFileSync(dataFile, 'utf8') : HEAD + '];\n';
+  const body = src.slice(src.indexOf('export default [') + 16, src.lastIndexOf('];'));
+  skins = body.split('\n').map((l) => l.trim().replace(/,$/, '')).filter(Boolean).map((l) => JSON.parse(l));
+}
+if (!Array.isArray(skins)) throw new Error('skins.json nie jest listą skinów');
 const builtIn = [...fs.readFileSync(lobbyFile, 'utf8').matchAll(/\{ id: '([a-z0-9-]+)', name:/g)].map((m) => m[1]);
 
 if (args[0] === '--usun') {
