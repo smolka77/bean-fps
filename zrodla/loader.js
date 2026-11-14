@@ -1,4 +1,4 @@
-// Ekran wczytywania BEANLADEN: biegnąca fasolka, tło z mapą, skośny pasek postępu, wskazówki w języku gracza.
+// Ekran wczytywania BEANLADEN: czarne tło, nazwa gry i cienki pasek postępu (tytuł, tło i wskazówki są ukryte w CSS).
 // Wygląd (CSS) i znaczniki są w index.html (#ld), żeby ekran był widoczny od pierwszej chwili, zanim wczyta się kod.
 //
 // Użycie:  import { loader } from './loader.js';
