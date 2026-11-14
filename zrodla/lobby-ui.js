@@ -477,6 +477,8 @@ export function initLobbyUI(ctx) {
   const API = walletApi();
   const W = API ? createWallet({ api: API, root: ui, getLang: () => LANG, toast, onChange: a => { acct = a; acctId = a ? a.username.toLowerCase() : null; renderAll(); } }) : null;
   let activeMatch = null;
+  // bez serwera: ten sam nowy portfel, ale na koncie lokalnym (tryb testowy)
+  const WL = W ? null : createWallet({ api: '', root: ui, getLang: () => LANG, toast, onChange: () => {}, local: { acct: () => acct, addTx: (a, type, note) => addTx(a, type, note) } });
   // profil (karta konta w menu): zapis przez serwer portfeli albo konto lokalne
   const localSave = async patch => {
     if (patch.username && patch.username.toLowerCase() !== acctId) {
@@ -596,7 +598,7 @@ export function initLobbyUI(ctx) {
     if (db) { try { await db.collection('matches').add(rec); return; } catch {} }
     try { const a = JSON.parse(ls.get('fasolka-matches') || '[]'); a.unshift(rec); ls.set('fasolka-matches', JSON.stringify(a.slice(0, 500))); } catch {}
   }
-  function openWallet(tab = 'deposit') { if (!acct) { toast(t('w.loginFirst')); openModal('lb-auth'); showTab('lb-auth', 'login'); return; } if (W) { closeAll(); W.open(tab); return; } openModal('lb-wallet'); showTab('lb-wallet', tab); }
+  function openWallet(tab = 'deposit') { if (!acct) { toast(t('w.loginFirst')); openModal('lb-auth'); showTab('lb-auth', 'login'); return; } if (W || WL) { closeAll(); (W || WL).open(tab); return; } openModal('lb-wallet'); showTab('lb-wallet', tab); }
   $('lb-dep-form').addEventListener('submit', async e => { e.preventDefault(); const a = Math.round(+$('lb-dep-amt').value * 100) / 100;
     if (!(a >= 1 && a <= 10000)) return toast(t('w.errAmount'), 'err'); await addTx(a, 'deposit'); $('lb-dep-amt').value = ''; toast(t('w.depOk', { a: money(a) }), 'ok'); });
   $('lb-dep-form').querySelectorAll('[data-q]').forEach(b => b.addEventListener('click', () => { $('lb-dep-amt').value = b.dataset.q; }));

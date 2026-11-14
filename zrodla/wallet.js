@@ -2,10 +2,10 @@
 // wpłaty z dowolnego portfela, wypłaty na dowolny adres, historia i zakładka Zarobki (wykres zysku w dolarach).
 // Saldo domyślnie w dolarach, pod spodem małym szarym drukiem ilość SOL; strzałki zamieniają kolejność.
 import qrcode from 'qrcode-generator';
-import { renderEarnings } from './earnings.js';
+import { renderEarnings, pointsFromHistory } from './earnings.js';
 
 const TXT = {
-  pl: { title: 'Portfel', bal: 'Saldo', dep: 'Wpłać', wd: 'Wypłać', hist: 'Historia', earn: 'Zarobki', swap: 'Zamień dolary i SOL', rate: '1 SOL = {p}',
+  pl: { demoAddr: 'Tryb testowy – adres portfela Solana pojawi się, gdy gra będzie połączona z serwerem. Nie wysyłaj tu prawdziwych SOL.', demoFaucet: 'Dodaj testowe $50', demoNet: 'TEST', title: 'Portfel', bal: 'Saldo', dep: 'Wpłać', wd: 'Wypłać', hist: 'Historia', earn: 'Zarobki', swap: 'Zamień dolary i SOL', rate: '1 SOL = {p}',
     depInfo: 'Twój adres portfela w grze. Wysyłaj tylko SOL w sieci Solana{net}. Wpłata pojawi się na saldzie po około 15–30 sekundach.',
     copy: 'Kopiuj adres', copied: 'Adres skopiowany', copyManual: 'Zaznaczono adres – naciśnij Ctrl+C', faucet: 'Pobierz testowe SOL', faucetInfo: 'Sieć testowa: darmowe SOL weźmiesz z faucet.solana.com – adres jest już skopiowany, wklej go tam.',
     check: 'Sprawdź wpłaty', checking: 'Sprawdzanie…', to: 'Adres odbiorcy (Solana)', amount: 'Kwota', max: 'MAX', youGet: 'Odbiorca dostanie ≈ {s}', feeNote: 'Opłatę sieci pokrywa gra.',
@@ -13,7 +13,7 @@ const TXT = {
     empty: 'Brak operacji', pending: 'w toku', failed: 'nieudana', net: 'Wynik', won: 'Wygrane', lost: 'Przegrane', wr: 'Skuteczność', games: 'Mecze', noGames: 'Zagraj mecz o stawkę, a tu zobaczysz swój wynik w czasie.',
     all: 'Wszystko', d7: '7 dni', d30: '30 dni', profit: 'Zysk', loss: 'Strata', live: 'Połączono z siecią Solana', offline: 'Serwer portfeli nie odpowiada',
     tx: { deposit: 'Wpłata', withdraw: 'Wypłata', stake: 'Stawka 1v1', win: 'Wygrana 1v1', loss: 'Przegrana 1v1' }, fee: 'prowizja {a}', match: 'Mecz {n}' },
-  en: { title: 'Wallet', bal: 'Balance', dep: 'Deposit', wd: 'Withdraw', hist: 'History', earn: 'Earnings', swap: 'Swap dollars and SOL', rate: '1 SOL = {p}',
+  en: { demoAddr: 'Test mode – your Solana wallet address appears once the game is connected to its server. Do not send real SOL here.', demoFaucet: 'Add test $50', demoNet: 'TEST', title: 'Wallet', bal: 'Balance', dep: 'Deposit', wd: 'Withdraw', hist: 'History', earn: 'Earnings', swap: 'Swap dollars and SOL', rate: '1 SOL = {p}',
     depInfo: 'Your in-game wallet address. Send only SOL on the Solana network{net}. Deposits show up in your balance in about 15–30 seconds.',
     copy: 'Copy address', copied: 'Address copied', copyManual: 'Address selected – press Ctrl+C', faucet: 'Get test SOL', faucetInfo: 'Test network: get free SOL at faucet.solana.com – your address is copied, paste it there.',
     check: 'Check deposits', checking: 'Checking…', to: 'Recipient address (Solana)', amount: 'Amount', max: 'MAX', youGet: 'Recipient gets ≈ {s}', feeNote: 'Network fee is covered by the game.',
@@ -21,7 +21,7 @@ const TXT = {
     empty: 'No transactions', pending: 'pending', failed: 'failed', net: 'Net result', won: 'Won', lost: 'Lost', wr: 'Win rate', games: 'Matches', noGames: 'Play a staked match and your results over time will show up here.',
     all: 'All', d7: '7 days', d30: '30 days', profit: 'Profit', loss: 'Loss', live: 'Connected to Solana', offline: 'Wallet server is not responding',
     tx: { deposit: 'Deposit', withdraw: 'Withdrawal', stake: '1v1 stake', win: '1v1 win', loss: '1v1 loss' }, fee: 'fee {a}', match: 'Match {n}' },
-  ru: { title: 'Кошелёк', bal: 'Баланс', dep: 'Пополнить', wd: 'Вывести', hist: 'История', earn: 'Доход', swap: 'Поменять доллары и SOL', rate: '1 SOL = {p}',
+  ru: { demoAddr: 'Тестовый режим – адрес кошелька Solana появится, когда игра подключится к серверу. Не отправляй сюда настоящие SOL.', demoFaucet: 'Добавить тестовые $50', demoNet: 'TEST', title: 'Кошелёк', bal: 'Баланс', dep: 'Пополнить', wd: 'Вывести', hist: 'История', earn: 'Доход', swap: 'Поменять доллары и SOL', rate: '1 SOL = {p}',
     depInfo: 'Адрес твоего игрового кошелька. Отправляй только SOL в сети Solana{net}. Пополнение появится на балансе примерно через 15–30 секунд.',
     copy: 'Копировать адрес', copied: 'Адрес скопирован', copyManual: 'Адрес выделен – нажмите Ctrl+C', faucet: 'Получить тестовые SOL', faucetInfo: 'Тестовая сеть: бесплатные SOL на faucet.solana.com – адрес уже скопирован, вставь его там.',
     check: 'Проверить пополнения', checking: 'Проверка…', to: 'Адрес получателя (Solana)', amount: 'Сумма', max: 'МАКС', youGet: 'Получатель получит ≈ {s}', feeNote: 'Комиссию сети платит игра.',
@@ -29,7 +29,7 @@ const TXT = {
     empty: 'Операций нет', pending: 'в процессе', failed: 'не удалось', net: 'Итог', won: 'Выиграно', lost: 'Проиграно', wr: 'Побед', games: 'Матчи', noGames: 'Сыграй матч на ставку – здесь появится твой результат.',
     all: 'Всё', d7: '7 дней', d30: '30 дней', profit: 'Прибыль', loss: 'Убыток', live: 'Подключено к Solana', offline: 'Сервер кошельков не отвечает',
     tx: { deposit: 'Пополнение', withdraw: 'Вывод', stake: 'Ставка 1v1', win: 'Победа 1v1', loss: 'Поражение 1v1' }, fee: 'комиссия {a}', match: 'Матч {n}' },
-  es: { title: 'Cartera', bal: 'Saldo', dep: 'Depositar', wd: 'Retirar', hist: 'Historial', earn: 'Ganancias', swap: 'Cambiar dólares y SOL', rate: '1 SOL = {p}',
+  es: { demoAddr: 'Modo de prueba – la dirección de tu cartera Solana aparece cuando el juego se conecta al servidor. No envíes SOL reales aquí.', demoFaucet: 'Añadir $50 de prueba', demoNet: 'TEST', title: 'Cartera', bal: 'Saldo', dep: 'Depositar', wd: 'Retirar', hist: 'Historial', earn: 'Ganancias', swap: 'Cambiar dólares y SOL', rate: '1 SOL = {p}',
     depInfo: 'La dirección de tu cartera en el juego. Envía solo SOL en la red Solana{net}. El depósito aparece en tu saldo en unos 15–30 segundos.',
     copy: 'Copiar dirección', copied: 'Dirección copiada', copyManual: 'Dirección seleccionada – pulsa Ctrl+C', faucet: 'Obtener SOL de prueba', faucetInfo: 'Red de prueba: SOL gratis en faucet.solana.com – tu dirección ya está copiada, pégala allí.',
     check: 'Comprobar depósitos', checking: 'Comprobando…', to: 'Dirección de destino (Solana)', amount: 'Importe', max: 'MÁX', youGet: 'El destinatario recibe ≈ {s}', feeNote: 'La comisión de red la paga el juego.',
@@ -43,6 +43,7 @@ const CSS = `
 #bl-w{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:16px;background:rgba(4,7,14,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);pointer-events:auto;
   font:500 14px/1.45 Inter,system-ui,sans-serif;color:#eef1f7;--bw-acc:#ffc629;--bw-ok:#2fd27a;--bw-bad:#ff6b5e;--bw-mut:#8e9ab0;--bw-line:rgba(255,255,255,.09)}
 #bl-w[hidden]{display:none}
+#bl-w [hidden]{display:none!important}
 #bl-w *{box-sizing:border-box}#bl-w button{font:inherit;color:inherit;cursor:pointer}
 #bl-w .bw{position:relative;width:min(480px,100%);max-height:calc(100dvh - 32px);overflow:auto;border-radius:22px;border:1px solid rgba(255,255,255,.12);
   background:linear-gradient(180deg,#121a2c,#0b111e);box-shadow:0 30px 80px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06);animation:bw-in .22s ease}
@@ -127,7 +128,8 @@ const I = {
   game: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/></svg>',
 };
 
-export function createWallet({ api, root, getLang, toast, onChange }) {
+// local: tryb bez serwera (artefakt, GitHub Pages) – ten sam wygląd portfela, saldo i historia z konta lokalnego (testowe)
+export function createWallet({ api, root, getLang, toast, onChange, local = null }) {
   const L = () => TXT[getLang()] || TXT.en, T = (k, v) => { let s = L()[k] ?? TXT.en[k] ?? k; if (v) for (const n in v) s = s.replace('{' + n + '}', v[n]); return s; };
   const loc = () => ({ pl: 'pl-PL', en: 'en-US', ru: 'ru-RU', es: 'es-ES' })[getLang()] || 'en-US';
   const fmtUsd = v => (v < 0 ? '−' : '') + '$' + Math.abs(v).toLocaleString(loc(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -135,17 +137,34 @@ export function createWallet({ api, root, getLang, toast, onChange }) {
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   let token = null, acct = null, hist = [], earn = null, solFirst = false, online = true, tab = 'dep', pollT = 0;
   try { token = localStorage.getItem('bl-token'); solFirst = localStorage.getItem('bl-solfirst') === '1'; } catch {}
+  const DEMO_PRICE = 150;   // tryb testowy bez serwera: stały kurs tylko do pokazania ilości SOL
+  async function localCall(method, p, body) {
+    const a = local.acct(); if (!a) { const e = new Error('Zaloguj się'); e.status = 401; throw e; }
+    const pack = () => { const b = local.acct(), h = b.history || [];
+      return { account: { username: b.username, email: b.email || '', avatar: b.avatar || '', createdAt: b.createdAt, address: '', lamports: Math.round(b.balance / DEMO_PRICE * 1e9), sol: b.balance / DEMO_PRICE,
+          balance: b.balance, price: DEMO_PRICE, cluster: 'test', admin: false, stats: b.stats || {} },
+        history: h.map(x => ({ ...x, lamports: x.amount ? Math.round(x.amount / DEMO_PRICE * 1e9) : 0 })) }; };
+    if (p === '/me' || p === '/scan') return pack();
+    if (p === '/earnings') return { points: pointsFromHistory(a.history) };
+    if (p === '/faucet') { await local.addTx(50, 'deposit', 'TEST'); return { ok: true }; }
+    if (p === '/withdraw') { const usd = Math.round(body.lamports / 1e9 * DEMO_PRICE * 100) / 100;
+      if (usd > a.balance) { const e = new Error(T('errFunds')); throw e; }
+      await local.addTx(-usd, 'withdraw', String(body.to).slice(0, 4) + '…' + String(body.to).slice(-4)); return { ...pack(), ok: true, url: '' }; }
+    throw new Error('Tryb testowy');
+  }
+  if (local) token = 'local';
 
   async function call(method, p, body) {
+    if (local) return localCall(method, p, body);
     const r = await fetch(api + '/api' + p, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: body ? JSON.stringify(body) : undefined });
     let j = {}; try { j = await r.json(); } catch {}
     if (!r.ok) { const e = new Error(j.message || 'Błąd serwera'); e.code = j.error; e.status = r.status; if (r.status === 401 && j.error === 'auth') setSession(null); throw e; }
     online = true; return j;
   }
-  function setSession(tok) { token = tok; try { tok ? localStorage.setItem('bl-token', tok) : localStorage.removeItem('bl-token'); } catch {} if (!tok) { acct = null; hist = []; earn = null; emit(); } }
+  function setSession(tok) { if (local) return; token = tok; try { tok ? localStorage.setItem('bl-token', tok) : localStorage.removeItem('bl-token'); } catch {} if (!tok) { acct = null; hist = []; earn = null; emit(); } }
   const toLobby = () => acct && { username: acct.username, email: acct.email || '', avatar: acct.avatar || '', createdAt: acct.createdAt, balance: acct.balance, wallet: acct.address, address: acct.address, sol: acct.sol, lamports: acct.lamports,
     price: acct.price, cluster: acct.cluster, admin: acct.admin, stats: acct.stats, history: hist };
-  function emit() { onChange(toLobby()); render(); }
+  function emit() { if (!local) onChange(toLobby()); render(); }
   function take(j) { if (j.account) acct = j.account; if (j.history) hist = j.history; emit(); return toLobby(); }
 
   const api$ = {
@@ -208,7 +227,7 @@ export function createWallet({ api, root, getLang, toast, onChange }) {
   $('bw-check').addEventListener('click', async e => { const b = e.currentTarget; b.disabled = true; b.textContent = T('checking'); await api$.refresh(true); b.disabled = false; b.textContent = T('check'); });
   $('bw-faucet').addEventListener('click', async () => {
     await copyAddr();
-    try { const j = await call('POST', '/faucet'); toast('+1 SOL', 'ok'); setTimeout(() => api$.refresh(true), 2000); return j; }
+    try { const j = await call('POST', '/faucet'); toast('+1 SOL', 'ok'); setTimeout(() => api$.refresh(true), local ? 0 : 2000); return j; }
     catch { window.open('https://faucet.solana.com/', '_blank', 'noopener'); }
   });
   // wypłata: kwota w dolarach albo w SOL (przycisk jednostki), MAX = całe saldo
@@ -226,7 +245,7 @@ export function createWallet({ api, root, getLang, toast, onChange }) {
     if (l > acct.lamports) return (msg.innerHTML = `<div class="bw-err">${esc(T('errFunds'))}</div>`);
     const b = $('bw-send'); b.disabled = true; b.textContent = T('sending');
     try { const j = await call('POST', '/withdraw', { to, lamports: l }); take(j); $('bw-amt').value = ''; calc();
-      msg.innerHTML = `<div class="bw-ok">✓ ${esc(T('sent'))} · <a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(T('view'))} ↗</a></div>`; }
+      msg.innerHTML = `<div class="bw-ok">✓ ${esc(T('sent'))}${j.url ? ` · <a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(T('view'))} ↗</a>` : ''}</div>`; }
     catch (er) { msg.innerHTML = `<div class="bw-err">${esc(er.message)}</div>`; }
     b.disabled = false; b.textContent = T('send');
   });
@@ -249,12 +268,15 @@ export function createWallet({ api, root, getLang, toast, onChange }) {
     wrap.querySelectorAll('[data-tab]').forEach(b => { b.classList.toggle('on', b.dataset.tab === tab); b.setAttribute('aria-selected', b.dataset.tab === tab); });
     wrap.querySelectorAll('[data-pane]').forEach(p => { p.hidden = p.dataset.pane !== tab; });
     // wpłata
-    if ($('bw-addr').textContent !== acct.address) {
+    const demo = !acct.address; wrap.querySelector('.bw-qr').hidden = demo; $('bw-copy').hidden = demo; $('bw-check').hidden = demo;
+    $('bw-addr').style.font = demo ? '500 13px/1.45 Inter,sans-serif' : ''; $('bw-addr').style.color = demo ? '#aeb8cc' : '';
+    if (demo) { $('bw-addr').textContent = T('demoAddr'); $('bw-faucet').textContent = T('demoFaucet'); }
+    else if ($('bw-addr').textContent !== acct.address) {
       $('bw-addr').textContent = acct.address;
       try { const qr = qrcode(0, 'M'); qr.addData('solana:' + acct.address); qr.make(); $('bw-qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch { $('bw-qr').textContent = ''; }
     }
     $('bw-depinfo').textContent = T('depInfo', { net: testnet ? ' (' + acct.cluster + ')' : '' });
-    $('bw-faucet').hidden = !testnet; $('bw-fnote').innerHTML = testnet ? esc(T('faucetInfo')).replace('faucet.solana.com', '<a href="https://faucet.solana.com/" target="_blank" rel="noopener">faucet.solana.com</a>') : '';
+    $('bw-faucet').hidden = !testnet; $('bw-fnote').innerHTML = demo ? '' : testnet ? esc(T('faucetInfo')).replace('faucet.solana.com', '<a href="https://faucet.solana.com/" target="_blank" rel="noopener">faucet.solana.com</a>') : '';
     // wypłata
     $('bw-unit').innerHTML = (wdSol ? 'SOL' : 'USD') + I.swap;
     $('bw-amt').placeholder = wdSol ? '0.0000' : '0.00';
