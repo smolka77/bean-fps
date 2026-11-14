@@ -912,7 +912,9 @@ function skinIcon(sk) {
   if (sk.p === 5) { defs = `<pattern id="${id}" width="20" height="20" patternUnits="userSpaceOnUse"><rect width="20" height="20" fill="${c1}"/><path d="M0 6l6 2 4-5 5 4 5-2M3 20l3-7 6 1 3-5 5 3" stroke="${c2}" stroke-width="1.6" fill="none"/></pattern>`; fill = `url(#${id})`; }
   if (sk.metal) { defs = `<linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff3c0"/><stop offset=".45" stop-color="#ffc23a"/><stop offset="1" stop-color="#a86d0e"/></linearGradient>`; fill = `url(#${id})`; }
   return `<svg viewBox="0 0 44 58"><defs>${defs}</defs><rect x="15" y="40" width="5" height="15" rx="2.5" fill="${fill}"/><rect x="24" y="40" width="5" height="15" rx="2.5" fill="${fill}"/>
-    <rect x="8" y="3" width="28" height="44" rx="14" fill="${fill}" stroke="rgba(0,0,0,.35)" stroke-width="1.2"/><ellipse cx="16" cy="13" rx="3.5" ry="5" fill="#fff" opacity=".35"/></svg>`;
+    <rect x="8" y="3" width="28" height="44" rx="14" fill="${fill}" stroke="rgba(0,0,0,.35)" stroke-width="1.2"/><ellipse cx="13.5" cy="12" rx="2.6" ry="4" fill="#fff" opacity=".3"/>
+    <g stroke="rgba(0,0,0,.25)" stroke-width=".5"><ellipse cx="18.6" cy="15" rx="3" ry="4" fill="#fff"/><ellipse cx="25.4" cy="15" rx="3" ry="4" fill="#fff"/></g>
+    <ellipse cx="18.6" cy="16.2" rx="1.6" ry="2.2" fill="#15161a"/><ellipse cx="25.4" cy="16.2" rx="1.6" ry="2.2" fill="#15161a"/></svg>`;   // oczy jak w grze
 }
 const DEFAULT_MODES = [
   { id: 'range', name: 'Strzelnica', desc: 'Solo · zestrzel czerwone fasolki', icon: 'range', tag: 'SOLO' },
