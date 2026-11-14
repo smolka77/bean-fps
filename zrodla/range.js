@@ -82,7 +82,7 @@ export function createRange(g) {
   function renderHud() {
     dirty = true;
     const el = document.getElementById('rgAcc');
-    if (el) el.textContent = stats.shots ? '· celność ' + Math.round((stats.hits / stats.shots) * 100) + '%' : '';
+    if (el) el.textContent = stats.shots ? '· ' + tr('rg.acc').toLowerCase() + ' ' + Math.round((stats.hits / stats.shots) * 100) + '%' : '';
   }
 
   // ------------------------------------------------------------- cele

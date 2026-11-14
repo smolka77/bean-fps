@@ -201,7 +201,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import glbB64 from './bean-data.js';
 import {createLobby,applySkin,SKINS} from './lobby.js';
-import {payout} from './lobby-ui.js';
+import {payout,t as i18n} from './lobby-ui.js';   // i18n: słownik lobby (PL/EN/RU/ES) – menu pauzy
 import {createMatch} from './match.js';
 import {createNet} from './net.js';
 import {createRange} from './range.js';
@@ -711,7 +711,7 @@ const initAudio=()=>{if(AC)return;try{AC=new(window.AudioContext||window.webkitA
 function setMuted(v){
   muted=v;if(master)master.gain.setTargetAtTime(v?0:VOL,AC.currentTime,.02);
   try{localStorage.setItem('beanfps-muted',v?'1':'0')}catch(e){}
-  for(const b of document.querySelectorAll('.mute')){b.textContent=v?'Dźwięk: wył. (M)':'Dźwięk: wł. (M)';b.setAttribute('aria-pressed',String(v))}
+  for(const b of document.querySelectorAll('.mute')){b.textContent=i18n(v?'pm.soundOff':'pm.soundOn');b.setAttribute('aria-pressed',String(v))}
 }
 let noiseBuf=null;
 function noise(){if(noiseBuf||!AC)return noiseBuf;const n=AC.sampleRate*.4;noiseBuf=AC.createBuffer(1,n,AC.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1;return noiseBuf}
@@ -784,13 +784,13 @@ for(const b of document.querySelectorAll('.mute'))b.addEventListener('click',e=>
 let SENS_K=1,SENS_ADS=1;   // czułość myszy i mnożnik czułości przy celowaniu (ustawienia lobby / menu pod Esc)
 const readSet=()=>{try{return JSON.parse(localStorage.getItem('fasolka-settings')||'null')||{}}catch(e){return {}}};
 {const v=readSet();if(+v.sens>0)SENS_K=+v.sens;if(+v.sensAds>0)SENS_ADS=+v.sensAds}
-const PM_SL=[['volume','Głośność ogólna',0,100,1,v=>Math.round(v)+'%'],['vGame','Dźwięki w grze',0,100,1,v=>Math.round(v)+'%'],
-  ['sens','Czułość myszy',.2,3,.05,v=>(+v).toFixed(2)],['sensAds','Czułość przy celowaniu',.2,2,.05,v=>(+v).toFixed(2)]];   // pole widzenia stałe (78°) – bez suwaka
+const PM_SL=[['volume','set.vMaster',0,100,1,v=>Math.round(v)+'%'],['vGame','set.vGame',0,100,1,v=>Math.round(v)+'%'],   // etykiety = klucze słownika lobby
+  ['sens','set.sens',.2,3,.05,v=>(+v).toFixed(2)],['sensAds','set.sensAds',.2,2,.05,v=>(+v).toFixed(2)]];   // pole widzenia stałe (78°) – bez suwaka
 {
   const rows=$('pmRows');
   for(const [k,lab,mn,mx,st,fmt] of PM_SL){
-    const r=document.createElement('div');r.className='pm-row';
-    r.innerHTML=`<label for="pm-${k}">${lab}</label><output id="pm-${k}-v"></output><input type="range" id="pm-${k}" min="${mn}" max="${mx}" step="${st}">`;
+    const r=document.createElement('div');r.className='pm-row';r._key=lab;
+    r.innerHTML=`<label for="pm-${k}">${i18n(lab)}</label><output id="pm-${k}-v"></output><input type="range" id="pm-${k}" min="${mn}" max="${mx}" step="${st}">`;
     rows.appendChild(r);const inp=r.querySelector('input'),o=r.querySelector('output');
     const paint=()=>{o.textContent=fmt(+inp.value);inp.style.setProperty('--p',((+inp.value-mn)/(mx-mn)*100)+'%')};
     inp.addEventListener('input',()=>{paint();const v=+inp.value;
@@ -802,15 +802,23 @@ const PM_SL=[['volume','Głośność ogólna',0,100,1,v=>Math.round(v)+'%'],['vG
     });
     r._fill=s=>{inp.value=s[k];paint()};
   }
-  const mr=document.createElement('div');mr.className='pm-row';mr.innerHTML='<label>Dźwięk</label><button class="mute" type="button" aria-pressed="false">Dźwięk: wł. (M)</button>';rows.appendChild(mr);
-  const mb=mr.querySelector('.mute');mb.textContent=muted?'Dźwięk: wył. (M)':'Dźwięk: wł. (M)';mb.setAttribute('aria-pressed',String(muted));
+  const mr=document.createElement('div');mr.className='pm-row';mr._key='set.audio';mr.innerHTML='<label></label><button class="mute" type="button" aria-pressed="false"></button>';rows.appendChild(mr);
+  const mb=mr.querySelector('.mute');mb.setAttribute('aria-pressed',String(muted));
   mb.addEventListener('click',e=>{e.stopPropagation();initAudio();setMuted(!muted)});
 }
 function pmShow(v){$('pmMenu').hidden=v!=='menu';$('pmSet').hidden=v!=='set';$('pmQuit').hidden=v!=='quit';$('ovText').hidden=v!=='menu';$('ovTitle').hidden=v==='quit';
-  $('pmTag').textContent=v==='set'?'USTAWIENIA':v==='quit'?'OPUSZCZASZ MECZ':pmTag();
+  $('pmTag').textContent=v==='set'?i18n('set.title').toUpperCase():v==='quit'?i18n('pm.tagQuit'):pmTag();
   if(v==='set'){const s={volume:80,vGame:100,fov:78,sens:SENS_K,sensAds:SENS_ADS,...readSet()};for(const r of $('pmRows').children)if(r._fill)r._fill(s)}
 }
-function pmTag(){return MODE==='1v1'?'1 NA 1'+(oaza.map?' · '+oaza.map.name.toUpperCase():''):'STRZELNICA'}
+function pmTag(){return MODE==='1v1'?i18n('tag.1v1')+(oaza.map?' · '+oaza.map.name.toUpperCase():''):i18n('mode.range.name').toUpperCase()}
+// napisy menu pauzy w języku lobby (statyczny HTML jest po polsku) – przy każdym otwarciu menu i przy setPauseText
+function pmI18n(){
+  const sp=(id,sel,k,html)=>{const el=$(id)&&(sel?$(id).querySelector(sel):$(id));if(el)el[html?'innerHTML':'textContent']=html?k:i18n(k)};
+  sp('ovTitle',null,'pm.title');sp('ovText',null,'pm.text');sp('ovGo',null,'pm.resume');sp('pmOpenSet','span','set.title');sp('toLobby','span','pm.lobby');
+  sp('pmBack','span','‹&nbsp; '+i18n('pm.back'),true);sp('pmQuit','h2','pm.sure');sp('pmLoss','small','pm.lose');sp('pmStay','span','pm.stay');sp('pmQuitYes','span','pm.leave');sp('lockHint',null,'pm.lock');
+  for(const r of $('pmRows').children)if(r._key)r.querySelector('label').textContent=i18n(r._key);
+  for(const b of document.querySelectorAll('.mute'))b.textContent=i18n(muted?'pm.soundOff':'pm.soundOn');
+}
 $('pm').addEventListener('click',e=>e.stopPropagation());                    // klik w panel nie wznawia gry (wznawia przycisk albo klik obok)
 $('pmResume').addEventListener('click',()=>$('overlay').click());
 $('pmOpenSet').addEventListener('click',()=>pmShow('set'));
@@ -820,7 +828,7 @@ let pmOpenT=0;
 addEventListener('keydown',e=>{if(e.code!=='Escape'||e.repeat||$('overlay').style.display==='none'||document.body.classList.contains('in-lobby'))return;
   e.preventDefault();e.stopImmediatePropagation();if(!$('pmSet').hidden||!$('pmQuit').hidden){pmShow('menu');return}
   if(performance.now()-pmOpenT>350)$('pmResume').click()},true);   // Esc w pauzie = Wznów
-new MutationObserver(()=>{if($('overlay').style.display!=='none'){pmOpenT=performance.now();$('pmTag').textContent=pmTag();pmShow('menu')}}).observe($('overlay'),{attributes:true,attributeFilter:['style']});
+new MutationObserver(()=>{if($('overlay').style.display!=='none'){pmOpenT=performance.now();pmI18n();$('pmTag').textContent=pmTag();pmShow('menu')}}).observe($('overlay'),{attributes:true,attributeFilter:['style']});
 
 addEventListener('keydown',e=>{if(e.code==='KeyM'&&!playing)setMuted(!muted)});
 setMuted(muted);
@@ -1368,7 +1376,7 @@ setHud();
 // ================= tryb 1v1: pojedynek z botem do 5 trafień =================
 let MODE='range';
 const WIN=5,duel={bot:null,hp:100,botScore:0,inv:0};
-function setPauseText(){$('ovTitle').textContent='Menu';$('ovText').textContent='Gra toczy się dalej. Naciśnij Esc albo kliknij Wznów, aby wrócić.';$('ovGo').textContent='WZNÓW'}
+function setPauseText(){pmI18n()}
 function setHp(v){duel.hp=Math.max(0,v);const w=duel.hp+'%';$('hpbar').style.width=w;$('hpghost').style.width=w;$('hpnum').textContent=Math.ceil(duel.hp);const h=$('hp');h.classList.toggle('low',duel.hp<=20);h.classList.toggle('mid',duel.hp>20&&duel.hp<=50)}
 function banner(t,c){const b=$('banner');b.textContent=t;b.style.color=c||'#fff';b.classList.remove('show');void b.offsetWidth;b.classList.add('show')}
 function resetPlayer(){player.pos.set(0,0,-14);player.vel.set(0,0,0);player.yaw=Math.PI;if(oaza.active){const s=oaza.spawns[TEAM.me===1&&oaza.spawns[1]?1:0];player.pos.set(s.x,s.y||0,s.z);player.yaw=s.yaw}player.pitch=0;refillAll();setHud();setHp(100);duel.inv=1.2}
@@ -1378,7 +1386,7 @@ function setMode(m,mi,quiet){
   MODE=m==='1v1'?'1v1':'range';document.body.classList.toggle('duel',MODE==='1v1');
   kills=0;duel.botScore=0;duel.bot=enemies[0];
   const rm=MODE==='range'&&RANGE_MAP.ready?RANGE_MAP:null;      // Strzelnica gra na własnej mapie, gdy się już wczytała (w tle); inaczej stara arena
-  $('score').innerHTML=MODE==='1v1'?'Ty <b id="kills">0</b> : <b id="botScore">0</b> Bot <small>do 5</small>':'Trafione fasolki <b id="kills">0</b>'+(rm?' <small id="rgAcc"></small>':'');
+  $('score').innerHTML=MODE==='1v1'?'Ty <b id="kills">0</b> : <b id="botScore">0</b> Bot <small>do 5</small>':i18n('hud.hits')+' <b id="kills">0</b>'+(rm?' <small id="rgAcc"></small>':'');
   for(const e of enemies){const on=MODE==='range'||e===duel.bot;e.off=!on;e.root.visible=on;e.hp=100;e.dead=0;e.fall=0;e.root.rotation.z=0;e.root.position.y=0;if(on&&MODE==='range')e.root.position.copy(spawnPos())}
   duel.mapBanner=false;
   if(MODE==='1v1'){if(mi!=null&&mi>=0&&MAPS[mi]&&MAPS[mi].ready)mapIdx=mi;else nextMap()}
@@ -1557,7 +1565,7 @@ $('toLobby').addEventListener('click',e=>{
   e.stopPropagation();
   if(midMatch()&&!$('pmQuit')._ok){                     // najpierw pytanie „Na pewno?”
     const st=+match.state.stake||0;
-    $('pmQuitTxt').innerHTML=st?'Wyjście w trakcie meczu oznacza <b>przegraną walkowerem i utratę stawki</b>. Tej operacji nie da się cofnąć.':'Wyjście w trakcie meczu oznacza <b>przegraną walkowerem</b>.';
+    $('pmQuitTxt').innerHTML=i18n(st?'pm.quitStake':'pm.quitFree');
     $('pmLoss').hidden=!st;$('pmLossAmt').textContent='−'+stakeTxt(st);
     pmShow('quit');return}
   $('pmQuit')._ok=false;leaveToLobby()});
