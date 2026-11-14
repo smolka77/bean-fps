@@ -1,6 +1,7 @@
 // Połączenie gry z serwerem meczów 1v1 (WebSocket /ws na serwerze portfeli).
 // Kolejka: queue({matchId, skin}) -> 'queued' -> 'matched' {seat, map, opp:{nick, skin}} -> obaj 'ready' -> 'go'.
-// W meczu gracz wysyła tylko: 'st' (stan ~20/s), 'sh' (skąd i w którą stronę strzelił), 'rl' (przeładowanie), 'rs'/'lv' (start rundy),
+// W meczu gracz wysyła tylko: 'st' (stan ~20/s + kąty kamery z każdej klatki i z chwili każdego strzału – serwer sprawdza nimi celowanie),
+// 'sh' (skąd i w którą stronę strzelił), 'rl' (przeładowanie), 'rs'/'lv' (start rundy),
 // 'po' (odpowiedź na ping). Trafienia, obrażenia, śmierć, amunicję i ruch sprawdza serwer: odsyła 'dmg', 'hc', 'sh' (smuga),
 // 'fix' (cofnięcie niedozwolonego ruchu), 'st' (przeciwnik; null = nie widać go), 'round' i 'end' {reason: 'score' | 'left' | 'cheat'}.
 import { walletApi } from './wallet-config.js';
@@ -11,6 +12,8 @@ export function createNet() {
   const on = {};                                                   // t -> funkcja(wiadomość)
   const emit = (t, m) => { const f = on[t]; if (f) try { f(m); } catch (e) { console.error('net', t, e); } };
   const token = () => { try { return localStorage.getItem('bl-token') || ''; } catch { return ''; } };
+  // identyfikator urządzenia (losowy, zapisany w tej przeglądarce): serwer łączy po nim konta jednej osoby (multikonta, omijanie blokady)
+  const devId = () => { try { let d = localStorage.getItem('bl-dev'); if (!d) { d = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join(''); localStorage.setItem('bl-dev', d); } return d; } catch { return ''; } };
   const base = () => (walletApi() || location.origin).replace(/\/+$/, '');
   // token sesji nie idzie w adresie /ws (adresy trafiają do logów): serwer daje jednorazowy bilet ważny 30 s
   async function wsUrl() {
@@ -18,7 +21,7 @@ export function createNet() {
     if (r.status === 401) throw new Error(tr('net.login'));
     if (!r.ok) throw new Error(tr('net.offline'));
     const { ticket } = await r.json();
-    return base().replace(/^http/i, 'ws') + '/ws?k=' + encodeURIComponent(ticket);
+    return base().replace(/^http/i, 'ws') + '/ws?k=' + encodeURIComponent(ticket) + '&d=' + encodeURIComponent(devId());
   }
   let pending = null;                                              // trwa pobieranie biletu / łączenie – drugie wywołanie czeka na to samo
   function connect() {

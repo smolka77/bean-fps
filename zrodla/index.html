@@ -1040,7 +1040,7 @@ function fireShot(){
   if(!inst.suppressed||rnd()<.5)spawnTracer(_mz,end);
   // online: do serwera idzie tylko skąd i w którą stronę celowałem (bez rozrzutu) – rozrzut, lot pocisku i trafienie liczy serwer
   if(ON.active){_e.set(player.pitch,player.yaw,0,'YXZ');const aim=V3(0,0,-1).applyEuler(_e);
-    NET.send({t:'sh',o:[_o.x,_o.y,_o.z].map(v=>+v.toFixed(3)),d:[aim.x,aim.y,aim.z].map(v=>+v.toFixed(4)),q:++ON.q})}
+    NET.send({t:'sh',o:[_o.x,_o.y,_o.z].map(v=>+v.toFixed(3)),d:[aim.x,aim.y,aim.z].map(v=>+v.toFixed(4)),q:++ON.q});ON.aim.push([performance.now(),player.yaw,player.pitch,ON.q])}
   // efekty broni: płomień, zamek, łuska, odrzut
   if(inst.flash){inst.flash.visible=true;inst.flash.rotation.z=rnd()*6.28;inst.flash.scale.setScalar(.75+rnd()*.5);inst.flashLight.intensity=inst.suppressed?.4:3.4*inst.flashScale;gun.flashT=.042}
   gun.slideT=.075;if(w.mag===0&&inst.pistol)inst.slideLocked=true;
@@ -1494,8 +1494,10 @@ function frame(){
   // menu pod Esc nie zatrzymuje gry (multiplayer): spadanie, przeładowanie, bot i odliczanie lecą dalej, tylko sterowanie jest wyłączone
   if(playing){if(match.frozen){gun.firing=false;gun.trigger=false}}else{gun.firing=false;gun.trigger=false;adsHeld=false}
   stepPlayer(dt);stepGun(dt);applyRecoil();
-  if(ON.active&&match.on){ON.sendT-=dt;if(ON.sendT<=0){ON.sendT=.05;const p=player,w=inv[curW],f2=v=>+(+v||0).toFixed(2),f3=v=>+(+v||0).toFixed(3);
-    NET.send({t:'st',s:[f3(p.pos.x),f3(p.pos.y),f3(p.pos.z),f3(p.yaw),f3(p.pitch),f2(p.crouch),f2(p.run),f2(p.air),f2(p.slideK),f2(p.legYaw),WEAPON_IDS.indexOf(w.id),p.ads>.5?1:0]})}}
+  if(ON.active&&match.on){const tn=performance.now();ON.aim.push([tn,player.yaw,player.pitch]);if(ON.aim.length>32)ON.aim.shift();   // kamera z każdej klatki (serwer sprawdza celowanie)
+    ON.sendT-=dt;if(ON.sendT<=0){ON.sendT=.05;const p=player,w=inv[curW],f2=v=>+(+v||0).toFixed(2),f3=v=>+(+v||0).toFixed(3),f4=v=>+(+v||0).toFixed(4);
+    NET.send({t:'st',s:[f3(p.pos.x),f3(p.pos.y),f3(p.pos.z),f3(p.yaw),f3(p.pitch),f2(p.crouch),f2(p.run),f2(p.air),f2(p.slideK),f2(p.legYaw),WEAPON_IDS.indexOf(w.id),p.ads>.5?1:0],
+      a:ON.aim.slice(-24).map(a=>a.length>3?[Math.round(tn-a[0]),f4(a[1]),f4(a[2]),a[3]]:[Math.round(tn-a[0]),f4(a[1]),f4(a[2])])});ON.aim.length=0}}
   stepEnemies(dt);
   if(player.view==='fps'){poseViewmodel(dt);me.visible=false}else{poseThirdPerson(dt)}
   if(window.__frameHook)window.__frameHook(dt);          // testy: odczyt pozy broni po każdej klatce
@@ -1764,7 +1766,7 @@ const match=createMatch({
 window.__match=match;
 // ================= 1v1 online: prawdziwi gracze przez serwer (net.js, WebSocket /ws) =================
 const NET=createNet();
-const ON={active:false,seat:0,opp:null,st:null,sendT:0,q:0,hidden:true};
+const ON={active:false,seat:0,opp:null,st:null,sendT:0,q:0,hidden:true,aim:[]};
 let remoteSkins=null;
 fetch('./skins.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(l=>{if(Array.isArray(l))remoteSkins=l}).catch(()=>{});
 const findSkin=id=>id?((remoteSkins||[]).find(k=>k.id===id)||SKINS.find(k=>k.id===id)||null):null;
@@ -1775,7 +1777,7 @@ function netFail(msg){
   dispatchEvent(new CustomEvent('fasolka:cancelled',{detail:{message:msg?srvText(msg,getLang()):i18n('net.offline')}}));
   toLobbyBg();if(document.pointerLockElement)document.exitPointerLock();lobby.show();
 }
-NET.on('matched',m=>{ON.active=true;ON.seat=m.seat===1?1:0;ON.opp=m.opp||{nick:'Gracz'};ON.st=null;ON.hidden=true;ON.q=0;match.found(ON.opp.nick,m.map)});
+NET.on('matched',m=>{ON.active=true;ON.seat=m.seat===1?1:0;ON.opp=m.opp||{nick:'Gracz'};ON.st=null;ON.hidden=true;ON.q=0;ON.aim=[];match.found(ON.opp.nick,m.map)});
 NET.on('go',()=>match.oppGo());
 NET.on('st',m=>{if(!ON.active)return;if(Array.isArray(m.s)){ON.st=m.s;ON.hidden=false}else if(m.s===null)ON.hidden=true});
 NET.on('sh',m=>{if(!ON.active||!Array.isArray(m.a)||!Array.isArray(m.b)||!match.on)return;spawnTracer(V3(...m.a),V3(...m.b));sndFar()});

@@ -185,6 +185,10 @@ const SRV = {
   'Szukasz meczu w innej karcie.': ['You are already searching for a match in another tab.', 'Ты уже ищешь матч в другой вкладке.', 'Ya estás buscando partida en otra pestaña.'],
   'Brak opłaconej stawki – zagraj jeszcze raz z lobby.': ['No paid stake – play again from the lobby.', 'Нет оплаченной ставки – сыграй ещё раз из лобби.', 'No hay apuesta pagada – juega de nuevo desde el lobby.'],
   'Błąd serwera': ['Server error', 'Ошибка сервера', 'Error del servidor'],
+  'Konto zablokowane za oszukiwanie – gra o stawki i wypłaty są wyłączone.': ['Account blocked for cheating – staked games and withdrawals are disabled.', 'Аккаунт заблокирован за читерство – игры на ставки и вывод отключены.', 'Cuenta bloqueada por trampas – las partidas con apuesta y los retiros están desactivados.'],
+  'Nowe konto: stawka najwyżej $5 (więcej po 5 meczach)': ['New account: max stake $5 (more after 5 matches)', 'Новый аккаунт: ставка до $5 (больше после 5 матчей)', 'Cuenta nueva: apuesta máxima $5 (más tras 5 partidas)'],
+  'Stawka najwyżej $25 – więcej po 20 meczach': ['Max stake $25 – more after 20 matches', 'Ставка до $25 – больше после 20 матчей', 'Apuesta máxima $25 – más tras 20 partidas'],
+  'Stawka najwyżej $100 – więcej po 50 meczach': ['Max stake $100 – more after 50 matches', 'Ставка до $100 – больше после 50 матчей', 'Apuesta máxima $100 – más tras 50 partidas'],
 };
 export function srvText(msg, lang) { const i = { en: 0, ru: 1, es: 2 }[lang]; return i == null || !msg || !SRV[msg] ? msg : SRV[msg][i]; }
 export function createWallet({ api, root, getLang, toast, onChange, local = null }) {
@@ -212,9 +216,11 @@ export function createWallet({ api, root, getLang, toast, onChange, local = null
   }
   if (local) token = 'local';
 
+  // identyfikator urządzenia (losowy, zapisany w tej przeglądarce): serwer łączy po nim konta jednej osoby (multikonta, omijanie blokady)
+  const devId = () => { try { let d = localStorage.getItem('bl-dev'); if (!d) { d = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join(''); localStorage.setItem('bl-dev', d); } return d; } catch { return ''; } };
   async function call(method, p, body) {
     if (local) return localCall(method, p, body);
-    const r = await fetch(api + '/api' + p, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    const r = await fetch(api + '/api' + p, { method, headers: { 'Content-Type': 'application/json', 'X-Dev': devId(), ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: body ? JSON.stringify(body) : undefined });
     let j = {}; try { j = await r.json(); } catch {}
     if (!r.ok) { const e = new Error(srvText(j.message || 'Błąd serwera', getLang())); e.code = j.error; e.status = r.status; if (r.status === 401 && j.error === 'auth') setSession(null); throw e; }
     online = true; return j;

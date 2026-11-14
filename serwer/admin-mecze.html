@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Sprawdzanie meczów</title>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a; --text:#e7e9ee; --mut:#9aa2b1; --acc:#ffb547;
+    --ok:#3ecf8e; --bad:#ff5a4d; --warn:#ffb547; --p0:#4da3ff; --p1:#ff7ab6; --floor:#232835; --box1:#343b4b; --box2:#4a5368; --box3:#6a7590; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 5; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0 8px 0 0; }
+  .pill { padding: 2px 9px; border-radius: 99px; background: var(--panel2); color: var(--mut); font-size: 12px; }
+  .pill.warn { background: rgba(255,181,71,.15); color: var(--warn); }
+  button, select, input { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 11px; }
+  button { cursor: pointer; } button:hover { border-color: #3a4152; }
+  button.ok { background: rgba(62,207,142,.14); border-color: rgba(62,207,142,.45); color: var(--ok); }
+  button.bad { background: rgba(255,90,77,.14); border-color: rgba(255,90,77,.45); color: var(--bad); }
+  button:disabled { opacity: .45; cursor: default; }
+  main { padding: 16px; max-width: 1400px; margin: 0 auto; }
+  .grow { flex: 1; }
+  #login { max-width: 340px; margin: 12vh auto; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: grid; gap: 10px; }
+  #login h2 { margin: 0 0 4px; font-size: 18px; }
+  .err { color: var(--bad); min-height: 1.2em; font-size: 13px; }
+  .room { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .room.held { border-color: rgba(255,181,71,.55); }
+  .rhead { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; color: var(--mut); font-size: 13px; }
+  .rhead b { color: var(--text); }
+  .players { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  @media (max-width: 760px) { .players { grid-template-columns: 1fr; } }
+  .pl { background: var(--panel2); border-radius: 10px; padding: 10px; border-left: 3px solid var(--p0); }
+  .pl.s1 { border-left-color: var(--p1); }
+  .pl h3 { margin: 0 0 6px; font-size: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .risk { font-weight: 700; padding: 1px 8px; border-radius: 6px; font-size: 12px; }
+  .r0 { background: rgba(62,207,142,.15); color: var(--ok); } .r1 { background: rgba(255,181,71,.16); color: var(--warn); } .r2 { background: rgba(255,90,77,.18); color: var(--bad); }
+  .flags { margin: 6px 0 0; padding: 0; list-style: none; font-size: 12.5px; }
+  .flags li { display: flex; gap: 8px; padding: 2px 0; } .flags li span:first-child { min-width: 34px; color: var(--mut); font-variant-numeric: tabular-nums; }
+  .mut { color: var(--mut); font-size: 12px; }
+  .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+  .hold { margin-top: 8px; font-size: 13px; color: var(--warn); }
+  .empty { color: var(--mut); text-align: center; padding: 40px 0; }
+  /* powtórka */
+  #rp { position: fixed; inset: 0; background: rgba(5,6,9,.86); z-index: 20; display: none; padding: 16px; }
+  #rp.open { display: flex; }
+  .rpbox { margin: auto; width: min(1300px, 100%); height: min(860px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; display: grid; grid-template-columns: 1fr 330px; grid-template-rows: auto 1fr auto; overflow: hidden; }
+  @media (max-width: 900px) { .rpbox { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto auto; } }
+  .rptop { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  #cv { width: 100%; height: 100%; display: block; background: var(--floor); }
+  .cvwrap { position: relative; min-height: 300px; }
+  .side { border-left: 1px solid var(--line); padding: 12px; overflow: auto; font-size: 13px; }
+  .side h4 { margin: 10px 0 4px; font-size: 13px; }
+  .bar { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--line); }
+  #tl { flex: 1; accent-color: var(--acc); }
+  .legend { display: flex; gap: 12px; font-size: 12px; color: var(--mut); flex-wrap: wrap; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+  table.st { width: 100%; border-collapse: collapse; font-size: 12.5px; } table.st td { padding: 2px 4px; border-bottom: 1px solid var(--line); } table.st td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div id="login" hidden>
+  <h2>Panel admina</h2>
+  <div class="mut" id="lt">Konto panelu admina (to samo co w panelu admina w grze).</div>
+  <input id="lu" placeholder="Login admina" autocomplete="username">
+  <input id="lp" type="password" placeholder="Hasło" autocomplete="current-password">
+  <div id="ls" class="mut" hidden></div>
+  <input id="lc" placeholder="Kod 2FA (6 cyfr)" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
+  <button id="lb" class="ok">Zaloguj</button>
+  <div class="err" id="le"></div>
+</div>
+<div id="app" hidden>
+  <header>
+    <h1>Sprawdzanie meczów</h1>
+    <span class="pill warn" id="cntHeld">0 czeka</span>
+    <span class="pill" id="cntInfo"></span>
+    <span class="grow"></span>
+    <label class="mut"><input type="checkbox" id="all"> wszystkie mecze</label>
+    <button id="refresh">Odśwież</button>
+    <button id="logout">Wyloguj</button>
+  </header>
+  <main>
+    <div class="mut" style="margin-bottom:12px">Wygrana czeka na decyzję, gdy serwer ocenił ryzyko oszustwa zwycięzcy na co najmniej <b id="hr">50%</b>, konto jest pod obserwacją,
+      ta sama para gra ze sobą za często, konta są powiązane albo stawka jest wysoka (od <b id="rs">$250</b>). <b>Wypłać</b> = pieniądze trafiają do zwycięzcy.
+      <b>Odrzuć</b> = wygrana przechodzi na przeciwnika, a oszust dostaje blokadę (gra o stawki i wypłaty wyłączone).</div>
+    <div id="list"></div>
+  </main>
+</div>
+<div id="rp">
+  <div class="rpbox">
+    <div class="rptop"><b id="rpTitle">Powtórka</b><span class="mut" id="rpInfo"></span><span class="grow"></span>
+      <div class="legend"><span><i class="dot" style="background:var(--p0)"></i><span id="lg0">gracz 1</span></span><span><i class="dot" style="background:var(--p1)"></i><span id="lg1">gracz 2</span></span>
+        <span>— strzał</span><span style="color:var(--bad)">— trafienie</span></div>
+      <button id="rpClose">Zamknij</button></div>
+    <div class="cvwrap"><canvas id="cv"></canvas></div>
+    <div class="side" id="rpSide"></div>
+    <div class="bar"><button id="play">▶</button>
+      <select id="spd"><option value="0.25">0,25×</option><option value="0.5">0,5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+      <input type="range" id="tl" min="0" max="1000" value="0" step="1"><span id="tt" class="mut" style="min-width:90px;text-align:right">0,0 s</span></div>
+  </div>
+</div>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // panel admina ma własne konta (login + hasło + kod 2FA, zakładane na serwerze: node admin.mjs dodaj NAZWA);
+  // sesja panelu tylko w tej karcie (sessionStorage 'bl-admin', jak panel admina w grze), w nagłówku X-Admin-Token
+  const adm = { get() { try { return sessionStorage.getItem('bl-admin') || ''; } catch { return ''; } }, set(v) { try { v ? sessionStorage.setItem('bl-admin', v) : sessionStorage.removeItem('bl-admin'); } catch {} } };
+  async function api(method, p, body) {
+    const r = await fetch('/api' + p, { method, headers: { 'Content-Type': 'application/json', 'X-Admin-Token': adm.get() }, body: body ? JSON.stringify(body) : undefined });
+    let j = {}; try { j = await r.json(); } catch {}
+    if (!r.ok) { const e = new Error(j.message || ('Błąd ' + r.status)); e.status = r.status; e.code = j.error; throw e; }
+    return j;
+  }
+  // etap: 'pass' = login, hasło i kod; 'setup' = pierwsze logowanie – klucz 2FA do dodania w aplikacji i pierwszy kod
+  let setupToken = '';
+  function showLogin(msg, stage = 'pass', secret = '', uri = '') {
+    $('app').hidden = true; $('login').hidden = false; $('le').textContent = msg || '';
+    $('lu').hidden = $('lp').hidden = stage !== 'pass'; $('ls').hidden = stage !== 'setup';
+    $('lt').textContent = stage === 'setup' ? 'Pierwsze logowanie: dodaj ten klucz w aplikacji 2FA (Google Authenticator, Authy…) i wpisz kod z aplikacji.'
+      : 'Konto panelu admina (to samo co w panelu admina w grze). Kod 2FA z aplikacji – przy pierwszym logowaniu zostaw puste.';
+    if (stage === 'setup') $('ls').innerHTML = `Klucz: <b style="font-family:ui-monospace,monospace;letter-spacing:.06em">${esc(secret.replace(/(.{4})/g, '$1 ').trim())}</b>${uri ? `<br><a href="${esc(uri)}" style="color:var(--acc)">otwórz w aplikacji 2FA</a>` : ''}`;
+    $('lb').textContent = stage === 'setup' ? 'Włącz 2FA i wejdź' : 'Zaloguj'; $('lb').dataset.stage = stage;
+    (stage === 'setup' ? $('lc') : $('lu')).focus();
+  }
+  $('lb').onclick = async () => {
+    $('le').textContent = '';
+    try {
+      let j;
+      if ($('lb').dataset.stage === 'setup') j = await api('POST', '/admin/2fa/enable', { setupToken, code: $('lc').value.trim() });
+      else {
+        j = await api('POST', '/admin/login', { username: $('lu').value.trim(), password: $('lp').value, code: $('lc').value.trim() });
+        if (j.setup) { setupToken = j.setupToken; $('lc').value = ''; return showLogin('', 'setup', j.secret, j.uri); }
+      }
+      adm.set(j.adminToken); $('lp').value = ''; $('lc').value = ''; load();
+    } catch (e) { $('le').textContent = e.message; }
+  };
+  for (const id of ['lp', 'lc']) $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') $('lb').click(); });
+
+  const fmtT = (t) => new Date(t).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const riskCls = (r) => r == null ? 'r0' : r >= 0.5 ? 'r2' : r >= 0.25 ? 'r1' : 'r0';
+  const pct = (v) => v == null ? '—' : Math.round(v * 100) + '%';
+  const STATE = { won: 'wygrał', lost: 'przegrał', held: 'wygrał – wypłata czeka', open: 'w grze' };
+  let DATA = null;
+
+  async function load() {
+    if (!adm.get()) return showLogin();
+    try { DATA = await api('GET', '/admin/review' + ($('all').checked ? '?all=1' : '')); }
+    catch (e) {
+      if (e.status === 401) { adm.set(''); return showLogin('Sesja panelu wygasła – zaloguj się ponownie.'); }   // 30 min bez ruchu albo 12 h
+      $('list').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return;
+    }
+    $('login').hidden = true; $('app').hidden = false;
+    $('cntHeld').textContent = DATA.held + ' czeka na decyzję'; $('cntInfo').textContent = DATA.rooms.length + ' meczów na liście';
+    $('hr').textContent = Math.round(DATA.holdRisk * 100) + '%'; $('rs').textContent = '$' + DATA.reviewStake;
+    render();
+  }
+  function render() {
+    const L = $('list');
+    if (!DATA.rooms.length) { L.innerHTML = `<div class="empty">Nic do sprawdzenia. ${$('all').checked ? '' : 'Zaznacz „wszystkie mecze”, żeby zobaczyć ostatnie mecze.'}</div>`; return; }
+    L.innerHTML = DATA.rooms.map((r) => {
+      const held = r.players.some((p) => p.state === 'held');
+      const pls = r.players.map((p, i) => `<div class="pl s${i}">
+        <h3>${esc(p.name)} <span class="risk ${riskCls(p.risk)}">ryzyko ${pct(p.risk)}</span><span class="mut">${esc(STATE[p.state] || p.state)}${p.payout ? ' · $' + p.payout.toFixed(2) : ''}</span>
+          ${p.banned ? `<span class="risk r2" title="${esc(p.banReason)}">ZABLOKOWANY</span>` : ''}</h3>
+        <div class="mut">podejrzenie konta ${pct(p.suspicion)} · ${p.matches} meczów${p.linked.length ? ' · powiązane: ' + p.linked.map((l) => esc(l.name) + (l.banned ? ' (zablok.)' : '') + ' [' + esc(String(l.kinds).replace('dev', 'urządzenie').replace('wd', 'adres wypłat')) + ']').join(', ') : ''}</div>
+        ${p.flags.length ? `<ul class="flags">${p.flags.map((f) => `<li><span>${Math.round(f.score * 100)}%</span><span>${esc(f.text)}</span></li>`).join('')}</ul>` : '<div class="mut" style="margin-top:6px">brak sygnałów</div>'}
+        <div class="acts"><button data-ban="${esc(p.name)}" data-on="${p.banned ? 0 : 1}" class="${p.banned ? '' : 'bad'}">${p.banned ? 'Odblokuj konto' : 'Zablokuj konto'}</button></div>
+      </div>`).join('');
+      return `<div class="room ${held ? 'held' : ''}">
+        <div class="rhead"><b>${esc(r.map || '?')}</b><span>${fmtT(r.t)}</span><span>stawka <b>$${(+r.stake || 0).toFixed(2)}</b></span><span>wynik <b>${esc(r.score || '—')}</b></span>
+          ${r.review ? `<span class="pill ${r.review === 'held' ? 'warn' : ''}">${({ held: 'czeka', approved: 'wypłacone', rejected: 'odrzucone' })[r.review] || esc(r.review)}</span>` : ''}
+          <span class="grow"></span>${r.replay ? `<button data-rp="${esc(r.room)}">Powtórka</button>` : '<span class="mut">bez powtórki</span>'}
+          ${held ? `<button class="ok" data-dec="approve" data-room="${esc(r.room)}">Wypłać</button><button class="bad" data-dec="reject" data-room="${esc(r.room)}">Odrzuć i zablokuj</button>` : ''}</div>
+        ${r.hold ? `<div class="hold">Wstrzymane: ${esc(r.hold)}</div>` : ''}
+        <div class="players">${pls}</div></div>`;
+    }).join('');
+  }
+  $('list').addEventListener('click', async (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.rp) return openReplay(b.dataset.rp);
+    if (b.dataset.dec) {
+      const r = DATA.rooms.find((x) => x.room === b.dataset.room), w = r && r.players.find((p) => p.state === 'held'), l = r && r.players.find((p) => p.state !== 'held');
+      const msg = b.dataset.dec === 'approve' ? `Wypłacić wygraną graczowi ${w ? w.name : ''}?` : `Odrzucić wygraną gracza ${w ? w.name : ''}? Pula trafi do ${l ? l.name : 'przeciwnika'}, a ${w ? w.name : 'zwycięzca'} dostanie blokadę konta.`;
+      if (!confirm(msg)) return;
+      b.disabled = true; try { await api('POST', '/admin/decide', { room: b.dataset.room, decision: b.dataset.dec }); await load(); } catch (err) { alert(err.message); b.disabled = false; }
+      return;
+    }
+    if (b.dataset.ban) {
+      const on = b.dataset.on === '1'; let reason = '';
+      if (on) { reason = prompt(`Powód blokady konta ${b.dataset.ban}:`, 'oszukiwanie'); if (reason === null) return; }
+      else if (!confirm(`Odblokować konto ${b.dataset.ban}?`)) return;
+      b.disabled = true; try { await api('POST', '/admin/ban', { username: b.dataset.ban, banned: on, reason }); await load(); } catch (err) { alert(err.message); b.disabled = false; }
+    }
+  });
+  $('refresh').onclick = load; $('all').onchange = load;
+  $('logout').onclick = async () => { try { await api('POST', '/admin/logout'); } catch {} adm.set(''); showLogin(); };
+
+  // ---------------- powtórka: widok z góry ----------------
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  let R = null, T = 0, playing = false, lastNow = 0, view = null;
+  async function openReplay(room) {
+    $('rp').classList.add('open'); $('rpTitle').textContent = 'Wczytuję powtórkę…'; $('rpSide').innerHTML = ''; R = null; draw();
+    try { R = await api('GET', '/admin/replay?room=' + encodeURIComponent(room)); } catch (e) { $('rpTitle').textContent = e.message; return; }
+    const st = R.rec.st; R.byS = [[], []]; for (const row of st) R.byS[row[1]].push(row);
+    R.t1 = Math.max(st.length ? st[st.length - 1][0] : 0, ...(R.rec.sh.length ? [R.rec.sh[R.rec.sh.length - 1][0]] : [0]));
+    R.t0 = st.length ? st[0][0] : 0; T = R.t0;
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const b of R.boxes || []) { x0 = Math.min(x0, b[0]); x1 = Math.max(x1, b[3]); z0 = Math.min(z0, b[2]); z1 = Math.max(z1, b[5]); }
+    for (const row of st) { x0 = Math.min(x0, row[2]); x1 = Math.max(x1, row[2]); z0 = Math.min(z0, row[4]); z1 = Math.max(z1, row[4]); }
+    view = { x0, x1, z0, z1 }; R.boxes = (R.boxes || []).slice().sort((a, b) => a[4] - b[4]);
+    $('rpTitle').textContent = `${R.map} · ${R.players.map((p) => p.nick).join(' vs ')} · ${R.score.join(':')}`;
+    $('rpInfo').textContent = `stawka $${R.stake} · ${({ score: 'koniec po rundach', left: 'walkower', cheat: 'wyrzucony za ruch' })[R.reason] || R.reason}`;
+    $('lg0').textContent = R.players[0].nick; $('lg1').textContent = R.players[1].nick;
+    $('rpSide').innerHTML = R.players.map((p, i) => { const s = R.stats[i] || {}, m = p.summary || {};
+      return `<h4 style="color:var(--p${i})">${esc(p.nick)} – ryzyko ${pct(p.risk)}</h4>
+        <table class="st"><tr><td>celność</td><td>${pct(m.acc)} (${m.hits}/${m.shots})</td></tr><tr><td>w głowę (odsłonięty)</td><td>${pct(m.hsOpen)}</td></tr>
+        <tr><td>mediana reakcji</td><td>${m.reaction != null ? Math.round(m.reaction * 1000) + ' ms' : '—'}</td></tr>
+        <tr><td>śledzenie celu</td><td>${s.track && s.track.n ? pct(s.track.on / s.track.n) : '—'}</td></tr>
+        <tr><td>strzały z celownikiem na celu</td><td>${s.shotsSeen ? pct(s.shotsOn / s.shotsSeen) : '—'}</td></tr>
+        <tr><td>snapy / silent aim</td><td>${m.snaps || 0} / ${(m.mismatch || 0) + (m.spikes || 0)}</td></tr>
+        <tr><td>przerwy w paczkach</td><td>${m.gaps || 0}</td></tr><tr><td>ping</td><td>${Math.round((m.rtt || 0) * 1000)} ms</td></tr></table>
+        ${p.flags.length ? `<ul class="flags">${p.flags.map((f) => `<li><span>${Math.round(f.score * 100)}%</span><span>${esc(f.text)}</span></li>`).join('')}</ul>` : '<div class="mut">brak sygnałów</div>'}`; }).join('') +
+      `<h4>Rundy</h4><div class="mut">${R.rec.rd.map((r) => `${(r[0] - R.t0).toFixed(1)} s: ${esc(R.players[r[1]].nick)}`).join('<br>') || '—'}</div>
+       <h4>Jak czytać</h4><div class="mut">Kółko = gracz, kreska = kierunek kamery, cienkie linie = strzały (czerwone = trafienie, grubsze = w głowę). Ciemniejsze bryły są wyższe.
+       Na powolnym tempie widać, czy celownik „przykleja się” do przeciwnika albo skacze na niego zza ściany.</div>`;
+    resize(); draw();
+  }
+  $('rpClose').onclick = () => { $('rp').classList.remove('open'); playing = false; $('play').textContent = '▶'; };
+  $('play').onclick = () => { playing = !playing; $('play').textContent = playing ? '❚❚' : '▶'; lastNow = performance.now(); if (playing) requestAnimationFrame(loop); };
+  $('tl').oninput = () => { if (!R) return; T = R.t0 + ($('tl').value / 1000) * (R.t1 - R.t0); draw(); };
+  document.addEventListener('keydown', (e) => { if (!$('rp').classList.contains('open')) return; if (e.key === ' ') { e.preventDefault(); $('play').click(); } if (e.key === 'Escape') $('rpClose').click();
+    if (e.key === 'ArrowRight' && R) { T = Math.min(R.t1, T + 0.1); draw(); } if (e.key === 'ArrowLeft' && R) { T = Math.max(R.t0, T - 0.1); draw(); } });
+  function loop(now) { if (!playing || !R) return; T += (now - lastNow) / 1000 * +$('spd').value; lastNow = now; if (T >= R.t1) { T = R.t1; playing = false; $('play').textContent = '▶'; } draw(); if (playing) requestAnimationFrame(loop); }
+  function resize() { const r = cv.parentElement.getBoundingClientRect(), d = devicePixelRatio || 1; cv.width = Math.max(10, r.width * d); cv.height = Math.max(10, r.height * d); }
+  addEventListener('resize', () => { if ($('rp').classList.contains('open')) { resize(); draw(); } });
+  function at(rows, t) {                                        // stan gracza w chwili t (interpolacja między paczkami)
+    if (!rows.length) return null; let lo = 0, hi = rows.length - 1; if (t <= rows[0][0]) return rows[0]; if (t >= rows[hi][0]) return rows[hi];
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (rows[m][0] <= t) lo = m; else hi = m; }
+    const a = rows[lo], b = rows[hi]; if (b[0] - a[0] > 0.5) return a; const k = (t - a[0]) / Math.max(1e-6, b[0] - a[0]);
+    let dy = b[5] - a[5]; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    return [t, a[1], a[2] + (b[2] - a[2]) * k, a[3] + (b[3] - a[3]) * k, a[4] + (b[4] - a[4]) * k, a[5] + dy * k, a[6] + (b[6] - a[6]) * k, a[7]];
+  }
+  function draw() {
+    const W = cv.width, H = cv.height, css = getComputedStyle(document.documentElement), col = (n) => css.getPropertyValue(n).trim();
+    ctx.fillStyle = col('--floor'); ctx.fillRect(0, 0, W, H);
+    if (!R || !view) return;
+    const pad = 20 * (devicePixelRatio || 1), sx = (W - pad * 2) / (view.x1 - view.x0 || 1), sz = (H - pad * 2) / (view.z1 - view.z0 || 1), s = Math.min(sx, sz);
+    const ox = (W - (view.x1 - view.x0) * s) / 2, oz = (H - (view.z1 - view.z0) * s) / 2;
+    const X = (x) => ox + (x - view.x0) * s, Z = (z) => oz + (z - view.z0) * s;
+    for (const b of R.boxes) { if (b[4] < 0.08) continue; ctx.fillStyle = b[4] < 0.7 ? col('--box1') : b[4] < 1.8 ? col('--box2') : col('--box3'); ctx.fillRect(X(b[0]), Z(b[2]), (b[3] - b[0]) * s, (b[5] - b[2]) * s); }
+    // strzały z ostatnich 0,35 s
+    for (const sh of R.rec.sh) { const age = T - sh[0]; if (age < 0 || age > 0.35) continue;
+      ctx.globalAlpha = 1 - age / 0.35; ctx.strokeStyle = sh[4] ? col('--bad') : col(sh[1] ? '--p1' : '--p0'); ctx.lineWidth = (sh[4] === 2 ? 3 : 1.4) * (devicePixelRatio || 1);
+      ctx.beginPath(); ctx.moveTo(X(sh[2][0]), Z(sh[2][2])); ctx.lineTo(X(sh[3][0]), Z(sh[3][2])); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    // gracze: ślad, pozycja, kierunek kamery
+    for (const seat of [0, 1]) {
+      const rows = R.byS[seat], p = at(rows, T); if (!p) continue; const c = col(seat ? '--p1' : '--p0');
+      ctx.strokeStyle = c; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.5 * (devicePixelRatio || 1); ctx.beginPath(); let first = true;
+      for (const r of rows) { if (r[0] < T - 3 || r[0] > T) continue; if (first) { ctx.moveTo(X(r[2]), Z(r[4])); first = false; } else ctx.lineTo(X(r[2]), Z(r[4])); } ctx.stroke(); ctx.globalAlpha = 1;
+      const px = X(p[2]), pz = Z(p[4]), L = 3.2 * s, dx = -Math.sin(p[5]), dz = -Math.cos(p[5]);
+      ctx.strokeStyle = c; ctx.lineWidth = 2 * (devicePixelRatio || 1); ctx.beginPath(); ctx.moveTo(px, pz); ctx.lineTo(px + dx * L, pz + dz * L); ctx.stroke();
+      ctx.fillStyle = c; ctx.beginPath(); ctx.arc(px, pz, Math.max(4, 0.32 * s), 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = col('--text'); ctx.font = `${12 * (devicePixelRatio || 1)}px system-ui`; ctx.fillText(`${R.players[seat].nick}  y ${p[3].toFixed(1)}`, px + 8, pz - 8);
+    }
+    const rdNow = R.rec.rd.filter((r) => r[0] <= T).length;
+    $('tt').textContent = (T - R.t0).toFixed(1).replace('.', ',') + ' s · runda ' + Math.min(rdNow + 1, R.rec.rd.length + 1);
+    $('tl').value = Math.round((T - R.t0) / Math.max(1e-6, R.t1 - R.t0) * 1000);
+  }
+  load();
+})();
+</script>
+</body>
+</html>

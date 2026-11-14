@@ -25,7 +25,8 @@ const V_MAX = 11.5, V_AVG = 9.0, SLACK = 1.0, JUMP_H = 1.35, UP_V = 7.5, SUP_M =
 const ROUND_DELAY = 6.6;               // od zabójstwa do „WALCZ!” (killcam 1 s + wynik 3,1 s + kurtyna + odliczanie 2,4 s)
 const START_DELAY = 6.8;               // od 'go' do „WALCZ!” (wczytanie + intro 4,4 s + odliczanie 2,4 s)
 const LIVE_GRACE = 2.5;                // po tylu sekundach od planowanego startu gracz jest w grze, nawet bez 'lv'
-const REWIND_MAX = 0.3;                // kompensacja opóźnienia: maksymalne cofnięcie przeciwnika (s)
+const REWIND_MAX = 0.25;               // kompensacja opóźnienia: maksymalne cofnięcie przeciwnika (s) – więcej nie daje sztuczny lag
+const LAG_SHOT = 0.35;                 // bez paczek ruchu dłużej niż tyle (lag switch) strzały nie są przyjmowane
 
 // ---------------- mapy: kolizje z plików gry ----------------
 const MAPS = {};
@@ -115,13 +116,18 @@ function newPlayer() {
   return { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, cr: 0, sl: 0, ads: 0, w: 0, run: 0, air: 0, legYaw: 0,
     hp: 100, live: false, inited: false, lastT: 0, lastGroundY: 0, airSince: 0, hist: [], trail: [],
     bloom: 0, bloomT: 0, tokens: 1, tokT: 0, lastQ: 0, ammo: {}, reloadW: -1, reloadAt: 0,
-    rtt: 0.1, viol: [], kicked: false, seen: false, seenT: 0, hiddenSent: false };
+    rtt: 0.1, viol: [], kicked: false, seen: false, seenT: 0, hiddenSent: false,
+    aim: [], lastStT: 0, visOpp: false, visSince: 0, reacted: true, spray: null, lastShotT: 0,
+    pending: [], preFire: false,
+    an: { shots: 0, hits: 0, heads: 0, hitsOpen: 0, headsOpen: 0, reactions: [], flicks: 0, flickHeads: 0, snaps: 0, snapHeads: 0, trigger: [], sprays: [], mismatch: 0, noSamp: 0,
+      samples: 0, noShotSamp: 0, spikes: 0, firstOn: 0, sweep: 0, shotsOn: 0, shotsSeen: 0, track: { n: 0, on: 0, on1: 0 }, gaps: 0, sevMoves: 0, rtts: [] } };
 }
 function refill(p) { p.ammo = {}; for (const id of WEAPON_IDS) p.ammo[id] = { mag: WEAPONS[id].mag, res: WEAPONS[id].reserve }; p.reloadW = -1; p.bloom = 0; }
 
 export function createRoom(mapName, now) {
   const map = MAPS[mapName]; if (!map) throw new Error('Brak mapy ' + mapName);
-  const room = { map, p: [newPlayer(), newPlayer()], liveAt: Infinity, phase: 'wait', score: [0, 0], over: false, log: [] };
+  const room = { map, p: [newPlayer(), newPlayer()], liveAt: Infinity, phase: 'wait', score: [0, 0], over: false, log: [],
+    t0: now, rec: { map: mapName, st: [], sh: [], rd: [] } };          // powtórka meczu do weryfikacji przez admina
   room.p.forEach(refill);
   return room;
 }
@@ -217,12 +223,15 @@ function acceptMove(room, p, s, now) {
   else { if (!p.airSince) p.airSince = now; p.ground = false; }
   pushHist(p, now);
   p.trail.push({ t: now, x: s.x, z: s.z }); while (p.trail.length && now - p.trail[0].t > 2.5) p.trail.shift();
+  const seat = room.p.indexOf(p), r2 = (v) => Math.round(v * 100) / 100, r3 = (v) => Math.round(v * 1000) / 1000;
+  if (room.rec.st.length < 60000) room.rec.st.push([r2(now - room.t0), seat, r2(s.x), r2(s.y), r2(s.z), r3(s.yaw), r3(s.pitch), r2(s.cr)]);
 }
 // Ciężkie odrzucenia (teleport, latanie, przenikanie przez ściany, wyjście poza mapę) liczą się do wyrzucenia z meczu;
 // łagodne (wciśnięcie w stopień, odrobinę za wysoko) tylko cofają gracza – zdarzają się też uczciwym przez fizykę gry.
 const SEVERE = new Set(['nan', 'poza mapą', 'za szybko', 'za szybko w górę', 'przez ścianę', 'wisi w powietrzu']);
 function violation(p, why, now) {
   if (!SEVERE.has(why)) return false;
+  if (why !== 'nan') p.an.sevMoves++;                            // NaN to błąd silnika gry (zdarza się uczciwym), nie liczy się do ryzyka
   p.viol.push(now); while (p.viol.length && now - p.viol[0] > 20) p.viol.shift();
   return p.viol.length >= 25;                                  // 25 ciężkich odrzuceń w 20 s = oszust
 }
@@ -232,6 +241,7 @@ function shoot(room, seat, m, now, out) {
   const me = room.p[seat], op = room.p[1 - seat], wid = WEAPON_IDS[me.w] || 'ak47', W = WEAPONS[wid];
   if (room.phase !== 'live' || !me.live || me.hp <= 0) return;
   const q = +m.q; if (!(q > me.lastQ)) return; me.lastQ = q;      // każdy strzał raz
+  if (now - me.lastStT > LAG_SHOT) return;                         // lag switch: bez świeżych paczek ruchu nie ma strzałów
   // szybkostrzelność: wiadro żetonów (rpm/60 na sekundę, zapas 2 na skoki sieci)
   me.tokens = Math.min(2, me.tokens + (now - me.tokT) * (W.rpm / 60)); me.tokT = now;
   if (me.tokens < 0.95) return; me.tokens -= 1;
@@ -249,6 +259,7 @@ function shoot(room, seat, m, now, out) {
   if (Array.isArray(m.o) && m.o.length === 3 && m.o.every(Number.isFinite) && Math.hypot(m.o[0] - eye[0], m.o[1] - eye[1], m.o[2] - eye[2]) <= 0.7) o = m.o;
   let d = Array.isArray(m.d) && m.d.length === 3 && m.d.every(Number.isFinite) ? m.d : null; if (!d) return;
   const L = Math.hypot(...d); if (L < 1e-6) return; d = d.map((v) => v / L);
+  const aimDir = d.slice();                                        // kierunek celowania gracza (przed rozrzutem) – do analizy celowania
   // losowy odchył w stożku spread wokół kierunku celowania
   const ang = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * spread;
   const up = Math.abs(d[1]) > 0.99 ? [1, 0, 0] : [0, 1, 0];
@@ -259,6 +270,12 @@ function shoot(room, seat, m, now, out) {
   let hit = null;
   if (op.live && op.hp > 0) { const back = Math.min(REWIND_MAX, me.rtt + 0.07); hit = rayBean(o, d, stateAt(op, now - back)); }
   const end = (t) => [o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t].map((x) => +x.toFixed(2));
+  const landed = !!(hit && hit.t < tWall);
+  // trafienie w głowę zza osłony (murek zasłania tułów) nie liczy się do odsetka trafień w głowę – tam inaczej się nie da
+  let open = true;
+  if (landed && hit.head) { const ts = stateAt(op, now - Math.min(REWIND_MAX, me.rtt + 0.07)), dr = CROUCH_DROP * (ts.cr || 0); open = visibleLine(room.map, o, [ts.x, ts.y + 0.95 - dr, ts.z]) || visibleLine(room.map, o, [ts.x, ts.y + 0.6 - dr, ts.z]); }
+  analyzeShot(room, seat, o, aimDir, landed, landed && hit.head, open, W, now, q);
+  room.rec.sh.push([Math.round((now - room.t0) * 100) / 100, seat, o.map((x) => +x.toFixed(2)), end(landed ? hit.t : Math.min(tWall, 120)), landed ? (hit.head ? 2 : 1) : 0]);
   if (hit && hit.t < tWall) {
     const dmg = Math.round(W.dmg * (hit.head ? W.head : 1));
     op.hp = Math.max(0, op.hp - dmg);
@@ -268,12 +285,128 @@ function shoot(room, seat, m, now, out) {
     if (op.hp <= 0) roundWon(room, seat, now, out);
   } else out(1 - seat, { t: 'sh', a: o.map((x) => +x.toFixed(2)), b: end(Math.min(tWall, 120)), w: wid });
 }
+// ---------------- telemetria celowania (aimbot, triggerbot, silent aim, skrypty na odrzut) ----------------
+// Gracz przysyła kąty kamery z każdej klatki (pole 'a' w paczce ruchu). Serwer porównuje je z tym, gdzie naprawdę był
+// przeciwnik (stan cofnięty o opóźnienie), i zbiera statystyki do oceny ryzyka po meczu (ochrona.mjs).
+const ang = (a, b) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])));
+const dirOf = (yaw, pitch) => [-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)];
+const wrapPi = (a) => { a = (a + Math.PI) % (2 * Math.PI); if (a < 0) a += 2 * Math.PI; return a - Math.PI; };
+// odległość kątowa dwóch kierunków kamery (yaw, pitch) – szybka, bez wektorów
+const angYP = (y1, p1, y2, p2) => Math.hypot(wrapPi(y2 - y1) * Math.cos((p1 + p2) / 2), p2 - p1);
+// błąd celowania (rad) do głowy i do środka tułowia przeciwnika w stanie s, z oka gracza e; radius = kątowa połowa szerokości fasolki
+function aimErr(e, dir, s) {
+  const drop = CROUCH_DROP * (s.cr || 0), head = [s.x, s.y + 1.35 - drop, s.z], body = [s.x, s.y + 0.95 - drop, s.z];
+  const toH = norm([head[0] - e[0], head[1] - e[1], head[2] - e[2]]), toB = norm([body[0] - e[0], body[1] - e[1], body[2] - e[2]]);
+  const dist = Math.hypot(body[0] - e[0], body[1] - e[1], body[2] - e[2]);
+  return { head: ang(dir, toH), body: ang(dir, toB), radius: Math.atan2(0.34, Math.max(0.5, dist)), dist };
+}
+function analyzeShot(room, seat, o, aimDir, landed, head, open, W, now, qn) {
+  const me = room.p[seat], op = room.p[1 - seat], an = me.an;
+  an.shots++; if (landed) { an.hits++; if (head) an.heads++; if (!head || open) { an.hitsOpen++; if (head) an.headsOpen++; } }
+  const back = Math.min(REWIND_MAX, me.rtt + 0.07), tgt = stateAt(op, now - back), err = aimErr(o, aimDir, tgt);
+  // czas reakcji: od chwili, gdy serwer pokazał przeciwnika, do pierwszego trafienia (minus opóźnienie sieci i wygładzanie obrazu);
+  // pomijamy „prefire” (strzelanie na ślepo w róg tuż przed wyjściem przeciwnika)
+  if (landed && !me.reacted && me.visSince) { if (!me.preFire) an.reactions.push(+Math.max(0, now - me.visSince - me.rtt - 0.07).toFixed(3)); me.reacted = true; }
+  const first = now - me.lastShotT > 0.3;                          // pierwszy strzał serii
+  // strzały w biegnącego przeciwnika na widoku: jaka część padła z celownikiem na nim (tułów albo głowa). Człowiek strzela też,
+  // gdy celownik ucieka; triggerbot i aimbot prawie tylko wtedy, gdy jest na celu
+  const t0 = stateAt(op, now - back - 0.1), off = Math.min(err.body, err.head);
+  if (me.visOpp && off < 0.5 && err.dist >= 3 && Math.hypot(tgt.x - t0.x, tgt.z - t0.z) / 0.1 >= 2.5) { an.shotsSeen++; if (off < err.radius) an.shotsOn++; }
+  // serie z broni automatycznej: błąd celowania względem rozmiaru celu (idealnie równy przy odrzucie = skrypt)
+  const auto = W.rpm >= 500, e = err.body / err.radius;
+  if (auto && me.spray && now - me.lastShotT < 0.2) { me.spray.n++; me.spray.hits += landed ? 1 : 0; me.spray.errs.push(e); }
+  else { endSpray(me); me.spray = auto ? { n: 1, hits: landed ? 1 : 0, errs: [e] } : null; }
+  me.lastShotT = now;
+  // ruch kamery wokół strzału sprawdzamy, gdy przyjdą próbki z klatek po nim (paczka ruchu co 50 ms)
+  if (me.pending.length < 64) me.pending.push({ t: now, qn, aimDir, back, landed, head, first, onTgt: err.body < err.radius, near: err.body < Math.max(0.035, err.radius * 1.5) });
+}
+// szczegóły jednego strzału na tle próbek kamery: silent aim, snap aimbota, flick, czas od wejścia celownika na cel (triggerbot)
+function aimDetail(room, seat, q) {
+  const me = room.p[seat], op = room.p[1 - seat], an = me.an;
+  const win = me.aim.filter((s) => s.q === undefined && s.t >= q.t - 0.3 && s.t <= q.t + 0.08), a = me.aim.filter((s) => s.q === undefined);
+  if (win.length < 2) { an.noSamp++; return; }
+  // silent aim: gra wysyła próbkę kamery z chwili strzału (ten sam numer co strzał). U uczciwego gracza kierunek strzału
+  // to dokładnie ta próbka. Inny kierunek = pocisk poleciał tam, gdzie kamera nie patrzyła. Próbka dopisana „pod strzał”,
+  // odstająca od klatek przed i po nim, to kamera, która skoczyła na cel tylko na czas strzału.
+  const shotS = me.aim.find((s) => s.q === q.qn);
+  if (!shotS) an.noShotSamp++;
+  else {
+    const dShot = ang(dirOf(shotS.yaw, shotS.pitch), q.aimDir);
+    if (dShot > 0.006) an.mismatch++;
+    const prev = win.filter((s) => s.t <= shotS.t + 0.001).pop(), next = win.find((s) => s.t > shotS.t + 0.001);
+    if (prev && next && next.t - prev.t < 0.06) {
+      let d = Infinity; for (let k = 0; k <= 8; k++) { const f = k / 8; d = Math.min(d, angYP(prev.yaw + wrapPi(next.yaw - prev.yaw) * f, prev.pitch + (next.pitch - prev.pitch) * f, shotS.yaw, shotS.pitch)); }
+      if (d > 0.035 && q.near) an.spikes++;
+    }
+  }
+  // snap: z bezruchu jednym skokiem kamery (jedna klatka, > 10 rad/s) prosto na cel i znów bezruch do strzału – ręka tak nie potrafi
+  for (let k = 1; k < win.length; k++) {
+    const s0 = win[k - 1], s1 = win[k], dt = s1.t - s0.t;
+    if (s1.t < q.t - 0.15 || s1.t > q.t + 0.008 || dt <= 0 || dt > 0.025) continue;   // skok kończy się przed strzałem (najpóźniej w jego klatce)
+    const step = angYP(s0.yaw, s0.pitch, s1.yaw, s1.pitch); if (step < 0.25 || step / dt < 10) continue;
+    let pre = 0, post = 0;
+    for (let j = k - 1; j > 0 && s0.t - win[j - 1].t < 0.07; j--) pre += angYP(win[j - 1].yaw, win[j - 1].pitch, win[j].yaw, win[j].pitch);
+    for (let j = k + 1; j < win.length && win[j].t <= q.t + 0.01; j++) post += angYP(win[j - 1].yaw, win[j - 1].pitch, win[j].yaw, win[j].pitch);
+    const preN = win.filter((s) => s.t < s0.t && s0.t - s.t < 0.07).length;
+    if (preN >= 2 && pre < 0.04 && post < 0.04 && q.onTgt) { an.snaps++; if (q.landed && q.head) an.snapHeads++; if (globalThis.__snapDbg) globalThis.__snapDbg({ q, k, win }); }
+    break;
+  }
+  // flick: obrót > 20° w 100–200 ms zakończony na celu (zdarza się też ludziom – słaby sygnał)
+  const cur = win.filter((s) => s.t <= q.t + 0.01).pop();
+  if (cur) {
+    const prev = win.filter((s) => cur.t - s.t >= 0.1 && cur.t - s.t <= 0.2).pop();
+    if (prev && angYP(prev.yaw, prev.pitch, cur.yaw, cur.pitch) > 0.35 && q.onTgt) { an.flicks++; if (q.landed && q.head) an.flickHeads++; }
+  }
+  // triggerbot: pierwszy strzał serii oddany, gdy celownik przelatywał po przeciwniku (szybki ruch kamery) – człowiek
+  // naciska spust po zatrzymaniu celownika, program w klatce, w której celownik przechodzi przez cel
+  if (q.first && q.onTgt) {
+    const p0 = win.filter((s) => s.t <= q.t).pop(), p1 = win.find((s) => s.t > q.t);
+    if (p0 && p1 && p1.t - p0.t < 0.05) { an.firstOn++; if (angYP(p0.yaw, p0.pitch, p1.yaw, p1.pitch) / (p1.t - p0.t) > 2.5) an.sweep++; }
+  }
+  // czas od wejścia celownika na przeciwnika do strzału (pierwszy strzał serii)
+  if (q.first && q.onTgt && cur) {
+    const eye = [me.x, EYE(me), me.z];
+    for (let i = a.indexOf(cur); i > 0 && q.t - a[i].t < 1.0; i--) {
+      const st = stateAt(op, a[i - 1].t - q.back), e = aimErr(eye, dirOf(a[i - 1].yaw, a[i - 1].pitch), st);
+      if (e.body > e.radius * 1.15) { an.trigger.push(+Math.max(0, q.t - a[i].t).toFixed(3)); break; }
+    }
+  }
+}
+function processAim(room, seat, now, flush) {
+  const me = room.p[seat];
+  while (me.pending.length && (flush || now - me.pending[0].t >= 0.09)) aimDetail(room, seat, me.pending.shift());
+}
+// śledzenie: jak długo celownik trzyma się poruszającego się przeciwnika, gdy ten jest na widoku i przed graczem
+function trackSample(room, seat, now) {
+  const me = room.p[seat], op = room.p[1 - seat];
+  if (room.phase !== 'live' || !me.visOpp || !op.live || op.hp <= 0 || me.hp <= 0) return;
+  const back = Math.min(REWIND_MAX, me.rtt + 0.07), st = stateAt(op, now - back), st0 = stateAt(op, now - back - 0.1);
+  if (Math.hypot(st.x - st0.x, st.z - st0.z) / 0.1 < 2.5) return;   // przeciwnik stoi – trzymanie celu nic nie mówi
+  const e = aimErr([me.x, EYE(me), me.z], dirOf(me.yaw, me.pitch), st);
+  if (e.dist < 3 || Math.min(e.body, e.head) > 0.5) return;       // za blisko albo poza polem widzenia
+  const off = Math.min(e.body, e.head);                            // celownik na tułowiu albo na głowie
+  me.an.track.n++; if (off < e.radius * 0.5) me.an.track.on++; if (off < e.radius) me.an.track.on1++;
+}
+function endSpray(p) {
+  const sp = p.spray; p.spray = null; if (!sp || sp.n < 6) return;
+  const m = sp.errs.reduce((x, y) => x + y, 0) / sp.n, sd = Math.sqrt(sp.errs.reduce((x, y) => x + (y - m) ** 2, 0) / sp.n);
+  p.an.sprays.push({ n: sp.n, hits: sp.hits, mean: +m.toFixed(3), sd: +sd.toFixed(3) });
+}
+// statystyki gracza po meczu (do oceny ryzyka w ochrona.mjs)
+export function playerStats(room, seat) {
+  const p = room.p[seat]; processAim(room, seat, Infinity, true); endSpray(p);
+  const r = p.an.rtts.slice().sort((x, y) => x - y);
+  return { ...p.an, rtt: +p.rtt.toFixed(3), rttMax: r.length ? r[r.length - 1] : 0, rttMed: r.length ? r[r.length >> 1] : 0 };
+}
+// bryły mapy (do rysowania powtórki w panelu admina)
+export const mapBoxes = (name) => (MAPS[name] ? MAPS[name].boxes.map((b) => [b.x0, b.y0, b.z0, b.x1, b.y1, b.z1].map((v) => +v.toFixed(2))) : null);
 function finishReload(p) { const id = WEAPON_IDS[p.reloadW], W = WEAPONS[id], a = p.ammo[id], n = Math.min(W.mag - a.mag, a.res); a.mag += n; a.res -= n; p.reloadW = -1; }
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const norm = (a) => { const l = Math.hypot(...a) || 1; return a.map((v) => v / l); };
 
 function roundWon(room, w, now, out) {
   room.score[w]++; room.phase = 'inter';
+  room.rec.rd.push([Math.round((now - room.t0) * 100) / 100, w]);
   room.p.forEach((p) => { p.live = false; });
   out(-1, { t: 'round', winner: w, score: room.score.slice() });
   if (room.score[w] >= 3) { room.over = true; room.winner = w; return; }
@@ -304,7 +437,19 @@ export function handleMessage(room, seat, m, now, out) {
   if (room.over) return;
   switch (m.t) {
     case 'st': {
-      if (!Array.isArray(m.s) || !me.inited) return;
+      if (!Array.isArray(m.s)) return;
+      if (me.lastStT && now - me.lastStT > 0.3 && room.phase === 'live' && me.live) me.an.gaps++;   // przerwa w paczkach (lag switch)
+      me.lastStT = now;
+      // próbki kamery z każdej klatki od ostatniej paczki: [ile ms temu, yaw, pitch]
+      if (Array.isArray(m.a)) for (const sm of m.a.slice(-24)) {
+        if (!Array.isArray(sm) || sm.length < 3 || sm.length > 4 || !sm.every(Number.isFinite)) continue;
+        const smp = { t: now - Math.max(0, Math.min(0.5, sm[0] / 1000)), yaw: sm[1], pitch: Math.max(-1.6, Math.min(1.6, sm[2])) };
+        if (sm.length === 4) smp.q = sm[3]; else me.an.samples++;
+        me.aim.push(smp);
+      }
+      me.aim.sort((x, y) => x.t - y.t); while (me.aim.length && now - me.aim[0].t > 2.5) me.aim.shift();
+      processAim(room, seat, now, false);
+      if (!me.inited) return;
       const [x, y, z, yaw, pitch, cr, run, air, sl, legYaw, w, ads] = m.s.map(Number);
       const s = { x, y, z, yaw: yaw || 0, pitch: pitch || 0, cr: clamp01(cr), run: clamp01(run), air: clamp01(air), sl: clamp01(sl), legYaw: legYaw || 0, w: WEAPON_IDS[w | 0] ? w | 0 : 0, ads: ads > 0.5 ? 1 : 0 };
       if (s.w !== me.w && me.reloadW >= 0) me.reloadW = -1;          // zmiana broni przerywa przeładowanie
@@ -319,6 +464,7 @@ export function handleMessage(room, seat, m, now, out) {
         return;
       }
       acceptMove(room, me, s, now);
+      trackSample(room, seat, now);
       relayState(room, seat, now, out);
       return;
     }
@@ -330,7 +476,7 @@ export function handleMessage(room, seat, m, now, out) {
     }
     case 'rs': if (room.phase !== 'live') placeAtSpawn(room, seat, now); return;
     case 'lv': if (room.phase !== 'inter' && now >= room.liveAt - 1.2) { me.live = true; if (room.phase === 'count') room.phase = 'live'; } return;
-    case 'po': { const rtt = now - (+m.s || 0); if (rtt >= 0 && rtt < 2) me.rtt = me.rtt * 0.7 + rtt * 0.3; return; }
+    case 'po': { const rtt = now - (+m.s || 0); if (rtt >= 0 && rtt < 2) { me.rtt = me.rtt * 0.7 + rtt * 0.3; me.an.rtts.push(+rtt.toFixed(3)); if (me.an.rtts.length > 200) me.an.rtts.shift(); } return; }
   }
 }
 const clamp01 = (v) => (v > 1 ? 1 : v > 0 ? v : 0);
@@ -339,6 +485,8 @@ const clamp01 = (v) => (v > 1 ? 1 : v > 0 ? v : 0);
 function relayState(room, seat, now, out) {
   const me = room.p[seat], op = room.p[1 - seat];
   const vis = canSee(room, op, me, now);
+  if (vis && !op.visOpp) { op.visSince = now; op.reacted = false; op.preFire = now - op.lastShotT < 0.4; }
+  op.visOpp = vis;
   if (vis) me.seenT = now;
   if (vis || now - me.seenT < 0.35) {                             // chwilę po zniknięciu jeszcze wysyłamy (bez migania na krawędzi)
     me.hiddenSent = false;
@@ -355,4 +503,4 @@ export function tick(room, now, out) {
   if (!room.pingT || now - room.pingT > 2) { room.pingT = now; out(-1, { t: 'pi', s: +now.toFixed(3) }); }
   room.p.forEach((p) => { if (p.reloadW >= 0 && now >= p.reloadAt) finishReload(p); });
 }
-export { START_DELAY, ROUND_DELAY, acceptMove as __accept };
+export { START_DELAY, ROUND_DELAY, acceptMove as __accept, canSee as __canSee };

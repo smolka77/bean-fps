@@ -11,6 +11,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { DatabaseSync } from 'node:sqlite';
 import { Connection, Keypair, PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL, sendAndConfirmTransaction, clusterApiUrl } from '@solana/web3.js';
 import { derivePath } from 'ed25519-hd-key';
@@ -18,6 +19,7 @@ import * as bip39 from 'bip39';
 import { WebSocketServer } from 'ws';
 import * as MECZ from './mecz.mjs';
 import * as OCH from './ochrona.mjs';
+import * as ANTY from './antycheat.mjs';                          // ocena ryzyka cheatów po meczu (aimbot, triggerbot, silent aim)
 
 // ---------------- konfiguracja ----------------
 const env = process.env;
@@ -30,6 +32,11 @@ const HOUSE_FEE = +(env.HOUSE_FEE || 0.10);                             // prowi
 const SCAN_MS = +(env.SCAN_MS || 15000);
 const MIN_WITHDRAW_LAMPORTS = Math.round(+(env.MIN_WITHDRAW_SOL || 0.001) * LAMPORTS_PER_SOL);
 const STAKE_MIN_USD = 1, STAKE_MAX_USD = 1000;
+// nowe konta grają o mniejsze stawki: [rozegrane mecze poniżej, najwyższa stawka w $] (cheater na świeżym koncie nie wygra od razu dużo)
+const STAKE_TIERS = [[5, 5], [20, 25], [50, 100]];
+const STAKE_MSG = { 5: 'Nowe konto: stawka najwyżej $5 (więcej po 5 meczach)', 25: 'Stawka najwyżej $25 – więcej po 20 meczach', 100: 'Stawka najwyżej $100 – więcej po 50 meczach' };
+const REVIEW_STAKE_USD = +(env.REVIEW_STAKE_USD || 250);               // od takiej stawki każda wygrana czeka na sprawdzenie przez admina
+const REPLAY_DAYS = +(env.REPLAY_DAYS || 60);                          // powtórki meczów trzymamy tyle dni (wstrzymane i odrzucone – zawsze)
 const TX_FEE = 5000;
 const GOOGLE_CLIENT_ID = (env.GOOGLE_CLIENT_ID || '').trim();   // logowanie przez Google (OAuth, typ: aplikacja internetowa)
 const HOST = env.HOST || '127.0.0.1';                                   // tylko ta maszyna (nginx); 0.0.0.0 = cały internet (niezalecane)
@@ -40,10 +47,11 @@ const WD_REVIEW_USD = +(env.WITHDRAW_REVIEW_USD || 100);                // wypł
 const SEC_HOLD_MS = +(env.SECURITY_HOLD_HOURS || 24) * 3600e3;          // blokada wypłat po zmianie hasła albo e-maila
 const GAME_DIR = path.resolve(env.GAME_DIR || path.join(path.dirname(new URL(import.meta.url).pathname), '..'));   // zbudowana gra (index.html) – serwer może ją podawać pod tym samym adresem                                                   // opłata sieci za prosty przelew (lamporty)
 if (CLUSTER === 'mainnet-beta' && env.ALLOW_MAINNET !== 'tak') {
-  console.error('Mainnet jest zablokowany: wyniki meczów liczy przeglądarka gracza (do oszukania). Zobacz README – „Przed mainnetem”.');
+  console.error('Mainnet jest zablokowany do czasu ustawienia ALLOW_MAINNET=tak. Zobacz README – „Przed mainnetem”.');
   process.exit(1);
 }
 fs.mkdirSync(DATA_DIR, { recursive: true });
+const REPLAY_DIR = path.join(DATA_DIR, 'powtorki'); fs.mkdirSync(REPLAY_DIR, { recursive: true });   // powtórki meczów (gzip) do sprawdzenia przez admina
 
 // fraza portfeli: ze zmiennej WALLET_MNEMONIC; bez niej (tylko devnet/testnet) generowana raz i zapisywana w dane/fraza.txt
 let MNEMONIC = (env.WALLET_MNEMONIC || '').trim();
@@ -78,6 +86,13 @@ CREATE TABLE IF NOT EXISTS withdrawals(id INTEGER PRIMARY KEY, tx_id INTEGER NOT
   usd REAL NOT NULL, t INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'review', decided INTEGER, decided_by INTEGER);`);
 // profil: e-mail i awatar; 2FA admina (totp, ostatni użyty krok, sekret w trakcie włączania); czas ostatniej zmiany hasła/e-maila
 for (const c of ['email TEXT', 'avatar TEXT', 'google_sub TEXT', 'totp TEXT', 'totp_step INTEGER', 'totp_pending TEXT', 'sec_changed INTEGER']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + c); } catch {} }
+// ochrona: blokada konta, podejrzenie (średnia ryzyka z meczów); przy meczu: przeciwnik, pokój, ryzyko, sygnały, powtórka, decyzja admina
+for (const c of ['banned INTEGER NOT NULL DEFAULT 0', 'ban_reason TEXT', 'suspicion REAL NOT NULL DEFAULT 0']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + c); } catch {} }
+for (const c of ['opp_id INTEGER', 'room TEXT', 'risk REAL', 'flags TEXT', 'replay TEXT', 'review TEXT', 'score TEXT', 'hold TEXT']) { try { db.exec('ALTER TABLE matches ADD COLUMN ' + c); } catch {} }
+// urządzenia, adresy IP i adresy wypłat każdego konta (wykrywanie multikont i omijania blokady)
+db.exec(`CREATE TABLE IF NOT EXISTS seen(user_id INTEGER NOT NULL, kind TEXT NOT NULL, value TEXT NOT NULL, first INTEGER NOT NULL, last INTEGER NOT NULL, n INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(user_id, kind, value));
+CREATE INDEX IF NOT EXISTS seen_val ON seen(kind, value);
+CREATE INDEX IF NOT EXISTS matches_room ON matches(room);`);
 OCH.adminSchema(db);                                                    // konta panelu admina (osobne od graczy) i ich sesje
 const q = sql => db.prepare(sql);
 const tx = fn => { db.exec('BEGIN IMMEDIATE'); try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; } };
@@ -125,7 +140,7 @@ function totals(uid) {
 }
 function publicUser(u) {
   return { username: u.username, email: u.email || '', avatar: u.avatar || '', createdAt: new Date(u.created).toISOString(), address: u.address, lamports: u.lamports, sol: u.lamports / LAMPORTS_PER_SOL,
-    balance: toUsd(u.lamports), price: PRICE, cluster: CLUSTER, admin: false,
+    balance: toUsd(u.lamports), price: PRICE, cluster: CLUSTER, admin: false, banned: !!u.banned, stakeMax: stakeCap(u.id).cap,
     stats: { ...Object.fromEntries(STAT_KEYS.map(k => [k, 0])), ...JSON.parse(u.stats || '{}'), ...totals(u.id), lastActive: u.last_active || u.created } };
 }
 const histOf = (uid, n = 60) => q('SELECT t,type,lamports,usd,fee_usd,note,sig,status FROM txs WHERE user_id=? ORDER BY t DESC, id DESC LIMIT ?').all(uid, n)
@@ -134,6 +149,37 @@ function addTx(uid, type, lamports, usd, extra = {}) {
   q('INSERT INTO txs(user_id,t,type,lamports,usd,fee_usd,note,sig,status) VALUES(?,?,?,?,?,?,?,?,?)').run(uid, Date.now(), type, lamports, usd, extra.fee || 0, extra.note || '', extra.sig || null, extra.status || 'ok');
   q('UPDATE users SET last_active=? WHERE id=?').run(Date.now(), uid);
 }
+
+// ---------------- ochrona: urządzenia, multikonta, blokady, limity stawek ----------------
+const BANNED_MSG = 'Konto zablokowane za oszukiwanie – gra o stawki i wypłaty są wyłączone.';
+const cleanDev = v => /^[0-9a-f]{16,64}$/.test(String(v || '')) ? String(v) : '';
+const seenAt = new Map();
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+function noteSeen(uid, kind, value) {
+  if (!uid || !value || (kind === 'ip' && LOOPBACK.has(value))) return;   // adres lokalny (test, serwer bez pośrednika) nikogo nie wyróżnia
+  const k = uid + '|' + kind + '|' + value, now = Date.now(); if (now - (seenAt.get(k) || 0) < 60000) return;
+  seenAt.set(k, now); if (seenAt.size > 50000) seenAt.clear();
+  q('INSERT INTO seen(user_id,kind,value,first,last) VALUES(?,?,?,?,?) ON CONFLICT(user_id,kind,value) DO UPDATE SET last=excluded.last, n=n+1').run(uid, kind, value, now, now);
+  if (kind === 'ip') return;                                           // wspólne IP (akademik, kawiarnia) to jeszcze nie dowód
+  // to samo urządzenie albo adres wypłat co zablokowane konto = ta sama osoba pod nową nazwą
+  const b = q('SELECT u.username FROM seen s JOIN users u ON u.id=s.user_id WHERE s.kind=? AND s.value=? AND s.user_id!=? AND u.banned=1 LIMIT 1').get(kind, value, uid);
+  if (b) banUser(uid, `${kind === 'dev' ? 'to samo urządzenie' : 'ten sam adres wypłat'} co zablokowane konto ${b.username}`);
+}
+function banUser(uid, reason, on = true) {
+  const u = fresh(uid); if (!u || !!u.banned === on) return;
+  q('UPDATE users SET banned=?, ban_reason=? WHERE id=?').run(on ? 1 : 0, on ? String(reason || '').slice(0, 200) : null, uid);
+  console.log(`[antycheat] ${on ? 'zablokowane' : 'odblokowane'} konto ${u.username}${on ? ': ' + reason : ''}`);
+}
+// dwa konta jednej osoby: wspólne urządzenie, adres wypłat albo adres IP (z ostatnich 30 dni)
+function linkOf(a, b) {
+  const since = Date.now() - 30 * 864e5;
+  return q(`SELECT s1.kind FROM seen s1 JOIN seen s2 ON s2.kind=s1.kind AND s2.value=s1.value AND s2.user_id=?
+    WHERE s1.user_id=? AND (s1.kind!='ip' OR (s1.last>? AND s2.last>?)) LIMIT 1`).get(b, a, since, since) || null;
+}
+const linkedAccounts = uid => q(`SELECT u.username name, u.banned, GROUP_CONCAT(DISTINCT s1.kind) kinds FROM seen s1
+  JOIN seen s2 ON s2.kind=s1.kind AND s2.value=s1.value AND s2.user_id!=s1.user_id JOIN users u ON u.id=s2.user_id WHERE s1.user_id=? GROUP BY u.id LIMIT 30`).all(uid);
+const playedMatches = uid => q("SELECT COUNT(*) n FROM matches WHERE user_id=? AND state IN ('won','lost','held')").get(uid).n;
+function stakeCap(uid) { const n = playedMatches(uid); for (const [lim, cap] of STAKE_TIERS) if (n < lim) return { cap, n, next: lim }; return { cap: STAKE_MAX_USD, n, next: null }; }
 
 // ---------------- wpłaty: wykrywanie i przeniesienie do skarbca ----------------
 const isOurs = new Set();                                              // podpisy przelewów wysłanych przez serwer (przeniesienia)
@@ -184,7 +230,7 @@ function send(res, code, obj, origin) {
 }
 function cors(origin) {
   const ok = ORIGINS.includes('*') ? '*' : (origin && ORIGINS.includes(origin) ? origin : ORIGINS[0]);
-  return { 'Access-Control-Allow-Origin': ok, 'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Admin-Token','Access-Control-Allow-Methods': 'GET, POST, OPTIONS', Vary: 'Origin' };
+  return { 'Access-Control-Allow-Origin': ok, 'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Admin-Token, X-Dev', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', Vary: 'Origin' };
 }
 const readBody = req => new Promise((ok, no) => { let b = ''; req.on('data', c => { b += c; if (b.length > 1e5) { no(new Error('za duże')); req.destroy(); } }); req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch { no(new Error('zły JSON')); } }); });
 class E extends Error { constructor(code, msg, status = 400) { super(msg); this.code = code; this.status = status; } }
@@ -226,7 +272,7 @@ async function payout(txId, userId, to, lam) {
 const routes = {
   'GET /api/health': async () => ({ ok: true, cluster: CLUSTER, price: PRICE, treasury: TREASURY.publicKey.toBase58() }),
   'GET /api/price': async () => ({ price: PRICE, at: PRICE_AT }),
-  'POST /api/register': async ({ body, ip }) => {
+  'POST /api/register': async ({ body, ip, dev }) => {
     if (limited(ip)) throw new E('rate', 'Za dużo prób – odczekaj minutę', 429);
     const u = String(body.username || '').trim(), p = String(body.password || '');
     if (!/^[a-z0-9_]{3,16}$/i.test(u)) throw new E('user', 'Nazwa: 3–16 znaków (litery, cyfry, _)');
@@ -240,9 +286,10 @@ const routes = {
       return Number(q('INSERT INTO users(username,pass,created,idx,address,last_active) VALUES(?,?,?,?,?,?)').run(u, pass, Date.now(), idx, address, Date.now()).lastInsertRowid);
     });
     console.log('[konto]', u, fresh(id).address);
+    noteSeen(id, 'ip', ip); noteSeen(id, 'dev', dev);
     return { token: newSession(id), account: publicUser(fresh(id)), history: [] };
   },
-  'POST /api/login': async ({ body, ip }) => {
+  'POST /api/login': async ({ body, ip, dev }) => {
     const name = String(body.username || '').trim(), pw = String(body.password || '');
     // limit na IP i osobno na nick (zgadywanie hasła jednego konta z wielu adresów)
     if (limited('login:' + ip) || limited('u:' + name.toLowerCase(), 20, 15 * 60e3)) throw new E('rate', 'Za dużo prób – odczekaj minutę', 429);
@@ -251,6 +298,7 @@ const routes = {
     if (!(await checkPass(pw, u.pass))) throw new E('creds', 'Zła nazwa lub hasło', 401);
     if (OCH.needsRehash(u.pass)) q('UPDATE users SET pass=? WHERE id=?').run(await hashPass(pw), u.id);   // mocniejszy hash przy okazji logowania
     q('UPDATE users SET last_active=? WHERE id=?').run(Date.now(), u.id);
+    noteSeen(u.id, 'ip', ip); noteSeen(u.id, 'dev', dev);
     scanUser(u).catch(() => {});
     return { token: newSession(u.id), account: publicUser(fresh(u.id)), history: histOf(u.id) };
   },
@@ -261,7 +309,7 @@ const routes = {
   'POST /api/scan': async ({ user }) => { need(user); await scanUser(fresh(user.id)); return { account: publicUser(fresh(user.id)), history: histOf(user.id) }; },
   'GET /api/earnings': async ({ user }) => {
     need(user);
-    const rows = q(`SELECT t, ended, state, stake_usd, payout_lamports, price, map FROM matches WHERE user_id=? AND state!='open' ORDER BY COALESCE(ended,t)`).all(user.id);
+    const rows = q(`SELECT t, ended, state, stake_usd, payout_lamports, price, map FROM matches WHERE user_id=? AND state IN ('won','lost') ORDER BY COALESCE(ended,t)`).all(user.id);
     let cum = 0;
     return { points: rows.map(m => { const net = m.state === 'won' ? Math.round((m.payout_lamports / 1e9 * m.price - m.stake_usd) * 100) / 100 : -m.stake_usd; cum = Math.round((cum + net) * 100) / 100;
       return { t: m.ended || m.t, net, cum, won: m.state === 'won', stake: m.stake_usd, map: m.map }; }) };
@@ -276,6 +324,8 @@ const routes = {
     need(user);
     let to; try { to = new PublicKey(String(body.to || '').trim()); } catch { throw new E('addr', 'Nieprawidłowy adres Solana'); }
     if (to.equals(new PublicKey(user.address))) throw new E('addr', 'To adres Twojego portfela w grze');
+    noteSeen(user.id, 'wd', to.toBase58());
+    if (fresh(user.id).banned) throw new E('banned', BANNED_MSG, 403);
     let lam = body.lamports != null ? Math.floor(+body.lamports) : body.sol != null ? Math.floor(+body.sol * LAMPORTS_PER_SOL) : body.usd != null && PRICE ? Math.floor(+body.usd / PRICE * LAMPORTS_PER_SOL) : NaN;
     if (!(lam >= MIN_WITHDRAW_LAMPORTS)) throw new E('amount', `Minimalna wypłata: ${MIN_WITHDRAW_LAMPORTS / LAMPORTS_PER_SOL} SOL`);
     const usd = toUsd(lam);
@@ -302,6 +352,8 @@ const routes = {
   'POST /api/match/start': async ({ user, body }) => {
     need(user); const usd = Math.round(+body.stakeUsd * 100) / 100;
     if (!(usd >= STAKE_MIN_USD && usd <= STAKE_MAX_USD)) throw new E('stake', `Stawka od $${STAKE_MIN_USD} do $${STAKE_MAX_USD}`);
+    if (fresh(user.id).banned) throw new E('banned', BANNED_MSG, 403);
+    const cap = stakeCap(user.id); if (usd > cap.cap) throw new E('stake_cap', STAKE_MSG[cap.cap] || `Stawka najwyżej $${cap.cap}`, 403);
     if (!PRICE) throw new E('price', 'Brak kursu SOL – spróbuj za chwilę', 503);
     const lam = Math.round(usd / PRICE * LAMPORTS_PER_SOL), price = PRICE;
     return tx(() => {
@@ -328,7 +380,7 @@ const routes = {
   },
   // logowanie przez Google: przeglądarka dostaje token dostępu (Google Identity Services), serwer sprawdza go w Google
   // (czy wydany dla naszej aplikacji i czy e-mail jest potwierdzony), potem loguje albo zakłada konto
-  'POST /api/google': async ({ body, ip }) => {
+  'POST /api/google': async ({ body, ip, dev }) => {
     if (!GOOGLE_CLIENT_ID) throw new E('google_off', 'Logowanie przez Google nie jest skonfigurowane', 503);
     if (limited(ip)) throw new E('rate', 'Za dużo prób – odczekaj minutę', 429);
     let info; try { const r = await fetch('https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(String(body.accessToken || '')), { signal: AbortSignal.timeout(8000) }); info = await r.json(); if (!r.ok) throw 0; }
@@ -350,6 +402,7 @@ const routes = {
       u = fresh(id); created = true; console.log('[konto google]', name, u.address);
     }
     q('UPDATE users SET last_active=? WHERE id=?').run(Date.now(), u.id);
+    noteSeen(u.id, 'ip', ip); noteSeen(u.id, 'dev', dev);
     return { token: newSession(u.id), account: publicUser(fresh(u.id)), history: histOf(u.id), created };
   },
   // ---- panel admina: osobne konta (login + hasło + kod 2FA) ----
@@ -456,12 +509,76 @@ const routes = {
     for (const k of STAT_KEYS) { const v = Math.floor(+body[k] || 0); if (v > 0 && v < 10000) st[k] = (st[k] || 0) + v; }
     q('UPDATE users SET stats=?, last_active=? WHERE id=?').run(JSON.stringify(st), Date.now(), u.id); return { ok: true };
   },
+  // mecze do sprawdzenia: wstrzymane wypłaty i mecze z ryzykiem od 30% (all=1: wszystkie z ostatnich)
+  'GET /api/admin/review': async ({ req }) => {
+    const adm = adminGate(req);
+    const all = new URL(req.url, 'http://x').searchParams.get('all') === '1';
+    const keys = q(`SELECT room, MAX(COALESCE(ended,t)) te FROM matches WHERE room IS NOT NULL ${all ? '' : "AND (review IS NOT NULL OR risk>=0.3)"} GROUP BY room ORDER BY te DESC LIMIT 300`).all();
+    const rooms = keys.map(({ room }) => {
+      const rows = q('SELECT m.*, u.username, u.banned, u.ban_reason, u.suspicion FROM matches m JOIN users u ON u.id=m.user_id WHERE m.room=? ORDER BY m.id').all(room);
+      const r0 = rows[0] || {};
+      return { room, t: r0.ended || r0.t, map: r0.map, stake: r0.stake_usd, score: r0.score, replay: !!r0.replay, review: rows.map(r => r.review).find(Boolean) || null,
+        hold: rows.map(r => r.hold).find(Boolean) || null,
+        players: rows.map(r => ({ uid: r.user_id, name: r.username, state: r.state, won: r.state === 'won' || r.state === 'held', risk: r.risk, flags: JSON.parse(r.flags || '[]'),
+          payout: Math.round(r.payout_lamports / 1e9 * r.price * 100) / 100, banned: !!r.banned, banReason: r.ban_reason || '', suspicion: r.suspicion || 0,
+          matches: playedMatches(r.user_id), linked: linkedAccounts(r.user_id) })) };
+    });
+    return { rooms, held: q("SELECT COUNT(*) n FROM matches WHERE state='held'").get().n, holdRisk: ANTY.HOLD_RISK, reviewStake: REVIEW_STAKE_USD };
+  },
+  // powtórka meczu (ruch obu graczy, strzały, rundy) + bryły mapy do rysowania
+  'GET /api/admin/replay': async ({ req }) => {
+    const adm = adminGate(req);
+    const room = String(new URL(req.url, 'http://x').searchParams.get('room') || '');
+    const r = q('SELECT replay FROM matches WHERE room=? AND replay IS NOT NULL LIMIT 1').get(room);
+    if (!r || !/^[a-z0-9]+-\d+\.json\.gz$/.test(r.replay)) throw new E('replay', 'Brak powtórki tego meczu', 404);
+    let rep; try { rep = JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(REPLAY_DIR, r.replay))).toString('utf8')); } catch { throw new E('replay', 'Brak powtórki tego meczu', 404); }
+    return { ...rep, boxes: MECZ.mapBoxes(rep.map) };
+  },
+  // decyzja o wstrzymanej wygranej: approve = wypłata zwycięzcy; reject = wygrana przechodzi na przeciwnika (+ blokada oszusta)
+  'POST /api/admin/decide': async ({ body, req, ip }) => {
+    const adm = adminGate(req);
+    const room = String(body.room || ''), ok = body.decision === 'approve';
+    if (!['approve', 'reject'].includes(body.decision)) throw new E('decision', 'Decyzja: approve albo reject');
+    const out = tx(() => {
+      const h = q("SELECT * FROM matches WHERE room=? AND state='held'").get(room); if (!h) throw new E('state', 'Ten mecz nie czeka na decyzję', 409);
+      const pendingTx = q("SELECT id FROM txs WHERE user_id=? AND type='win' AND status='pending' AND lamports=? ORDER BY id DESC LIMIT 1").get(h.user_id, h.payout_lamports);
+      if (ok) {
+        q("UPDATE matches SET state='won', review='approved' WHERE id=?").run(h.id);
+        q('UPDATE users SET lamports=lamports+? WHERE id=?').run(h.payout_lamports, h.user_id);
+        if (pendingTx) q("UPDATE txs SET status='ok', t=? WHERE id=?").run(Date.now(), pendingTx.id);
+        q("UPDATE matches SET review='approved' WHERE room=? AND id!=?").run(room, h.id);
+        q('UPDATE users SET suspicion=suspicion*0.5 WHERE id=?').run(h.user_id);   // fałszywy alarm: następne wygrane rzadziej czekają
+        return { approved: h.user_id };
+      }
+      q("UPDATE matches SET state='lost', payout_lamports=0, fee_lamports=0, review='rejected' WHERE id=?").run(h.id);
+      if (pendingTx) q("UPDATE txs SET status='failed', note='odrzucona: oszukiwanie' WHERE id=?").run(pendingTx.id);
+      const v = q("SELECT * FROM matches WHERE room=? AND id!=? AND state='lost'").get(room, h.id);
+      if (v) {
+        q("UPDATE matches SET state='won', payout_lamports=?, fee_lamports=?, review='rejected' WHERE id=?").run(h.payout_lamports, h.fee_lamports, v.id);
+        q('UPDATE users SET lamports=lamports+? WHERE id=?').run(h.payout_lamports, v.user_id);
+        addTx(v.user_id, 'win', h.payout_lamports, Math.round(h.payout_lamports / 1e9 * v.price * 100) / 100, { fee: Math.round(h.fee_lamports / 1e9 * v.price * 100) / 100, note: 'przeciwnik oszukiwał' });
+      }
+      return { rejected: h.user_id, victim: v ? v.user_id : null };
+    });
+    if (!ok && body.ban !== false) banUser(out.rejected, String(body.reason || `oszukiwanie (mecz ${room})`));
+    audit(adm.username, ip, ok ? 'match_approve' : 'match_reject', `pokój ${room} user=${out.approved || out.rejected}`);
+    console.log(`[antycheat] mecz ${room}: ${ok ? 'wypłata zatwierdzona' : 'wygrana odrzucona'} przez ${adm.username}`);
+    return { ok: true, ...out };
+  },
+  'POST /api/admin/ban': async ({ body, req, ip }) => {
+    const adm = adminGate(req);
+    const u = q('SELECT * FROM users WHERE username=?').get(String(body.username || '').trim()); if (!u) throw new E('user', 'Nie ma takiego konta', 404);
+    banUser(u.id, String(body.reason || 'decyzja admina'), body.banned !== false);
+    audit(adm.username, ip, body.banned !== false ? 'ban' : 'unban', `${u.username}: ${String(body.reason || '').slice(0, 120)}`);
+    if (body.banned === false) q('UPDATE users SET suspicion=0 WHERE id=?').run(u.id);
+    return { ok: true, banned: !!fresh(u.id).banned };
+  },
   'GET /api/admin/overview': async ({ req }) => {
     adminGate(req);
     const accounts = q('SELECT * FROM users ORDER BY id').all().map(u => ({ id: String(u.id), ...publicUser(u), wallet: u.address, history: histOf(u.id, 40) }));
     const names = Object.fromEntries(accounts.map(a => [a.id, a.username]));
     const matches = q("SELECT * FROM matches WHERE state!='open' ORDER BY COALESCE(ended,t) DESC LIMIT 1000").all().map(m => ({ id: String(m.id), u: String(m.user_id), name: names[m.user_id],
-      t: m.ended || m.t, map: m.map, stake: m.stake_usd, won: m.state === 'won', forfeit: !!m.forfeit,
+      t: m.ended || m.t, map: m.map, stake: m.stake_usd, won: m.state === 'won', held: m.state === 'held', risk: m.risk, forfeit: !!m.forfeit,
       payout: Math.round(m.payout_lamports / 1e9 * m.price * 100) / 100, fee: Math.round(m.fee_lamports / 1e9 * m.price * 100) / 100 }));
     let tre = 0; try { tre = await conn.getBalance(TREASURY.publicKey); } catch {}
     const ledger = q('SELECT COALESCE(SUM(lamports),0) s FROM users').get().s;
@@ -509,6 +626,10 @@ async function coverLogin(req, res) {
   const secure = req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : '';
   res.writeHead(204, { 'Set-Cookie': `bl_cover=${coverToken()}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}${secure}`, 'Cache-Control': 'no-store' }); res.end();
 }
+function serveAdminPage(res) {
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' });
+  res.end(fs.readFileSync(new URL('./admin-mecze.html', import.meta.url)));
+}
 function serveCover(res) {
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' });
   res.end(fs.readFileSync(new URL('./cover.html', import.meta.url)));
@@ -542,22 +663,50 @@ function refundMatch(matchId, userId) {
     });
   } catch (e) { console.error('[1v1] zwrot stawki', e); }
 }
-// rozliczenie jednego gracza po meczu (to samo co POST /api/match/end, ale decyduje serwer)
-function settleDuel(matchId, userId, won, forfeit, map) {
+// rozliczenie jednego gracza po meczu (decyduje serwer). x: przeciwnik, pokój, ryzyko, sygnały, powtórka, wynik, powód wstrzymania wypłaty
+function settleDuel(matchId, userId, won, forfeit, map, x = {}) {
   try {
     tx(() => {
       const m = q("SELECT * FROM matches WHERE id=? AND user_id=? AND state='open'").get(matchId, userId); if (!m) return;
+      const meta = [x.opp ?? null, x.room ?? null, x.risk ?? null, x.flags ? JSON.stringify(x.flags) : null, x.replay ?? null, x.score ?? null];
+      const setMeta = 'opp_id=?, room=?, risk=?, flags=?, replay=?, score=?';
       if (won) {
-        const pot = m.stake_lamports * 2, fee = Math.round(pot * HOUSE_FEE), pay = pot - fee;
-        q("UPDATE matches SET state='won', payout_lamports=?, fee_lamports=?, ended=?, map=COALESCE(?,map) WHERE id=?").run(pay, fee, Date.now(), map || null, m.id);
-        q('UPDATE users SET lamports=lamports+? WHERE id=?').run(pay, userId);
-        addTx(userId, 'win', pay, Math.round(pay / 1e9 * m.price * 100) / 100, { fee: Math.round(fee / 1e9 * m.price * 100) / 100 });
+        const pot = m.stake_lamports * 2, fee = Math.round(pot * HOUSE_FEE), pay = pot - fee, usd = Math.round(pay / 1e9 * m.price * 100) / 100, feeUsd = Math.round(fee / 1e9 * m.price * 100) / 100;
+        if (x.hold) {                                                  // wygrana czeka na admina: saldo bez zmian, w historii „w toku”
+          q(`UPDATE matches SET state='held', payout_lamports=?, fee_lamports=?, ended=?, map=COALESCE(?,map), ${setMeta}, hold=?, review='held' WHERE id=?`).run(pay, fee, Date.now(), map || null, ...meta, x.hold, m.id);
+          addTx(userId, 'win', pay, usd, { fee: feeUsd, note: 'weryfikacja wyniku', status: 'pending' });
+        } else {
+          q(`UPDATE matches SET state='won', payout_lamports=?, fee_lamports=?, ended=?, map=COALESCE(?,map), ${setMeta} WHERE id=?`).run(pay, fee, Date.now(), map || null, ...meta, m.id);
+          q('UPDATE users SET lamports=lamports+? WHERE id=?').run(pay, userId);
+          addTx(userId, 'win', pay, usd, { fee: feeUsd });
+        }
       } else {
-        q("UPDATE matches SET state='lost', forfeit=?, ended=?, map=COALESCE(?,map) WHERE id=?").run(forfeit ? 1 : 0, Date.now(), map || null, m.id);
+        q(`UPDATE matches SET state='lost', forfeit=?, ended=?, map=COALESCE(?,map), ${setMeta} WHERE id=?`).run(forfeit ? 1 : 0, Date.now(), map || null, ...meta, m.id);
         addTx(userId, 'loss', 0, 0, { note: '$' + m.stake_usd.toFixed(2) });
       }
     });
   } catch (e) { console.error('[1v1] rozliczenie', e); }
+}
+// po meczu: ocena ryzyka obu graczy, powód wstrzymania wypłaty zwycięzcy, powtórka na dysk
+function judgeRoom(room, winner, reason) {
+  const g = room.game, key = Date.now().toString(36) + '-' + room.id;
+  const stats = [0, 1].map(s => MECZ.playerStats(g, s)), ev = stats.map(ANTY.assess);
+  const W = room.p[winner], L = room.p[1 - winner], hold = [];
+  if (ev[winner].risk >= ANTY.HOLD_RISK) hold.push(`ryzyko oszustwa ${Math.round(ev[winner].risk * 100)}%`);
+  const wu = fresh(W.user.id) || {};
+  if ((wu.suspicion || 0) >= ANTY.FLAG_SUSP) hold.push(`konto pod obserwacją (${Math.round(wu.suspicion * 100)}%)`);
+  if (wu.banned) hold.push('konto zablokowane');
+  const pairN = q('SELECT COUNT(*) n FROM matches WHERE user_id=? AND opp_id=? AND t>?').get(W.user.id, L.user.id, Date.now() - 864e5).n;
+  if (pairN >= 3) hold.push(`${pairN + 1}. mecz tej samej pary w 24 h`);
+  if (reason === 'left' && g.score[0] + g.score[1] === 0 && pairN >= 1) hold.push('walkower bez gry z tym samym przeciwnikiem');
+  const link = linkOf(W.user.id, L.user.id); if (link) hold.push(`konta powiązane (${link.kind === 'dev' ? 'urządzenie' : link.kind === 'wd' ? 'adres wypłat' : 'IP'})`);
+  if (W.stake >= REVIEW_STAKE_USD) hold.push(`stawka od $${REVIEW_STAKE_USD}`);
+  let replay = key + '.json.gz';
+  try {
+    fs.writeFileSync(path.join(REPLAY_DIR, replay), zlib.gzipSync(JSON.stringify({ v: 1, key, t: Date.now(), map: room.map, stake: W.stake, reason, winner, score: g.score,
+      players: room.p.map((p, s) => ({ uid: p.user.id, nick: p.nick, risk: ev[s].risk, flags: ev[s].flags, summary: ev[s].summary })), stats: stats.map(st => ({ ...st, rtts: undefined })), rec: g.rec })));
+  } catch (e) { console.error('[powtórka]', e.message); replay = null; }
+  return { key, ev, hold, replay };
 }
 
 function leaveQueue(ws, refund) {
@@ -578,8 +727,15 @@ function startRoom(a, b) {
 }
 function endRoom(room, winner, reason) {
   if (room.over) return; room.over = true; rooms.delete(room);
-  room.p.forEach((pl, seat) => settleDuel(pl.matchId, pl.user.id, seat === winner, seat !== winner && reason === 'left', room.map));
-  room.p.forEach(pl => { wsSend(pl.ws, { t: 'end', winner, score: room.score, reason }); if (pl.ws) pl.ws.mm = null; });
+  let J = null; try { J = judgeRoom(room, winner, reason); } catch (e) { console.error('[antycheat] ocena meczu', e); }
+  room.p.forEach((pl, seat) => settleDuel(pl.matchId, pl.user.id, seat === winner, seat !== winner && reason === 'left', room.map, J ? {
+    opp: room.p[1 - seat].user.id, room: J.key, risk: J.ev[seat].risk, flags: J.ev[seat].flags, replay: J.replay, score: room.game.score.join(':'),
+    hold: seat === winner && J.hold.length ? J.hold.join('; ') : null } : {}));
+  if (J) room.p.forEach((pl, seat) => { const u = fresh(pl.user.id); if (u) q('UPDATE users SET suspicion=? WHERE id=?').run(ANTY.nextSuspicion(u.suspicion, J.ev[seat]), u.id); });
+  const held = !!(J && J.hold.length);
+  room.p.forEach((pl, seat) => { wsSend(pl.ws, { t: 'end', winner, score: room.score, reason, ...(held && seat === winner ? { held: true } : {}) }); if (pl.ws) pl.ws.mm = null; });
+  if (held) console.log(`[antycheat] pokój ${room.id}: wygrana ${room.p[winner].nick} czeka na admina – ${J.hold.join('; ')}`);
+  if (J) J.ev.forEach((e, s) => { if (e.flags.length) console.log(`[antycheat] pokój ${room.id}: ${room.p[s].nick} ryzyko ${Math.round(e.risk * 100)}% –`, e.flags.map(f => f.code + ' ' + f.score).join(', ')); });
   console.log(`[1v1] pokój ${room.id}: koniec, wygrał ${room.p[winner].nick} (${room.score.join(':')}${reason === 'left' ? ', walkower' : reason === 'cheat' ? ', przeciwnik wyrzucony za oszukiwanie' : ''})`);
   if (room.game.log.length) console.log(`[1v1] pokój ${room.id}: odrzucone ruchy:`, room.game.log.slice(-20).join(' | '));
 }
@@ -589,11 +745,12 @@ function onDuelMessage(ws, user, raw) {
   const me = ws.mm;
   if (m.t === 'queue') {
     if (me) return;                                              // już w kolejce albo w meczu
+    if ((fresh(user.id) || {}).banned) return wsSend(ws, { t: 'error', code: 'banned', message: BANNED_MSG });
     const match = q("SELECT * FROM matches WHERE id=? AND user_id=? AND state='open'").get(+m.matchId, user.id);
     if (!match) return wsSend(ws, { t: 'error', code: 'match', message: 'Brak opłaconej stawki – zagraj jeszcze raz z lobby.' });
     for (const x of mmQueue.filter(x => x.user.id === user.id)) { leaveQueue(x.ws, true); wsSend(x.ws, { t: 'error', code: 'dup', message: 'Szukasz meczu w innej karcie.' }); }
     const entry = { ws, user, matchId: match.id, stake: match.stake_usd, nick: user.username, skin: String(m.skin || '').slice(0, 64) };
-    const i = mmQueue.findIndex(x => x.stake === entry.stake && x.user.id !== user.id && x.ws.readyState === 1);
+    const i = mmQueue.findIndex(x => x.stake === entry.stake && x.user.id !== user.id && x.ws.readyState === 1 && !linkOf(x.user.id, user.id));
     if (i < 0) { mmQueue.push(entry); ws.mm = entry; wsSend(ws, { t: 'queued', waiting: mmQueue.filter(x => x.stake === entry.stake).length }); return; }
     startRoom(mmQueue.splice(i, 1)[0], entry); return;
   }
@@ -621,6 +778,7 @@ function afterGame(room) {
 setInterval(() => { const t = nowS(); for (const room of rooms) { if (room.over) continue; MECZ.tick(room.game, t, room.out); afterGame(room); } }, 100);
 wss.on('connection', (ws, req, user) => {
   ws.alive = true; ws.on('pong', () => { ws.alive = true; });
+  try { noteSeen(user.id, 'ip', OCH.clientIp(req)); noteSeen(user.id, 'dev', cleanDev(new URL(req.url, 'http://x').searchParams.get('d'))); } catch {}
   ws.on('message', d => onDuelMessage(ws, user, String(d)));
   ws.on('close', () => {
     const me = ws.mm; if (!me) return;
@@ -651,13 +809,14 @@ const server = http.createServer(async (req, res) => {
     }
   }
   const url = new URL(req.url, 'http://x'), key = req.method + ' ' + url.pathname, h = routes[key];
+  if (req.method === 'GET' && url.pathname === '/admin-mecze') return serveAdminPage(res);
   if (!h && req.method === 'GET' && !url.pathname.startsWith('/api/')) return serveGame(url.pathname, res);
   if (!h) return send(res, 404, { error: 'not_found', message: 'Nie ma takiej ścieżki' }, origin);
   try {
     const body = req.method === 'POST' ? await readBody(req) : {};
-    const ip = OCH.clientIp(req);
-    const user = userFromReq(req); if (user) user._auth = req.headers.authorization;
-    send(res, 200, await h({ req, body, ip, user }), origin);
+    const ip = OCH.clientIp(req), dev = cleanDev(req.headers['x-dev']);
+    const user = userFromReq(req); if (user) { user._auth = req.headers.authorization; noteSeen(user.id, 'ip', ip); noteSeen(user.id, 'dev', dev); }
+    send(res, 200, await h({ req, body, ip, dev, user }), origin);
   } catch (e) {
     if (!(e instanceof E)) console.error(key, e);
     send(res, e.status || 500, { error: e.code || 'server', message: e instanceof E ? e.message : 'Błąd serwera' }, origin);
@@ -668,4 +827,12 @@ server.listen(PORT, HOST, () => {
   console.log(`Portfele BEANLADEN: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}  sieć: ${CLUSTER}  skarbiec: ${TREASURY.publicKey.toBase58()}`);
 });
 refreshPrice(); setInterval(refreshPrice, 60000);
+function cleanReplays() {                                        // stare powtórki znikają; wstrzymane i odrzucone mecze zostają
+  try {
+    const keep = new Set(q("SELECT replay FROM matches WHERE replay IS NOT NULL AND (state='held' OR review IN ('held','rejected'))").all().map(r => r.replay));
+    const lim = Date.now() - REPLAY_DAYS * 864e5;
+    for (const f of fs.readdirSync(REPLAY_DIR)) { const fp = path.join(REPLAY_DIR, f); if (!keep.has(f) && fs.statSync(fp).mtimeMs < lim) fs.unlinkSync(fp); }
+  } catch (e) { console.warn('[powtórki]', e.message); }
+}
+setInterval(cleanReplays, 6 * 3600e3); setTimeout(cleanReplays, 60e3);
 setInterval(scanAll, SCAN_MS); setTimeout(scanAll, 3000);
