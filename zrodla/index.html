@@ -1501,6 +1501,7 @@ function lobbyAnimate(b,t,dt,st){
     solveArm(ud.arms[i],def,_lt,{avoid:false});
   }
 }
+let mySkin='';   // przed createLobby: lobby od razu wywołuje onSkin z zapisanym skinem
 const lobby=createLobby({renderer,bean:lobbyBean,animate:lobbyAnimate,
   onPlay:(m,o)=>{o=o||{};if(m==='1v1'){matchLock();lobby.hide();ON.active=false;match.start({stake:o.stake});    // 1v1: kolejka na serwerze, mapę losuje serwer
       NET.queue({matchId:o.matchId,skin:mySkin}).catch(e=>netFail(e.message));return}
@@ -1569,7 +1570,6 @@ const match=createMatch({
 });
 window.__match=match;
 // ================= 1v1 online: prawdziwi gracze przez serwer (net.js, WebSocket /ws) =================
-let mySkin='';
 const NET=createNet();
 const ON={active:false,seat:0,opp:null,st:null,sendT:0};
 let remoteSkins=null;
