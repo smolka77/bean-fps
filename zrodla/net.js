@@ -1,7 +1,8 @@
 // Połączenie gry z serwerem meczów 1v1 (WebSocket /ws na serwerze portfeli).
 // Kolejka: queue({matchId, skin}) -> 'queued' -> 'matched' {seat, map, opp:{nick, skin}} -> obaj 'ready' -> 'go'.
-// W meczu: send({t:'st', s}) stan gracza ~20/s, 'shot' (smuga), 'hit' (trafienie przeciwnika), 'dead' (zginąłem),
-// serwer odsyła 'round' {winner, score} i 'end' {winner, score, reason: 'score' | 'left'}.
+// W meczu gracz wysyła tylko: 'st' (stan ~20/s), 'sh' (skąd i w którą stronę strzelił), 'rl' (przeładowanie), 'rs'/'lv' (start rundy),
+// 'po' (odpowiedź na ping). Trafienia, obrażenia, śmierć, amunicję i ruch sprawdza serwer: odsyła 'dmg', 'hc', 'sh' (smuga),
+// 'fix' (cofnięcie niedozwolonego ruchu), 'st' (przeciwnik; null = nie widać go), 'round' i 'end' {reason: 'score' | 'left' | 'cheat'}.
 import { walletApi } from './wallet-config.js';
 import { t as tr } from './lobby-ui.js';
 

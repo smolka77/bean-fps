@@ -68,12 +68,26 @@ Każdy hosting Node z trwałym dyskiem, np. Railway (wolumen), Fly.io (volume), 
 **Fraza = wszystkie środki.** Kto ją zna, ma dostęp do skarbca i wszystkich adresów depozytów.
 Nie wrzucaj jej do repozytorium (katalog `dane/` jest w `.gitignore`).
 
+## Antycheat: mecz liczy serwer
+
+Mecz 1v1 rozstrzyga serwer (`mecz.mjs`), a nie przeglądarka gracza. Gracz wysyła tylko swój stan ruchu i „strzeliłem stąd w tę stronę”.
+
+- **Trafienia i obrażenia:** serwer sam liczy rozrzut broni, lot pocisku po kolizjach mapy (`zrodla/*-data.js`) i trafienie w fasolkę
+  przeciwnika (z cofnięciem jej pozycji o opóźnienie strzelającego). Odejmuje HP i ogłasza śmierć. Meldunki „trafiłem” i „zginąłem” od gracza nie istnieją.
+- **Broń:** szybkostrzelność (rpm), magazynek, zapas i czas przeładowania każdej broni. Strzał ponad limit albo bez naboi przepada.
+- **Ruch:** prędkość (chwilowa i średnia z 2 s), wysokość skoku, czas w powietrzu, wejście w ścianę i przejście przez nią, granice mapy.
+  Złą pozycję serwer odrzuca i cofa gracza (`fix`). 25 ciężkich odrzuceń w 20 s (teleport, latanie, przenikanie) = walkower za oszukiwanie.
+- **Wallhack:** pozycja przeciwnika idzie do gracza tylko wtedy, gdy ten może go zobaczyć (linie wzroku po kolizjach mapy, z wyprzedzeniem 0,15 s).
+- **Rundy:** strzały i obrażenia działają dopiero po odliczaniu. Pozycje startowe i pełne HP ustawia serwer.
+- **Wynik i pieniądze:** rozliczenie robi serwer po ostatniej rundzie. `POST /api/match/end` niczego już nie zmienia.
+
+Nie da się w ten sposób zablokować aimbota (celowanie robi gracz). Na niego potrzebne są statystyki (celność, trafienia w głowę, czas reakcji)
+i ręczna weryfikacja przed dużymi wypłatami.
+
 ## Przed mainnetem (prawdziwe pieniądze)
 
-Serwer odmawia startu na `mainnet-beta`, dopóki nie ustawisz `ALLOW_MAINNET=tak`. Wcześniej trzeba zrobić trzy rzeczy:
+Serwer odmawia startu na `mainnet-beta`, dopóki nie ustawisz `ALLOW_MAINNET=tak`. Wcześniej trzeba zrobić dwie rzeczy:
 
-- **Wynik meczu liczy dziś przeglądarka gracza** i wysyła go do serwera. Na prawdziwe pieniądze każdy mógłby
-  wysłać „wygrałem”. Potrzebny jest serwer gry, który sam rozstrzyga mecz.
 - **Gorący portfel:** trzymaj w skarbcu tylko tyle, ile potrzeba na bieżące wypłaty, a resztę na osobnym portfelu.
   Dodaj limity i ręczną akceptację dużych wypłat.
 - **Prawo:** gry o pieniądze wymagają w wielu krajach licencji. Sprawdź to przed startem.

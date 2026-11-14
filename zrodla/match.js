@@ -352,7 +352,7 @@ export function createMatch(g) {
       $('mt-cround').textContent = tr('mt.round') + ' ' + S.round + (S.me === ROUNDS_TO_WIN - 1 && S.op === ROUNDS_TO_WIN - 1 ? ' · ' + tr('mt.decider') : '');
       count.classList.add('on'); countN = 3; setCount('3'); sfx('count');
     },
-    live() { frozen = false; },
+    live() { frozen = false; if (g.live) g.live(); },
     killcam() { frozen = true; },
     result() {
       const won = lastWinner === 'me', k = ROUNDS_TO_WIN - S.me;
