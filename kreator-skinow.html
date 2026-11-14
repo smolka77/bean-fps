@@ -573,13 +573,15 @@ addEventListener('keydown', e => {
 // ================= zapis / odczyt =================
 const slug = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'skin';
 function isEmpty() { const d = pctx.getImageData(0, 0, TW, TH).data; for (let i = 3; i < d.length; i += 16) if (d[i]) return false; return true; }
+// obrazki skina zapisujemy jako WebP (z przezroczystością, kilkanaście razy mniejsze niż PNG); przeglądarka bez WebP zostaje przy PNG
+const smallImg = cv => { try { const w = cv.toDataURL('image/webp', .9); if (w.startsWith('data:image/webp')) return w; } catch {} return cv.toDataURL('image/png'); };
 function makeIcon() {        // ikonka do kafelka w lobby: fasolka od przodu, przezroczyste tło
   const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   r.setSize(150, 200); r.outputColorSpace = THREE.SRGBColorSpace;
   const cam = new THREE.PerspectiveCamera(30, 150 / 200, .05, 20); cam.position.set(0, .95, -3.3); cam.lookAt(0, .74, PROJ.cz);
   cam.add(keyL.clone()); scene.add(cam);
   const bg = scene.background; scene.background = null; floor.visible = ring.visible = false;
-  r.render(scene, cam); const url = r.domElement.toDataURL('image/png');
+  r.render(scene, cam); const url = smallImg(r.domElement);
   scene.background = bg; floor.visible = true; scene.remove(cam); r.dispose(); r.forceContextLoss();
   return url;
 }
@@ -588,7 +590,7 @@ function skinData() {
   return {
     format: 'fasolka-skin', version: 1, id: slug(name), name, c: st.base, eyes: st.eyes,
     proj: { type: 'arc-y', cx: +PROJ.cx.toFixed(5), cz: +PROJ.cz.toFixed(5), y0: +PROJ.y0.toFixed(5), y1: +PROJ.y1.toFixed(5), w: TW, h: TH, vmap: VMAP.map(v => +v.toFixed(6)) },
-    tex: isEmpty() ? null : paint.toDataURL('image/png'),
+    tex: isEmpty() ? null : smallImg(paint),
   };
 }
 // tryb osadzony (?embed=1): kreator w panelu admina gry; zapis wraca do gry zamiast pobierania pliku

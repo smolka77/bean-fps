@@ -31,6 +31,7 @@ F oglądanie broni, 1–4 / kółko zmiana broni, V widok, M dźwięk, Esc pauza
 
 Panel admina (menu ☰ albo Ctrl+Shift+A) ma zakładkę **Skiny**: dodawanie, edycja w kreatorze, usuwanie i kolejność.
 „Opublikuj w grze” zapisuje `skins.json` w tym repo przez GitHub API (token z dostępem Contents: zapis), więc zmiany widzą wszyscy po odświeżeniu strony.
+Skiny z kreatora nie są wbudowane w `index.html`: gra pobiera je z `skins.json` (obrazki w WebP). Gra otwarta prosto z dysku, bez serwera, pokazuje tylko skiny wbudowane.
 
 ## Przebudowanie po zmianach w `zrodla/`
 

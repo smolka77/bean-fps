@@ -22,9 +22,9 @@ const patch = (f, from, to) => {
   wr(f, s.split(from).join(to));
 };
 
-// 0) skiny z kreatora: aktualna lista z skins.json w katalogu repo trafia też do pliku gry (zapas, gdy skins.json się nie wczyta)
-const skinsJson = path.join(srcDir, '..', 'skins.json');
-if (fs.existsSync(skinsJson)) wr('skins-data.js', '// wygenerowane z skins.json przy budowaniu\nexport default ' + JSON.stringify(JSON.parse(fs.readFileSync(skinsJson, 'utf8'))) + ';\n');
+// 0) skiny z kreatora NIE są wbudowywane w plik gry: lobby pobiera je przy starcie z ./skins.json (serwer, GitHub Pages).
+//    Wcześniej leżały w obu plikach i każdy gracz pobierał je dwa razy. Gra otwarta z dysku (bez serwera) ma tylko skiny wbudowane.
+wr('skins-data.js', '// skiny z kreatora wczytuje lobby z ./skins.json\nexport default [];\n');
 
 // 1) skrypt modułu ze strony -> main.js
 let html = rd('index.html');
