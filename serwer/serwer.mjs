@@ -487,7 +487,9 @@ const routes = {
 };
 
 // gra pod tym samym adresem co API: index.html z wpisanym adresem serwera portfeli + skins.json
-const STATIC = { '/': 'index.html', '/index.html': 'index.html', '/skins.json': 'skins.json', '/kreator-skinow.html': 'zrodla/kreator-skinow.html' };
+const STATIC = { '/': 'index.html', '/index.html': 'index.html', '/skins.json': 'skins.json', '/kreator-skinow.html': 'zrodla/kreator-skinow.html',
+  '/privacy.html': 'privacy.html', '/privacy': 'privacy.html', '/polityka-prywatnosci': 'privacy.html' };
+const PUBLIC_PAGES = new Set(['/privacy.html', '/privacy', '/polityka-prywatnosci']);   // dostępne bez hasła bramki (Google sprawdza politykę prywatności)
 function serveGame(p, res) {
   const f = STATIC[p] && path.join(GAME_DIR, STATIC[p]);
   if (!f || !fs.existsSync(f)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Nie znaleziono'); }
@@ -653,7 +655,7 @@ const server = http.createServer(async (req, res) => {
   if (COVER_PW) {                                               // bramka z hasłem (lock screen)
     const p0 = new URL(req.url, 'http://x').pathname;
     if (req.method === 'POST' && p0 === '/__cover') return coverLogin(req, res);
-    if (!coverOk(req)) {
+    if (!coverOk(req) && !(req.method === 'GET' && PUBLIC_PAGES.has(p0))) {
       if (req.method === 'GET' && !p0.startsWith('/api/')) return serveCover(res);
       res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...cors(origin) });
       return res.end(JSON.stringify({ error: 'locked', message: 'Strona jest zablokowana hasłem' }));
