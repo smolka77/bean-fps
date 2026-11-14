@@ -10,7 +10,10 @@
   #mgate .mg-hero{position:absolute;inset:0;z-index:0!important;overflow:hidden;background:#1a0a12}
   .mg-stage{position:absolute;left:0;top:0;width:720px;height:1280px;transform-origin:0 0}
   .mg-kick{position:absolute;inset:0;transform-origin:360px 950px;will-change:transform}
-  .mg-img{position:absolute;inset:0;background:center/100% 100% no-repeat}
+  .mg-img{position:absolute;inset:0;background:center/100% 100% no-repeat;transition:opacity .9s ease}
+  /* na żywo: scena lobby z gry (canvas WebGL) pod warstwą efektów; statyczny render zostaje tylko do pierwszych klatek */
+  #mgate .mg-3d{position:absolute;left:0;top:0;width:100%!important;height:100%!important;display:block}
+  html.mg-live #mgate .mg-img{opacity:0}
   #mg-fx{position:absolute;left:0;top:0;width:720px;height:1280px}
   #mgate::before{content:"";position:absolute;inset:0;z-index:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.035) 0 2px,transparent 2px 14px);pointer-events:none}
   #mgate::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;background:linear-gradient(180deg,rgba(14,4,12,.55) 0%,transparent 22%,transparent 58%,rgba(14,4,12,.92) 82%,#0e040c 100%)}
@@ -81,21 +84,31 @@
   var emb=[],i;
   for(i=0;i<64;i++)emb.push({x:R()*WD,y:200+R()*1050,vy:-(10+R()*28),r:2+R()*5,ph:R()*6.3,sw:.6+R()*1.4,tw:1+R()*3});
   var sp=[],smoke=[],cas=[],tr=[],hits=[];
-  var ph='idle',pt=0,idleDur=1,shots=0,burst=5,nextShot=0,tx=620,ty=610,vis=0,lock=0,flash=0,flashA=0,recoil=0,tt=0,last=0;
-  function pick(){var mn=Math.min(MX+70,visR-34);tx=mn+R()*Math.max(8,visR-16-mn);ty=572+R()*76}
+  var ph='idle',pt=0,idleDur=1,shots=0,burst=5,nextShot=0,tx=620,ty=610,vis=0,lock=0,flash=0,flashA=0,recoil=0,tt=0,last=0,spray=0,live=false;
+  var hero=document.querySelector('#mgate .mg-hero'),F=window.__mgFx={ph:'idle',recoil:0,shotN:0};   // stan dla sceny 3D (index.html: mobileAnimate)
+  function pick(){spray=0;if(live)return;var mn=Math.min(MX+70,visR-34);tx=mn+R()*Math.max(8,visR-16-mn);ty=MY-49+R()*76}
+  function sync3d(){   // scena 3D na żywo: wylot lufy, kierunek lufy i wyrzutnik gilz rzutowane na ekran (px) -> współrzędne obrazu
+    var L=window.__mg3dPts;if(!L)return;
+    if(!live){live=true;kick.style.transform='none'}
+    MX=(L.m.x-ox)/sc;MY=(L.m.y-oy)/sc;CX=(L.e.x-ox)/sc;CY=(L.e.y-oy)/sc;
+    var dx=L.a.x-L.m.x,dy=L.a.y-L.m.y,dl=Math.hypot(dx,dy)||1;dx/=dl;dy/=dl;
+    var dist=dx>.25?Math.min(230,Math.max(60,(visR-80-MX)/dx)):110;
+    tx=MX+dx*dist;ty=MY+dy*dist+spray;
+  }
   function shoot(){
-    flash=1;flashA=R()*6.28;recoil=1;
-    tr.push({tx:visR+50,ty:ty+(R()-.5)*3,t:0});
+    flash=1;flashA=R()*6.28;recoil=1;F.shotN++;
+    var k=tx>MX+1?(visR+50-MX)/(tx-MX):3;
+    tr.push({sx:MX,sy:MY,tx:MX+(tx-MX)*k,ty:MY+(ty-MY)*k+(R()-.5)*3,t:0});
     var hx=tx+(R()-.5)*5,hy=ty+(R()-.5)*3;hits.push({x:hx,y:hy,t:0});
     var k,a,v;
     for(k=0;k<7;k++){a=R()*6.28;v=40+R()*120;sp.push({x:hx,y:hy,vx:Math.cos(a)*v,vy:Math.sin(a)*v-30,l:0,d:.35+R()*.35,r:1.4+R()*2})}
     for(k=0;k<4;k++)sp.push({x:MX,y:MY,vx:60+R()*220,vy:-40+R()*80,l:0,d:.25+R()*.3,r:1.2+R()*1.8});
     cas.push({x:CX,y:CY,vx:70+R()*70,vy:-(160+R()*80),a:R()*6.28,va:(R()-.5)*30,l:0});
     smoke.push({x:MX+6,y:MY,vx:30+R()*26,vy:-(14+R()*16),r:14,gr:46+R()*24,l:0,d:1.1+R()*.6});
-    ty-=2.2;   // seria lekko ucieka w górę, jak odrzut broni
+    spray-=2.2;if(!live)ty-=2.2;   // seria lekko ucieka w górę, jak odrzut broni
   }
   function step(dt){
-    tt+=dt;pt+=dt;
+    tt+=dt;pt+=dt;sync3d();
     if(ph==='idle'){vis=Math.max(0,vis-dt*4);if(pt>idleDur){ph='aim';pt=0;lock=0;pick()}}
     else if(ph==='aim'){vis=Math.min(1,pt*4);lock=Math.min(1,pt/1.05);if(pt>1.1){ph='fire';pt=0;shots=0;nextShot=0;burst=4+(R()*3|0)}}
     else{nextShot-=dt;if(shots<burst&&nextShot<=0){shoot();shots++;nextShot=.095}
@@ -108,7 +121,8 @@
     for(k=cas.length-1;k>=0;k--){c=cas[k];c.l+=dt;c.vy+=900*dt;c.x+=c.vx*dt;c.y+=c.vy*dt;c.a+=c.va*dt;if(c.l>.9)cas.splice(k,1)}
     for(k=tr.length-1;k>=0;k--){tr[k].t+=dt;if(tr[k].t>.16)tr.splice(k,1)}
     for(k=hits.length-1;k>=0;k--){hits[k].t+=dt;if(hits[k].t>.22)hits.splice(k,1)}
-    var r=recoil,sw=Math.sin(tt*1.3);
+    var r=recoil,sw=Math.sin(tt*1.3);F.ph=ph;F.recoil=recoil;
+    if(live){hero.style.transform=r>.01?'translate('+(-r*3).toFixed(2)+'px,'+(r*1.2).toFixed(2)+'px)':'';return}   // scena 3D: tylko lekkie drgnięcie ekranu przy strzale
     kick.style.transform='translate('+(-r*5+sw*1.2).toFixed(2)+'px,'+(r*1.4+Math.sin(tt*.9)*1.6).toFixed(2)+'px) rotate('+(-r*.45).toFixed(3)+'deg) scale('+(1.012+Math.sin(tt*.35)*.012+r*.007).toFixed(4)+')';
   }
   function draw(){
@@ -133,7 +147,7 @@
       ctx.shadowBlur=0;ctx.globalAlpha=1;
     }
     ctx.globalCompositeOperation='lighter';
-    for(k=0;k<tr.length;k++){t=tr[k];var p=Math.min(1,t.t/.07),hx=MX+(t.tx-MX)*p,hy=MY+(t.ty-MY)*p,q=Math.max(0,p-.45),x0=MX+(t.tx-MX)*q,y0=MY+(t.ty-MY)*q;
+    for(k=0;k<tr.length;k++){t=tr[k];var p=Math.min(1,t.t/.07),hx=t.sx+(t.tx-t.sx)*p,hy=t.sy+(t.ty-t.sy)*p,q=Math.max(0,p-.45),x0=t.sx+(t.tx-t.sx)*q,y0=t.sy+(t.ty-t.sy)*q;
       g=ctx.createLinearGradient(x0,y0,hx,hy);g.addColorStop(0,'rgba(255,200,70,0)');g.addColorStop(1,'rgba(255,246,200,'+(1-t.t/.16).toFixed(2)+')');
       ctx.strokeStyle=g;ctx.lineWidth=2.6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(hx,hy);ctx.stroke()}
     for(k=0;k<sp.length;k++){s=sp[k];sa=1-s.l/s.d;sd=s.r*5;ctx.globalAlpha=sa;ctx.drawImage(EMB,s.x-sd/2,s.y-sd/2,sd,sd)}
@@ -144,7 +158,8 @@
     ctx.globalAlpha=1;
     if(flash>0){   // błysk z lufy i ciepłe światło na fasolce
       ctx.globalCompositeOperation='lighter';
-      g=ctx.createRadialGradient(MX,MY,0,MX,MY,190);g.addColorStop(0,'rgba(255,190,80,'+(.55*flash).toFixed(2)+')');g.addColorStop(1,'rgba(255,120,20,0)');ctx.fillStyle=g;ctx.fillRect(MX-200,MY-200,400,400);
+      g=ctx.createRadialGradient(MX,MY,0,MX,MY,190);g.addColorStop(0,'rgba(255,190,80,'+((live?.3:.55)*flash).toFixed(2)+')');g.addColorStop(1,'rgba(255,120,20,0)');ctx.fillStyle=g;ctx.fillRect(MX-200,MY-200,400,400);
+      if(live){ctx.globalCompositeOperation='source-over';return}   // w 3D błysk rysuje sama broń (płomień + światło na fasolce)
       ctx.save();ctx.translate(MX+4,MY);ctx.rotate((flashA-3.14)*.05);var L=(52+flashA*5)*(.6+.4*flash);
       ctx.fillStyle='rgba(255,226,120,'+(.95*flash).toFixed(2)+')';ctx.beginPath();ctx.moveTo(0,-5);ctx.lineTo(L*.45,-12);ctx.lineTo(L*.34,-3);ctx.lineTo(L,0);ctx.lineTo(L*.34,3);ctx.lineTo(L*.45,12);ctx.lineTo(0,5);ctx.lineTo(-L*.2,0);ctx.closePath();ctx.fill();
       ctx.fillStyle='rgba(255,255,240,'+flash.toFixed(2)+')';ctx.beginPath();ctx.ellipse(L*.14,0,L*.28,6.5,0,0,6.283);ctx.fill();ctx.restore();
@@ -1683,6 +1698,7 @@ const loadMaps=(async()=>{                         // mapy ładują się w tle, 
 const lobbyBean=makeBean(ME_COLOR,{eyes:false});
 const _lt=V3();
 function lobbyAnimate(b,t,dt,st){
+  if(MOBILE_SHOW){mobileAnimate(b,t,dt);return}             // telefon: ekran „coming soon”
   const ud=b.userData,br=Math.sin(t*2.1);
   poseLegs(ud,0,0,0,0);
   ud.upper.position.y=br*.006;
@@ -1700,7 +1716,7 @@ const lobby=createLobby({renderer,bean:lobbyBean,animate:lobbyAnimate,
   onPlay:(m,o)=>{o=o||{};if(m==='1v1'){matchLock();lobby.hide();ON.active=false;match.start({stake:o.stake});    // 1v1: kolejka na serwerze, mapę losuje serwer
       NET.queue({matchId:o.matchId,skin:mySkin}).catch(e=>netFail(e.message));return}
     setMode(m,null);lobby.hide();document.body.classList.remove('in-lobby');startPlay()},
-  onSkin:s=>{mySkin=s.id||'';applySkin(me.userData.mats.skin,s);applySkin(me.userData.mats.body,s);applySkin(fpsSkin,s);me.userData.eyes.visible=s.eyes!==false}});   // skin z lobby także na postaci w grze
+  onSkin:s=>{mySkin=s.id||'';applySkin(me.userData.mats.skin,s);applySkin(me.userData.mats.body,s);applySkin(fpsSkin,s);me.userData.eyes.visible=s.eyes!==false;if(MOBILE_SHOW&&MOBILE_SHOW.skinIt)setTimeout(MOBILE_SHOW.skinIt,0)}});   // skin z lobby także na postaci w grze
 $('overlay').addEventListener('click',()=>setTimeout(()=>{setPauseText();if(duel.mapBanner&&oaza.active){duel.mapBanner=false;banner(i18n('mt.map')+': '+mapName(oaza.map.name).toUpperCase(),'#ffe14a')}},0));
 const stakeTxt=v=>'$'+(Math.round(v*100)/100).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2});   // kwota w USD (płatna w SOL)
 const midMatch=()=>match.on&&match.phase!=='final';     // trwa mecz (po zakończeniu wyjście nic nie kosztuje)
@@ -1867,7 +1883,57 @@ function inspectProbe(){
   return out;
 }
 window.__game={TEAM,slotList,match,MAPS,snapMap,playerHit,armJoints,bodyHit,inv,selectWeapon,get curW(){return curW},get rifle(){return rifle},solveArm,armR,armL,TP_HOLD,VM,me,poseArmsTo,makeBean,scene,keepRifleOut,placeTP,createWeapon,lobby,duel,setMode,player,gun,enemies,camera,setView:attachRifle,startPlay,start:()=>{playing=true;$('overlay').style.display='none'},fire:()=>{if(gun.mag>0&&gun.cd<=0&&gun.reloading<=0)fireShot()},reload:startReload,inspect:startInspect,inspectProbe,INSP,fpsArms:[fpsArmR,fpsArmL],viewModel,vmCam,WRIST,setAds:v=>adsHeld=v,keys};
-loader.hide();window.__ready=true;if(!window.__mobileGate)frame();   // na telefonie gra nie rusza (ekran „coming soon”)
+// ================= telefon: ekran „coming soon” z żywą sceną lobby – Pepe idzie w miejscu, celuje i strzela z AK =================
+// Rytm (bezczynność → celowanie → seria) prowadzi skrypt ekranu (#mgate, window.__mgFx); tu tylko poza fasolki, błysk i rzut punktów na ekran.
+var MOBILE_SHOW=null;
+function mobileAnimate(b,t,dt){
+  const S=MOBILE_SHOW,ud=b.userData,fx=window.__mgFx,ph=fx?fx.ph:'idle',rec=fx?fx.recoil:0,g=S.gun;
+  b.rotation.y=-2.55;                                       // 3/4 w prawo: twarz do kamery, lufa w prawą stronę ekranu
+  S.aim=damp(S.aim,ph==='idle'?0:1,ph==='idle'?2.5:9,dt);
+  S.phase+=dt*8.5*S.run;
+  ud.pelvis.rotation.y=0;poseLegs(ud,S.phase,S.run,0,0);
+  ud.upper.position.y=Math.abs(Math.sin(S.phase))*.045*S.run;
+  leanTorso(ud,-.05-.08*S.run+rec*.05,Math.sin(S.phase)*.06*S.run,Math.sin(S.phase)*.035*S.run);
+  S.holder.rotation.x=lerp(-.62,Math.sin(t*1.7)*.02,S.aim)+rec*.1;S.holder.rotation.y=lerp(.3,0,S.aim);
+  placeTP(g,0,rec*.05,rec*.14);
+  keepRifleOut(ud,g.group);b.updateWorldMatrix(true,true);
+  _gr.copy(g.gripR);g.group.localToWorld(_gr);ud.torso.worldToLocal(_gr);
+  _gl.copy(g.gripLTP);g.group.localToWorld(_gl);ud.torso.worldToLocal(_gl);
+  poseArmsTo(ud,_gr,_gl);
+  if(fx&&fx.shotN!==S.shotN){S.shotN=fx.shotN;S.flashT=.05;g.flash.visible=true;g.flash.rotation.z=rnd()*6.28;g.flash.scale.setScalar(.85+rnd()*.5);g.flashLight.intensity=3.4*g.flashScale}
+  if(S.flashT>0){S.flashT-=dt;if(S.flashT<=0){g.flash.visible=false;g.flashLight.intensity=0}}
+}
+function mobileShow(){
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;   // bez ruchu: zostaje statyczny obrazek
+  const hero=document.querySelector('#mgate .mg-hero');if(!hero)return;
+  const S=MOBILE_SHOW={run:.5,phase:0,aim:0,shotN:0,flashT:0};
+  const holder=new THREE.Group();holder.position.copy(HOLDER_PIVOT);lobbyBean.userData.torso.add(holder);
+  const g=createWeapon('ak47',{fx:true});placeTP(g);holder.add(g.group);g.group.traverse(o=>{if(o.isMesh)o.castShadow=true});
+  S.holder=holder;S.gun=g;
+  // skin PEPE z kreatora: w zbudowanej grze skiny przychodzą z ./skins.json (w źródłach także z skins-data.js)
+  const isPepe=k=>k&&(String(k.name||'').toUpperCase()==='PEPE'||k.id==='moj-skin');
+  let pepe=SKINS.find(isPepe)||null;
+  fetch('./skins.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null)
+    .then(l=>{if(Array.isArray(l)){const k=l.find(x=>x&&String(x.name||'').toUpperCase()==='PEPE')||l.find(isPepe);if(k){pepe=k;skinIt()}}}).catch(()=>{});
+  const skinIt=()=>{if(!pepe)return;applySkin(lobbyBean.userData.mats.skin,pepe);applySkin(lobbyBean.userData.mats.body,pepe)};
+  S.skinIt=skinIt;skinIt();   // lobby po wczytaniu skins.json przywraca zapisany skin (onSkin) – wtedy Pepe wraca
+  renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(innerWidth,innerHeight);
+  const cv=renderer.domElement;cv.classList.add('mg-3d');hero.insertBefore(cv,hero.firstChild);
+  const v=V3(),q=new THREE.Quaternion(),ej=g.anchors.ejectPort?g.anchors.ejectPort.clone():null;
+  const scr=()=>{v.project(lobby.camera);return{x:(v.x*.5+.5)*innerWidth,y:(-v.y*.5+.5)*innerHeight}};
+  let last=performance.now(),n=0;
+  (function tick(){
+    const now=performance.now(),dt=Math.min(.05,(now-last)/1000);last=now;
+    lobby.update(dt);
+    g.muzzle.getWorldPosition(v);const m=scr();
+    g.muzzle.getWorldPosition(v);g.group.getWorldQuaternion(q);v.add(V3(0,0,-3).applyQuaternion(q));const a=scr();
+    if(ej){v.copy(ej);g.inner.localToWorld(v)}else g.group.getWorldPosition(v);const e=scr();
+    window.__mg3dPts={m,a,e};
+    if(++n===3)document.documentElement.classList.add('mg-live');   // pierwsze klatki gotowe: statyczny obrazek znika
+    requestAnimationFrame(tick);
+  })();
+}
+loader.hide();window.__ready=true;if(!window.__mobileGate)frame();else try{mobileShow()}catch(e){console.warn('mobileShow',e)}   // na telefonie gra nie rusza (ekran „coming soon” z animowaną sceną)
 </script>
 
 
