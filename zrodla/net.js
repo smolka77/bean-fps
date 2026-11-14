@@ -3,6 +3,7 @@
 // W meczu: send({t:'st', s}) stan gracza ~20/s, 'shot' (smuga), 'hit' (trafienie przeciwnika), 'dead' (zginąłem),
 // serwer odsyła 'round' {winner, score} i 'end' {winner, score, reason: 'score' | 'left'}.
 import { walletApi } from './wallet-config.js';
+import { t as tr } from './lobby-ui.js';
 
 export function createNet() {
   let ws = null, closing = false;
@@ -17,12 +18,12 @@ export function createNet() {
     if (ws && ws.readyState <= 1) return Promise.resolve();
     closing = false;
     return new Promise((ok, fail) => {
-      if (!token()) return fail(new Error('Zaloguj się, żeby grać 1v1.'));
+      if (!token()) return fail(new Error(tr('net.login')));
       let s; try { s = new WebSocket(wsUrl()); } catch (e) { return fail(e); }
       ws = s; let opened = false;
-      const to = setTimeout(() => { if (!opened) { try { s.close(); } catch {} fail(new Error('Serwer meczów nie odpowiada.')); } }, 8000);
+      const to = setTimeout(() => { if (!opened) { try { s.close(); } catch {} fail(new Error(tr('net.timeout'))); } }, 8000);
       s.onopen = () => { opened = true; clearTimeout(to); ok(); };
-      s.onerror = () => { if (!opened) { clearTimeout(to); fail(new Error('Brak połączenia z serwerem meczów.')); } };
+      s.onerror = () => { if (!opened) { clearTimeout(to); fail(new Error(tr('net.offline'))); } };
       s.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch { return; } if (m && m.t) emit(m.t, m); };
       s.onclose = () => { if (ws === s) ws = null; if (opened && !closing) emit('close', {}); };
     });

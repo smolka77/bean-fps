@@ -249,6 +249,7 @@
   </div>
   <div class="ld-tipbox"><span class="ld-tag" id="ld-tiptag">TIP</span><span class="ld-tip in" id="ld-tip">Headshots deal much more damage.</span></div>
 </div>
+<script>(function(){try{var L='en',s=JSON.parse(localStorage.getItem('fasolka-settings')||'null');if(s&&s.langPicked&&s.lang)L=s.lang;var T={pl:['WSKAZÓWKA','WCZYTYWANIE','Strzał w głowę zadaje dużo więcej obrażeń.'],en:['TIP','LOADING','Headshots deal much more damage.'],ru:['СОВЕТ','ЗАГРУЗКА','Выстрел в голову наносит гораздо больше урона.'],es:['CONSEJO','CARGANDO','Los disparos a la cabeza hacen mucho más daño.']}[L];if(!T)return;document.getElementById('ld-tiptag').textContent=T[0];document.getElementById('ld-label').textContent=T[1];document.getElementById('ld-tip').textContent=T[2]}catch(e){}})()</script>
 <div id="cross" class="hud"><i class="h l"></i><i class="h r"></i><i class="v t"></i><i class="v b"></i></div>
 <div id="marker" class="hud"><svg viewBox="0 0 26 26" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M3 3l6 6M23 3l-6 6M3 23l6-6M23 23l-6-6"/></svg></div>
 <div id="vlabel" class="hud"></div>
@@ -677,7 +678,7 @@ const VM={rifle:{hip:V3(.135,-.165,-.29),yaw:.05,pitch:.015,scale:.72,pR:V3(.2,-
           pistol:{hip:V3(.11,-.15,-.36),yaw:.03,pitch:.02,scale:1,pR:V3(.19,-.28,-.12),pL:V3(-.08,-.3,-.14),cR:V3(.4,.8,-.45).normalize(),cL:V3(-.4,.8,-.45).normalize(),poleR:V3(.8,-1,.2),poleL:V3(-.9,-1,.1)}};
 for(const k in VM){const L=VM[k];L.shR=L.pR.clone().addScaledVector(L.cR,-armR.l0*.85);L.shL=L.pL.clone().addScaledVector(L.cL,-armL.l0*.85)}   // zgodność: bark przy ciele
 const _gr=V3(),_gl=V3(),_s=V3();
-const VIEW_LABEL={fps:'',tps:'Widok zza ramienia (V - zmień widok)',front:'Widok z przodu (V - wróć do FPS)'};
+const VIEW_LABEL={fps:'',tps:'g.viewTps',front:'g.viewFront'};   // klucze słownika lobby
 function setLayer(o,l){o.traverse(c=>{if(c.isLight){c.layers.enable(0);c.layers.enable(1)}else c.layers.set(l)})}
 setLayer(fpsArmR,1);setLayer(fpsArmL,1);
 function attachRifle(view){
@@ -685,7 +686,7 @@ function attachRifle(view){
   rifle.group.visible=true;for(const m of rifle.rear)m.visible=true;
   if(view==='fps'){viewModel.add(rifle.group);setLayer(rifle.group,1);me.visible=false;fpsArmR.visible=fpsArmL.visible=true}
   else{meHolder.add(rifle.group);setLayer(rifle.group,0);placeTP(rifle);me.visible=true;fpsArmR.visible=fpsArmL.visible=false}
-  player.view=view;$('vlabel').textContent=VIEW_LABEL[view];
+  player.view=view;$('vlabel').textContent=VIEW_LABEL[view]?i18n(VIEW_LABEL[view]):'';
 }
 attachRifle('fps');
 
@@ -746,7 +747,7 @@ function buildHudSlots(){
 }
 function setHud(){
   const w=inv[curW],st=WEAPON_STATS[w.id];$('mag').textContent=gun.mag;$('reserve').textContent=gun.reserve;
-  $('state').textContent=gun.switching>0?'zmiana broni':gun.reloading>0?'przeładowanie':(gun.mag===0&&gun.reserve===0?'brak amunicji':st.name);
+  $('state').textContent=gun.switching>0?i18n('g.switch'):gun.reloading>0?i18n('g.reload'):(gun.mag===0&&gun.reserve===0?i18n('g.noAmmo'):st.name);
   if(!CSHUD.built)buildHudSlots();
   const sel=gun.switchTo>=0?gun.switchTo:curW,sl=slotList();
   CSHUD.slotEls.forEach((el,i)=>{const k=sl.indexOf(i);el.style.display=k<0?'none':'';el.querySelector('b').textContent=k+1;el.classList.toggle('on',i===sel)});
@@ -1454,12 +1455,12 @@ function setMode(m,mi,quiet){
   MODE=m==='1v1'?'1v1':'range';document.body.classList.toggle('duel',MODE==='1v1');
   kills=0;duel.botScore=0;duel.bot=enemies[0];
   const rm=MODE==='range'&&RANGE_MAP.ready?RANGE_MAP:null;      // Strzelnica gra na własnej mapie, gdy się już wczytała (w tle); inaczej stara arena
-  $('score').innerHTML=MODE==='1v1'?'Ty <b id="kills">0</b> : <b id="botScore">0</b> Bot <small>do 5</small>':i18n('hud.hits')+' <b id="kills">0</b>'+(rm?' <small id="rgAcc"></small>':'');
+  $('score').innerHTML=MODE==='1v1'?i18n('g.you')+' <b id="kills">0</b> : <b id="botScore">0</b> '+i18n('g.bot')+' <small>'+i18n('g.to5')+'</small>':i18n('hud.hits')+' <b id="kills">0</b>'+(rm?' <small id="rgAcc"></small>':'');
   for(const e of enemies){const on=MODE==='range'||e===duel.bot;e.off=!on;e.root.visible=on;e.hp=100;e.dead=0;e.fall=0;e.root.rotation.z=0;e.root.position.y=0;if(on&&MODE==='range')e.root.position.copy(spawnPos())}
   duel.mapBanner=false;
   if(MODE==='1v1'){if(mi!=null&&mi>=0&&MAPS[mi]&&MAPS[mi].ready)mapIdx=mi;else nextMap()}
   useOaza(MODE==='1v1'||!!rm,rm);
-  if(oaza.active&&!quiet)setTimeout(()=>banner('MAPA: '+oaza.map.name.toUpperCase(),'#ffe14a'),600);
+  if(oaza.active&&!quiet)setTimeout(()=>banner(i18n('mt.map')+': '+oaza.map.name.toUpperCase(),'#ffe14a'),600);
   setTeam(MODE==='1v1'?(Math.random()<.5?0:1):null);       // losowanie strony: bez komunikatu dla graczy
   if(MODE==='1v1'){duelSpawn(duel.bot);resetPlayer()}
   if(rm){range.enter(rm);resetPlayer()}
@@ -1472,7 +1473,7 @@ function sndFar(){
 function endMatch(won){
   dispatchEvent(new CustomEvent('fasolka:match',{detail:{won:!!won}}));
   playing=false;gun.firing=false;if(document.pointerLockElement)document.exitPointerLock();
-  $('ovTitle').textContent=won?'WYGRANA!':'PRZEGRANA';nextMap();useOaza(true);duel.mapBanner=true;$('ovText').textContent='Wynik '+kills+' : '+duel.botScore+'. Następna mapa: '+(oaza.map?oaza.map.name:'—')+'. Kliknij, aby zagrać.';$('ovGo').textContent='ZAGRAJ PONOWNIE';
+  $('ovTitle').textContent=i18n(won?'g.won':'g.lost');nextMap();useOaza(true);duel.mapBanner=true;$('ovText').textContent=i18n('g.result',{a:kills,b:duel.botScore,m:oaza.map?oaza.map.name:'—'});$('ovGo').textContent=i18n('g.playAgain');
   $('overlay').style.display='flex';
   kills=0;duel.botScore=0;$('kills').textContent=0;$('botScore').textContent=0;duelSpawn(duel.bot);resetPlayer();   // nowy mecz od razu gotowy
 }
@@ -1481,7 +1482,7 @@ function playerHit(d){
   const el=$('dmg');el.style.boxShadow='inset 0 0 140px rgba(255,0,0,.6)';clearTimeout(el._t);el._t=setTimeout(()=>el.style.boxShadow='',140);
   if(duel.hp<=0){duel.botScore++;$('botScore').textContent=duel.botScore;
     if(match.on){player.dead=true;gun.firing=false;adsHeld=false;document.body.classList.add('mt-dead');if(ON.active)NET.send({t:'dead'});else match.kill('op');return}
-    if(duel.botScore>=WIN)endMatch(false);else{banner('ZGINĄŁEŚ','#ff6a5c');resetPlayer()}}
+    if(duel.botScore>=WIN)endMatch(false);else{banner(i18n('g.died'),'#ff6a5c');resetPlayer()}}
 }
 // przeciwnik w 1v1: drugi gracz. Jego stan (pozycja, patrzenie, kucanie, bieg, broń) przychodzi z serwera ~20 razy na sekundę,
 // między paczkami pozycja jest wygładzana. Bot do 1v1 został usunięty – mecze są tylko z prawdziwymi graczami.
@@ -1599,7 +1600,7 @@ const loadMaps=(async()=>{                         // mapy ładują się w tle, 
       M.bx=Math.max(...D.colliders.map(c=>Math.max(-c[0],c[3])))-.6;M.bz=Math.max(...D.colliders.map(c=>Math.max(-c[2],c[5])))-.6;   // granice areny z pełnej listy kolizji
       M.ready=true;if(!M.range)thumbQ.push(M);          // miniatury tylko dla map z rotacji 1v1
       if(M.range&&MODE==='range'&&!oaza.active&&!lobby.active&&!match.on&&!match.lobbyPhase)setMode('range',null,true);   // Strzelnica wczytała się już po wejściu w tryb: przenieś grę na jej mapę
-      if(MODE==='1v1'&&!oaza.active&&!match.on&&!match.lobbyPhase){if(mapIdx<0)nextMap();useOaza(true);duelSpawn(duel.bot);resetPlayer();banner('MAPA: '+oaza.map.name.toUpperCase(),'#ffe14a')}
+      if(MODE==='1v1'&&!oaza.active&&!match.on&&!match.lobbyPhase){if(mapIdx<0)nextMap();useOaza(true);duelSpawn(duel.bot);resetPlayer();banner(i18n('mt.map')+': '+oaza.map.name.toUpperCase(),'#ffe14a')}
     }catch(e){console.warn('Mapa '+M.name+':',e)}
   }));
   mapsSettled=true;
@@ -1627,7 +1628,7 @@ const lobby=createLobby({renderer,bean:lobbyBean,animate:lobbyAnimate,
       NET.queue({matchId:o.matchId,skin:mySkin}).catch(e=>netFail(e.message));return}
     setMode(m,null);lobby.hide();document.body.classList.remove('in-lobby');startPlay()},
   onSkin:s=>{mySkin=s.id||'';applySkin(me.userData.mats.skin,s);applySkin(me.userData.mats.body,s);applySkin(fpsSkin,s);me.userData.eyes.visible=s.eyes!==false}});   // skin z lobby także na postaci w grze
-$('overlay').addEventListener('click',()=>setTimeout(()=>{setPauseText();if(duel.mapBanner&&oaza.active){duel.mapBanner=false;banner('MAPA: '+oaza.map.name.toUpperCase(),'#ffe14a')}},0));
+$('overlay').addEventListener('click',()=>setTimeout(()=>{setPauseText();if(duel.mapBanner&&oaza.active){duel.mapBanner=false;banner(i18n('mt.map')+': '+oaza.map.name.toUpperCase(),'#ffe14a')}},0));
 const stakeTxt=v=>'$'+(Math.round(v*100)/100).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2});   // kwota w USD (płatna w SOL)
 const midMatch=()=>match.on&&match.phase!=='final';     // trwa mecz (po zakończeniu wyjście nic nie kosztuje)
 $('toLobby').addEventListener('click',e=>{
@@ -1710,7 +1711,7 @@ NET.on('hit',m=>{if(ON.active&&match.on)playerHit(+m.d||0)});
 NET.on('round',m=>{if(!ON.active)return;const w=m.winner===ON.seat?'me':'op';if(w==='me'&&duel.bot){duel.bot.dead=99;duel.bot.fall=0}match.kill(w)});
 NET.on('end',m=>{if(!ON.active)return;ON.active=false;if(m.reason==='left')match.oppLeft();NET.close();restoreOppSkin()});
 NET.on('error',m=>netFail(m.message));
-NET.on('close',()=>{if(match.phase==='search'||match.lobbyPhase)netFail('Utracono połączenie z serwerem meczów.');else if(ON.active&&match.phase!=='final'){ON.active=false;banner('ROZŁĄCZONO Z SERWEREM','#ff6a5c')}});
+NET.on('close',()=>{if(match.phase==='search'||match.lobbyPhase)netFail('Utracono połączenie z serwerem meczów.');else if(ON.active&&match.phase!=='final'){ON.active=false;banner(i18n('g.disconnected'),'#ff6a5c')}});
 window.__net={NET,ON};
 // miniatury map do losowania: jedna klatka z silnika na mapę (z góry pod kątem, dach hali ukryty), robiona przed zwykłą klatką
 const thumbCam=new THREE.PerspectiveCamera(46,16/10,.5,700);

@@ -10,7 +10,7 @@
 // aż obaj są gotowi (match.oppGo), a wyjście przeciwnika kończy mecz walkowerem (match.oppLeft).
 
 import { loader } from './loader.js';
-import { MAP_IMG } from './lobby-ui.js';
+import { MAP_IMG, t as tr } from './lobby-ui.js';
 
 export const ROUNDS_TO_WIN = 3;
 const OPP_NAMES = ['Groszek', 'Bobek_PL', 'Fasolino', 'Cieciorka', 'Soczewica', 'Edamame', 'Pinto', 'Mung', 'Wielki Bób',
@@ -192,10 +192,10 @@ const BEAN = visor => `<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="13" 
 
 const HTML = `
 <div id="mt-mm" hidden><div class="mt-box">
-  <div class="mt-head"><span class="mt-tag">TRYB 1 NA 1</span><h2 class="mt-title" id="mt-title"></h2>
-    <div class="mt-chips"><span class="mt-chip" id="mt-stakechip"><small>STAWKA</small>${COIN}<b id="mt-stake"></b></span><span class="mt-chip"><small>RUNDY</small><b>DO ${ROUNDS_TO_WIN} WYGRANYCH</b></span></div></div>
+  <div class="mt-head"><span class="mt-tag" data-i18n="mt.mode"></span><h2 class="mt-title" id="mt-title"></h2>
+    <div class="mt-chips"><span class="mt-chip" id="mt-stakechip"><small data-i18n="mt.stake"></small>${COIN}<b id="mt-stake"></b></span><span class="mt-chip"><small data-i18n="mt.rounds"></small><b data-i18n="mt.firstTo"></b></span></div></div>
   <div class="mt-vs" id="mt-vs">
-    <div class="mt-pl me"><div class="av">${BEAN('#5a3500')}</div><span class="nm" id="mt-me"></span><small>TY</small></div>
+    <div class="mt-pl me"><div class="av">${BEAN('#5a3500')}</div><span class="nm" id="mt-me"></span><small data-i18n="mt.you"></small></div>
     <div class="mt-vsx">VS</div>
     <div class="mt-pl op" id="mt-opcard"><div class="av"><i class="radar"></i>${BEAN('#6e140c')}<b class="q">?</b></div><span class="nm" id="mt-op"></span><small id="mt-opst"></small></div>
   </div>
@@ -203,14 +203,14 @@ const HTML = `
   <div class="mt-foot">
     <div class="mt-timer" id="mt-timer">0:00</div>
     <div class="mt-load" id="mt-load" hidden><small class="mt-lbl" id="mt-lbl"></small><div class="mt-bar"><i id="mt-bar"></i></div><div class="mt-ready"><span id="mt-rme"></span><span id="mt-rop"></span></div></div>
-    <button class="mt-btn ghost" id="mt-cancel" type="button">ANULUJ<kbd>ESC</kbd></button>
+    <button class="mt-btn ghost" id="mt-cancel" type="button"><span data-i18n="mt.cancel"></span><kbd>ESC</kbd></button>
   </div>
 </div></div>
 <div id="mt-dim"></div>
 <div id="mt-hud">
   <div class="side me"><span class="nm" id="mt-hme"></span><span class="pips" id="mt-hpme"></span></div>
   <b class="sc me" id="mt-hsme">0</b>
-  <div class="mid"><small>RUNDA</small><b id="mt-hround">1</b></div>
+  <div class="mid"><small data-i18n="mt.round"></small><b id="mt-hround">1</b></div>
   <b class="sc op" id="mt-hsop">0</b>
   <div class="side op"><span class="nm" id="mt-hop"></span><span class="pips" id="mt-hpop"></span></div>
 </div>
@@ -257,7 +257,7 @@ export function createMatch(g) {
   const S = { me: 0, op: 0, round: 1, nick: 'Gracz', opp: '', mapIdx: -1, mapName: '', stake: 0, preset: null };
   let opts = {};                             // z lobby: { map: nazwa wylosowanej mapy, stake: stawka pobrana z portfela }
   const money = v => g.money ? g.money(v) : String(v);
-  const stakeChip = () => S.stake ? `<span class="mt-chip"><small>STAWKA</small>${COIN}<b>${esc(money(S.stake))}</b></span>` : '';
+  const stakeChip = () => S.stake ? `<span class="mt-chip"><small>${tr('mt.stake')}</small>${COIN}<b>${esc(money(S.stake))}</b></span>` : '';
   let phase = 'idle', t = 0, frozen = false, lastWinner = null;
   let searchDur = 3, nameT = 0, oppReadyT = 1, countN = 0, curtainT = -1, roul = null, drawDone = -1, switched = false;
   let oppGo = false, sentReady = false;                    // online: przeciwnik gotowy (serwer: 'go'), my już zgłosiliśmy gotowość
@@ -298,20 +298,20 @@ export function createMatch(g) {
       $('mt-stakechip').hidden = !S.stake; $('mt-stake').textContent = S.stake ? money(S.stake) : '';
       $('mt-load').hidden = true; $('mt-timer').hidden = false;
       $('mt-cancel').hidden = !!S.stake && !online();     // online: anulowanie szukania zwraca stawkę (serwer); offline stawka przepada
-      setTitle('SZUKANIE PRZECIWNIKA<span class="mt-dots"><i>.</i><i>.</i><i>.</i></span>');
+      setTitle(tr('mt.searching') + '<span class="mt-dots"><i>.</i><i>.</i><i>.</i></span>');
       $('mt-me').textContent = S.nick;
-      opCard.className = 'mt-pl op searching'; $('mt-op').textContent = '???'; $('mt-opst').textContent = online() ? 'W KOLEJCE' : 'SZUKANIE';
+      opCard.className = 'mt-pl op searching'; $('mt-op').textContent = '???'; $('mt-opst').textContent = tr(online() ? 'mt.inQueue' : 'mt.search');
       searchDur = rand(2.4, 4.8); nameT = 0;
     },
     found() {
       if (!S.opp) { const pool = OPP_NAMES.filter(n => n.toLowerCase() !== S.nick.toLowerCase()); S.opp = pool[Math.floor(Math.random() * pool.length)]; }
       $('mt-cancel').hidden = true;
-      $('mt-op').textContent = S.opp; $('mt-opst').textContent = 'PRZECIWNIK';
+      $('mt-op').textContent = S.opp; $('mt-opst').textContent = tr('mt.opponent');
       opCard.className = 'mt-pl op'; void opCard.offsetWidth; opCard.classList.add('found');
-      setTitle('PRZECIWNIK ZNALEZIONY', true); sfx('found');
+      setTitle(tr('mt.found'), true); sfx('found');
     },
     draw() {
-      setTitle('LOSOWANIE MAPY<span class="mt-dots"><i>.</i><i>.</i><i>.</i></span>');
+      setTitle(tr('mt.drawing') + '<span class="mt-dots"><i>.</i><i>.</i><i>.</i></span>');
       vs.classList.add('compact'); $('mt-timer').hidden = true;
       const maps = g.maps(); mapsEl.innerHTML = ''; mapsEl.style.setProperty('--n', Math.max(1, maps.length));
       maps.forEach(m => { const d = document.createElement('div'); d.className = 'mt-map'; d.style.backgroundImage = m.thumb ? `url("${m.thumb}")` : mapFallback(m.name);
@@ -330,48 +330,48 @@ export function createMatch(g) {
         mapsEl.classList.add('done'); mapsEl.hidden = false; sfx('select');
       }
       $('mt-cancel').hidden = true; $('mt-load').hidden = false; $('mt-bar').style.width = '0%';
-      $('mt-lbl').textContent = 'WCZYTYWANIE GRACZY'; $('mt-lbl').className = 'mt-lbl';
+      $('mt-lbl').textContent = tr('mt.loadPlayers'); $('mt-lbl').className = 'mt-lbl';
       const rme = $('mt-rme'), rop = $('mt-rop'); rme.textContent = S.nick.toUpperCase(); rop.textContent = S.opp.toUpperCase(); rme.className = rop.className = '';
-      setTitle('MAPA: ' + esc(S.mapName.toUpperCase()), true);
+      setTitle(tr('mt.map') + ': ' + esc(S.mapName.toUpperCase()), true);
       oppReadyT = rand(.7, 1.5); curtainT = -1;
       { const m = S.mapIdx >= 0 ? g.maps()[S.mapIdx] : null;       // ekran wczytywania (loader.js) z mapą w tle
-        loader.show({ title: 'MAPA: ' + S.mapName.toUpperCase(), sub: S.nick + '   VS   ' + S.opp,
-          bg: MAP_IMG[S.mapName] ? `url("${MAP_IMG[S.mapName]}")` : m && m.thumb ? `url("${m.thumb}")` : mapFallback(S.mapName), label: 'WCZYTYWANIE GRACZY' });
+        loader.show({ title: tr('mt.map') + ': ' + S.mapName.toUpperCase(), sub: S.nick + '   VS   ' + S.opp,
+          bg: MAP_IMG[S.mapName] ? `url("${MAP_IMG[S.mapName]}")` : m && m.thumb ? `url("${m.thumb}")` : mapFallback(S.mapName), label: tr('mt.loadPlayers') });
         ldOn = true; }
     },
     intro() {
       frozen = true; mm.hidden = true; g.resetRound();
       renderHud(); hud.classList.add('on'); dim.classList.add('on'); document.body.classList.add('mt-on');
-      showStrip('intro', `<span class="mt-tag">MECZ 1 NA 1</span>
-        <div class="mt-vsrow"><div class="me"><span class="nm">${esc(S.nick)}</span><small>TY</small></div><div class="mt-vsx">VS</div><div class="op"><span class="nm">${esc(S.opp)}</span><small>PRZECIWNIK</small></div></div>
-        <div class="mt-chips"><span class="mt-chip"><small>MAPA</small><b>${esc(S.mapName.toUpperCase())}</b></span>${stakeChip()}<span class="mt-chip"><small>RUNDY</small><b>DO ${ROUNDS_TO_WIN} WYGRANYCH</b></span></div>
-        <div class="mt-clickhint">KLIKNIJ, ABY ZACZĄĆ</div>`);
+      showStrip('intro', `<span class="mt-tag">${tr('mt.match')}</span>
+        <div class="mt-vsrow"><div class="me"><span class="nm">${esc(S.nick)}</span><small>${tr('mt.you')}</small></div><div class="mt-vsx">VS</div><div class="op"><span class="nm">${esc(S.opp)}</span><small>${tr('mt.opponent')}</small></div></div>
+        <div class="mt-chips"><span class="mt-chip"><small>${tr('mt.map')}</small><b>${esc(S.mapName.toUpperCase())}</b></span>${stakeChip()}<span class="mt-chip"><small>${tr('mt.rounds')}</small><b>${tr('mt.firstTo', { n: ROUNDS_TO_WIN })}</b></span></div>
+        <div class="mt-clickhint">${tr('mt.clickStart')}</div>`);
     },
     count() {
       frozen = true; hideStrip(); dim.classList.remove('on'); renderHud();
-      $('mt-cround').textContent = 'RUNDA ' + S.round + (S.me === ROUNDS_TO_WIN - 1 && S.op === ROUNDS_TO_WIN - 1 ? ' · DECYDUJĄCA' : '');
+      $('mt-cround').textContent = tr('mt.round') + ' ' + S.round + (S.me === ROUNDS_TO_WIN - 1 && S.op === ROUNDS_TO_WIN - 1 ? ' · ' + tr('mt.decider') : '');
       count.classList.add('on'); countN = 3; setCount('3'); sfx('count');
     },
     live() { frozen = false; },
     killcam() { frozen = true; },
     result() {
       const won = lastWinner === 'me', k = ROUNDS_TO_WIN - S.me;
-      const note = S.me === ROUNDS_TO_WIN - 1 && S.op === ROUNDS_TO_WIN - 1 ? 'NASTĘPNA RUNDA ROZSTRZYGA MECZ'
-        : `DO WYGRANIA MECZU BRAKUJE CI ${k} ${k === 1 ? 'RUNDY' : 'RUND'}`;
+      const note = S.me === ROUNDS_TO_WIN - 1 && S.op === ROUNDS_TO_WIN - 1 ? tr('mt.nextDecides')
+        : k === 1 ? tr('mt.need1') : tr('mt.needN', { n: k });
       dim.classList.add('on'); curtainT = -1;
-      showStrip(won ? 'win' : 'loss', `<span class="mt-sub">RUNDA ${S.round}</span><div class="mt-big">${won ? 'ZWYCIĘSTWO' : 'PORAŻKA'}</div>${scoreRow()}<span class="mt-note">${note}</span>`);
+      showStrip(won ? 'win' : 'loss', `<span class="mt-sub">${tr('mt.round')} ${S.round}</span><div class="mt-big">${tr(won ? 'mt.win' : 'mt.loss')}</div>${scoreRow()}<span class="mt-note">${note}</span>`);
       sfx(won ? 'win' : 'lose');
     },
     final() {
       const won = S.forceWin || S.me > S.op; frozen = true; g.release(); dim.classList.add('on'); mm.hidden = true;
       if (g.matchEnd) g.matchEnd(won);       // lobby rozlicza stawkę w portfelu
       const prize = !S.stake ? '' : won
-        ? `<div class="mt-prize plus"><small>WYGRANA</small>${COIN}<b>+${esc(money(g.prize ? g.prize(S.stake) : S.stake * 2))}</b></div>`
-        : `<div class="mt-prize minus"><small>STAWKA</small>${COIN}<b>−${esc(money(S.stake))}</b></div>`;
-      showStrip((won ? 'win' : 'loss') + ' final', `<span class="mt-sub">KONIEC MECZU · ${esc(S.mapName.toUpperCase())}</span><div class="mt-big">${won ? 'ZWYCIĘSTWO' : 'PORAŻKA'}</div>${scoreRow()}
-        ${S.forceWin ? '<span class="mt-note">PRZECIWNIK OPUŚCIŁ MECZ – WYGRANA WALKOWEREM</span>' : ''}
+        ? `<div class="mt-prize plus"><small>${tr('mt.prize')}</small>${COIN}<b>+${esc(money(g.prize ? g.prize(S.stake) : S.stake * 2))}</b></div>`
+        : `<div class="mt-prize minus"><small>${tr('mt.stake')}</small>${COIN}<b>−${esc(money(S.stake))}</b></div>`;
+      showStrip((won ? 'win' : 'loss') + ' final', `<span class="mt-sub">${tr('mt.over')} · ${esc(S.mapName.toUpperCase())}</span><div class="mt-big">${tr(won ? 'mt.win' : 'mt.loss')}</div>${scoreRow()}
+        ${S.forceWin ? '<span class="mt-note">' + tr('mt.forfeit') + '</span>' : ''}
         ${prize}
-        <div class="mt-actions"><button class="mt-btn pri" type="button" data-a="again">GRAJ DALEJ</button><button class="mt-btn ghost" type="button" data-a="lobby">LOBBY</button></div>`);
+        <div class="mt-actions"><button class="mt-btn pri" type="button" data-a="again">${tr('mt.again')}</button><button class="mt-btn ghost" type="button" data-a="lobby">${tr('mt.lobby')}</button></div>`);
       sfx(won ? 'win' : 'lose');
     },
   };
@@ -400,7 +400,7 @@ export function createMatch(g) {
     if (roul.i >= roul.steps.length - 1 && roul.acc >= .25) {
       for (const c of cards) c.classList.remove('on');
       if (cards[S.mapIdx]) cards[S.mapIdx].classList.add('sel');
-      mapsEl.classList.add('done'); setTitle('MAPA: ' + esc(S.mapName.toUpperCase()), true); sfx('select');
+      mapsEl.classList.add('done'); setTitle(tr('mt.map') + ': ' + esc(S.mapName.toUpperCase()), true); sfx('select');
       roul = null; drawDone = 0;
     }
   }
@@ -420,12 +420,12 @@ export function createMatch(g) {
     },
     load() {
       const M = S.mapIdx >= 0 ? g.maps()[S.mapIdx] : null, mready = !M || M.ready || g.mapsSettled();   // mapa z lobby mogła się jeszcze nie wczytać
-      const p = Math.min(mready ? 1 : .9, t / 1.6); $('mt-bar').style.width = (p * 100).toFixed(1) + '%'; if (ldOn) loader.set(p * .96, mready ? null : 'WCZYTYWANIE MAPY');
+      const p = Math.min(mready ? 1 : .9, t / 1.6); $('mt-bar').style.width = (p * 100).toFixed(1) + '%'; if (ldOn) loader.set(p * .96, mready ? null : tr('mt.loadMap'));
       if (t >= .45 && mready) { $('mt-rme').className = 'ok'; if (online() && !sentReady) { sentReady = true; if (g.localReady) g.localReady(); } }
-      if (online()) { if (oppGo) $('mt-rop').className = 'ok'; else { if (mready) { t = Math.min(t, 1.55); if (ldOn) loader.set(.96, 'CZEKANIE NA PRZECIWNIKA'); } return; } }
+      if (online()) { if (oppGo) $('mt-rop').className = 'ok'; else { if (mready) { t = Math.min(t, 1.55); if (ldOn) loader.set(.96, tr('mt.waitOpp')); } return; } }
       else if (t >= oppReadyT) $('mt-rop').className = 'ok';
       if (!mready) { t = Math.min(t, 1.5); return; }
-      if (t >= Math.max(.45, online() ? 0 : oppReadyT) && t >= 1.6 && !$('mt-lbl').classList.contains('ok')) { $('mt-lbl').textContent = 'OBAJ GRACZE GOTOWI'; $('mt-lbl').classList.add('ok'); if (ldOn) loader.set(1, 'OBAJ GRACZE GOTOWI'); }
+      if (t >= Math.max(.45, online() ? 0 : oppReadyT) && t >= 1.6 && !$('mt-lbl').classList.contains('ok')) { $('mt-lbl').textContent = tr('mt.bothReady'); $('mt-lbl').classList.add('ok'); if (ldOn) loader.set(1, tr('mt.bothReady')); }
       if (t >= 1.9 && curtainT < 0) { curtainT = 0; curtain.classList.add('on'); }
       if (curtainT >= 0) { curtainT += DT; if (curtainT >= .4) { g.enterGame(S.mapIdx); if (ldOn) { ldOn = false; loader.hide(); } go('intro'); curtain.classList.remove('on'); } }
     },
@@ -433,7 +433,7 @@ export function createMatch(g) {
     count() {
       const n = 3 - Math.floor(t / .8);
       if (n !== countN && n > 0) { countN = n; setCount(String(n)); sfx('count'); }
-      if (t >= 2.4) { countN = 0; setCount('WALCZ!', true); sfx('go'); go('live'); }
+      if (t >= 2.4) { countN = 0; setCount(tr('mt.fight'), true); sfx('go'); go('live'); }
     },
     live() { if (t >= 1 && count.classList.contains('on')) count.classList.remove('on'); },
     killcam() {
@@ -457,6 +457,8 @@ export function createMatch(g) {
     DT = dt; t += dt;
     (TICK[phase] || (() => {}))();
   }
+  // napisy statycznego HTML w języku gracza (data-i18n), odświeżane przy każdym starcie meczu
+  function i18nStatic() { root.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.dataset.i18n, { n: ROUNDS_TO_WIN }); }); }
   function hideAll() {
     mm.hidden = true; hideStrip(); hud.classList.remove('on'); dim.classList.remove('on'); count.classList.remove('on');
     curtain.classList.remove('on'); root.classList.remove('needclick'); document.body.classList.remove('mt-on');
@@ -478,7 +480,7 @@ export function createMatch(g) {
 
   return {
     // o = { map, stake } z lobby; bez mapy mecz sam ją losuje
-    start(o) { opts = o || {}; hideAll(); go('search'); },
+    start(o) { opts = o || {}; i18nStatic(); hideAll(); go('search'); },
     abort, cancel, update,
     // zabójstwo kończy rundę: 'me' = gracz wygrał rundę, 'op' = przeciwnik
     kill(w) {

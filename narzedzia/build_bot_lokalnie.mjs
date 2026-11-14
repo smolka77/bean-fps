@@ -22,7 +22,7 @@ function stepDuelBot(e,dt){
   const r=e.root,ud=r.userData;
   if(e.flash>0){e.flash-=dt;e.mats.skin.emissive.setScalar(.9)}else e.mats.skin.emissive.setScalar(0);
   if(e.dead>0){
-    if(!e.counted){e.counted=true;if(kills>=WIN){endMatch(true);return}banner('TRAFIONY!','#ffe14a')}
+    if(!e.counted){e.counted=true;if(kills>=WIN){endMatch(true);return}banner(i18n('g.hit'),'#ffe14a')}
     e.dead-=dt;e.fall=Math.min(1,e.fall+dt*3);r.rotation.z=e.fall*(Math.PI/2);r.position.y=Math.sin(e.fall*Math.PI/2)*.28;
     if(e.dead<=0)duelSpawn(e);
     return;
