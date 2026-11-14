@@ -216,7 +216,7 @@ const HTML = `
 </div>
 <div id="mt-count"><small id="mt-cround"></small><b id="mt-cnum"></b></div>
 <div id="mt-strip"></div>
-<div id="mt-catch" title="Kliknij, aby zacząć"></div>
+<div id="mt-catch" data-i18n-title="mt.clickStart"></div>
 <div id="mt-curtain"></div>`;
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -458,7 +458,8 @@ export function createMatch(g) {
     (TICK[phase] || (() => {}))();
   }
   // napisy statycznego HTML w języku gracza (data-i18n), odświeżane przy każdym starcie meczu
-  function i18nStatic() { root.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.dataset.i18n, { n: ROUNDS_TO_WIN }); }); }
+  function i18nStatic() { root.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.dataset.i18n, { n: ROUNDS_TO_WIN }); });
+    root.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = tr(el.dataset.i18nTitle); }); }
   function hideAll() {
     mm.hidden = true; hideStrip(); hud.classList.remove('on'); dim.classList.remove('on'); count.classList.remove('on');
     curtain.classList.remove('on'); root.classList.remove('needclick'); document.body.classList.remove('mt-on');

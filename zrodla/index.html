@@ -1700,7 +1700,7 @@ function applyOppSkin(){const e=duel.bot,sk=ON.opp&&findSkin(ON.opp.skin);if(!e)
 function restoreOppSkin(){const e=duel.bot;if(!e)return;const k={id:'bot',c:HUES[0]};applySkin(e.mats.skin,k);if(e.mats.body)applySkin(e.mats.body,k);if(e.root.userData.eyes)e.root.userData.eyes.visible=true}
 function netFail(msg){
   const wasSearch=match.phase==='search';ON.active=false;NET.close();match.abort();
-  dispatchEvent(new CustomEvent('fasolka:cancelled',{detail:{message:msg||'Brak połączenia z serwerem meczów.'}}));
+  dispatchEvent(new CustomEvent('fasolka:cancelled',{detail:{message:msg||i18n('net.offline')}}));
   toLobbyBg();if(document.pointerLockElement)document.exitPointerLock();lobby.show();
 }
 NET.on('matched',m=>{ON.active=true;ON.seat=m.seat===1?1:0;ON.opp=m.opp||{nick:'Gracz'};ON.st=null;match.found(ON.opp.nick,m.map)});
@@ -1711,7 +1711,7 @@ NET.on('hit',m=>{if(ON.active&&match.on)playerHit(+m.d||0)});
 NET.on('round',m=>{if(!ON.active)return;const w=m.winner===ON.seat?'me':'op';if(w==='me'&&duel.bot){duel.bot.dead=99;duel.bot.fall=0}match.kill(w)});
 NET.on('end',m=>{if(!ON.active)return;ON.active=false;if(m.reason==='left')match.oppLeft();NET.close();restoreOppSkin()});
 NET.on('error',m=>netFail(m.message));
-NET.on('close',()=>{if(match.phase==='search'||match.lobbyPhase)netFail('Utracono połączenie z serwerem meczów.');else if(ON.active&&match.phase!=='final'){ON.active=false;banner(i18n('g.disconnected'),'#ff6a5c')}});
+NET.on('close',()=>{if(match.phase==='search'||match.lobbyPhase)netFail(i18n('net.lost'));else if(ON.active&&match.phase!=='final'){ON.active=false;banner(i18n('g.disconnected'),'#ff6a5c')}});
 window.__net={NET,ON};
 // miniatury map do losowania: jedna klatka z silnika na mapę (z góry pod kątem, dach hali ukryty), robiona przed zwykłą klatką
 const thumbCam=new THREE.PerspectiveCamera(46,16/10,.5,700);
