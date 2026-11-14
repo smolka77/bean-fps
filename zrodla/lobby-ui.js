@@ -722,14 +722,6 @@ export function initLobbyUI(ctx) {
     activeStake = lastStake; addTx(-lastStake, 'stake');
   });
 
-  // pasek: prawa grupa (język, portfel, menu) ma szerokość i prawą krawędź panelu stawki
-  const trEl = $('lb-tr'), dockEl = ui.querySelector('.lb-dock'), topEl = ui.querySelector('.lb-top'), logoEl = ui.querySelector('.lb-logo');
-  function fitTop() {
-    if (!trEl || !dockEl) return; const r = dockEl.getBoundingClientRect(); if (!r.width) return;
-    trEl.classList.add('fit'); trEl.style.width = r.width + 'px'; trEl.style.right = (innerWidth - r.right) + 'px';
-    const lr = logoEl.getBoundingClientRect(); topEl.classList.toggle('tight', r.left < lr.left + logoEl.scrollWidth + 12);
-  }
-  addEventListener('resize', fitTop); if (window.ResizeObserver) new ResizeObserver(fitTop).observe(dockEl); setTimeout(fitTop, 0);
   function renderAll() { renderTop(); renderStake(); renderAuth(); renderWallet(); if (P) P.render(); }
   // ---- zakładka Business (ustawienia): e-mail do zapytań biznesowych, regulamin, polityka prywatności ----
   var bizDoc = null, bizEmail = OPERATOR.businessEmail, BIZ_IC = {

@@ -31,13 +31,6 @@ const CSS = `
 #lb-ui .lb-beta{font:700 10px/1 Inter,sans-serif;font-style:normal;letter-spacing:.14em;color:var(--acc);border:1px solid rgba(255,198,41,.45);
   border-radius:5px;padding:4px 6px;margin-left:2px;align-self:center;background:rgba(10,14,24,.4)}
 #lb-ui .lb-sp{flex:1}
-/* prawa grupa paska (język, portfel, menu) – tej samej szerokości i w tej samej linii co panel stawki pod spodem (szerokość ustawia lobby-ui.js) */
-#lb-ui .lb-tr{display:flex;align-items:center;gap:8px;pointer-events:none}
-#lb-ui .lb-tr.fit{position:absolute;top:max(14px,env(safe-area-inset-top))}
-#lb-ui .lb-tr.fit .lb-wchip{flex:1;min-width:0;justify-content:flex-start}
-#lb-ui .lb-tr.fit .lb-wchip .lb-plus{margin-left:auto}
-#lb-ui .lb-tr.fit .lb-lang,#lb-ui .lb-tr.fit .lb-burger{flex:none}
-#lb-ui .lb-top.tight .lb-logo{visibility:hidden}
 /* wybór języka flagą w pasku */
 #lb-ui .lb-lang{position:relative;pointer-events:auto}
 #lb-ui .lb-chip.lb-lchip{padding:0 12px;gap:8px}
@@ -596,12 +589,10 @@ const HTML = `
 <header class="lb-top">
   <div class="lb-logo">BEAN<b>LADEN</b></div>
   <div class="lb-sp"></div>
-  <div class="lb-tr" id="lb-tr">
   <div class="lb-lang"><button class="lb-chip lb-lchip" id="lb-langbtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Language"><i class="lb-flag" id="lb-langflag"></i><b id="lb-langcode">EN</b><svg class="lb-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4.5 6 8.5 10 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
     <div class="lb-langmenu" id="lb-langmenu" role="menu" hidden></div></div>
   <button class="lb-chip lb-wchip" id="lb-walletchip" type="button" aria-label="Portfel"><span class="lb-coin"><svg viewBox="0 0 398 312" aria-hidden="true"><defs><linearGradient id="lbsol" x1="361" y1="-37" x2="141" y2="383" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#00ffa3"/><stop offset="1" stop-color="#dc1fff"/></linearGradient></defs><g fill="url(#lbsol)"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1z"/></g></svg></span><span class="lb-wbal"><b id="lb-bal">—</b><small data-i18n="cur.in">in SOL</small></span><span class="lb-plus">+</span></button>
     <button class="lb-burger" id="lb-burger" type="button" aria-label="Menu" aria-haspopup="menu" aria-expanded="false"><span></span><span></span><span></span></button>
-  </div>
 </header>
 <nav class="lb-menu" id="lb-menu" role="menu" hidden>
   <button class="lb-macct" id="lb-acct" type="button" role="menuitem"><span class="lb-av" id="lb-acct-av">?</span><span class="lb-aname" id="lb-acct-name"></span></button>
