@@ -269,7 +269,8 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import glbB64 from './bean-data.js';
 import {createLobby,applySkin,SKINS} from './lobby.js';
-import {payout,t as i18n} from './lobby-ui.js';   // i18n: słownik lobby (PL/EN/RU/ES) – menu pauzy
+import {payout,t as i18n,getLang,mapName} from './lobby-ui.js';
+import {srvText} from './wallet.js';   // komunikaty serwera w języku gry   // i18n: słownik lobby (PL/EN/RU/ES) – menu pauzy
 import {loader} from './loader.js';
 import {createMatch} from './match.js';
 import {createNet} from './net.js';
@@ -879,7 +880,7 @@ function pmShow(v){$('pmMenu').hidden=v!=='menu';$('pmSet').hidden=v!=='set';$('
   $('pmTag').textContent=v==='set'?i18n('set.title').toUpperCase():v==='quit'?i18n('pm.tagQuit'):pmTag();
   if(v==='set'){const s={volume:80,vGame:100,fov:78,sens:SENS_K,sensAds:SENS_ADS,...readSet()};for(const r of $('pmRows').children)if(r._fill)r._fill(s)}
 }
-function pmTag(){return MODE==='1v1'?i18n('tag.1v1')+(oaza.map?' · '+oaza.map.name.toUpperCase():''):i18n('mode.range.name').toUpperCase()}
+function pmTag(){return MODE==='1v1'?i18n('tag.1v1')+(oaza.map?' · '+mapName(oaza.map.name).toUpperCase():''):i18n('mode.range.name').toUpperCase()}
 // napisy menu pauzy w języku lobby (statyczny HTML jest po polsku) – przy każdym otwarciu menu i przy setPauseText
 function pmI18n(){
   const sp=(id,sel,k,html)=>{const el=$(id)&&(sel?$(id).querySelector(sel):$(id));if(el)el[html?'innerHTML':'textContent']=html?k:i18n(k)};
@@ -1467,7 +1468,7 @@ function setMode(m,mi,quiet){
   duel.mapBanner=false;
   if(MODE==='1v1'){if(mi!=null&&mi>=0&&MAPS[mi]&&MAPS[mi].ready)mapIdx=mi;else nextMap()}
   useOaza(MODE==='1v1'||!!rm,rm);
-  if(oaza.active&&!quiet)setTimeout(()=>banner(i18n('mt.map')+': '+oaza.map.name.toUpperCase(),'#ffe14a'),600);
+  if(oaza.active&&!quiet)setTimeout(()=>banner(i18n('mt.map')+': '+mapName(oaza.map.name).toUpperCase(),'#ffe14a'),600);
   setTeam(MODE==='1v1'?(Math.random()<.5?0:1):null);       // losowanie strony: bez komunikatu dla graczy
   if(MODE==='1v1'){duelSpawn(duel.bot);resetPlayer()}
   if(rm){range.enter(rm);resetPlayer()}
@@ -1480,7 +1481,7 @@ function sndFar(){
 function endMatch(won){
   dispatchEvent(new CustomEvent('fasolka:match',{detail:{won:!!won}}));
   playing=false;gun.firing=false;if(document.pointerLockElement)document.exitPointerLock();
-  $('ovTitle').textContent=i18n(won?'g.won':'g.lost');nextMap();useOaza(true);duel.mapBanner=true;$('ovText').textContent=i18n('g.result',{a:kills,b:duel.botScore,m:oaza.map?oaza.map.name:'—'});$('ovGo').textContent=i18n('g.playAgain');
+  $('ovTitle').textContent=i18n(won?'g.won':'g.lost');nextMap();useOaza(true);duel.mapBanner=true;$('ovText').textContent=i18n('g.result',{a:kills,b:duel.botScore,m:oaza.map?mapName(oaza.map.name):'—'});$('ovGo').textContent=i18n('g.playAgain');
   $('overlay').style.display='flex';
   kills=0;duel.botScore=0;$('kills').textContent=0;$('botScore').textContent=0;duelSpawn(duel.bot);resetPlayer();   // nowy mecz od razu gotowy
 }
@@ -1608,7 +1609,7 @@ const loadMaps=(async()=>{                         // mapy ładują się w tle, 
       M.bx=Math.max(...D.colliders.map(c=>Math.max(-c[0],c[3])))-.6;M.bz=Math.max(...D.colliders.map(c=>Math.max(-c[2],c[5])))-.6;   // granice areny z pełnej listy kolizji
       M.ready=true;if(!M.range)thumbQ.push(M);          // miniatury tylko dla map z rotacji 1v1
       if(M.range&&MODE==='range'&&!oaza.active&&!lobby.active&&!match.on&&!match.lobbyPhase)setMode('range',null,true);   // Strzelnica wczytała się już po wejściu w tryb: przenieś grę na jej mapę
-      if(MODE==='1v1'&&!oaza.active&&!match.on&&!match.lobbyPhase){if(mapIdx<0)nextMap();useOaza(true);duelSpawn(duel.bot);resetPlayer();banner(i18n('mt.map')+': '+oaza.map.name.toUpperCase(),'#ffe14a')}
+      if(MODE==='1v1'&&!oaza.active&&!match.on&&!match.lobbyPhase){if(mapIdx<0)nextMap();useOaza(true);duelSpawn(duel.bot);resetPlayer();banner(i18n('mt.map')+': '+mapName(oaza.map.name).toUpperCase(),'#ffe14a')}
     }catch(e){console.warn('Mapa '+M.name+':',e)}
   }));
   mapsSettled=true;
@@ -1636,7 +1637,7 @@ const lobby=createLobby({renderer,bean:lobbyBean,animate:lobbyAnimate,
       NET.queue({matchId:o.matchId,skin:mySkin}).catch(e=>netFail(e.message));return}
     setMode(m,null);lobby.hide();document.body.classList.remove('in-lobby');startPlay()},
   onSkin:s=>{mySkin=s.id||'';applySkin(me.userData.mats.skin,s);applySkin(me.userData.mats.body,s);applySkin(fpsSkin,s);me.userData.eyes.visible=s.eyes!==false}});   // skin z lobby także na postaci w grze
-$('overlay').addEventListener('click',()=>setTimeout(()=>{setPauseText();if(duel.mapBanner&&oaza.active){duel.mapBanner=false;banner(i18n('mt.map')+': '+oaza.map.name.toUpperCase(),'#ffe14a')}},0));
+$('overlay').addEventListener('click',()=>setTimeout(()=>{setPauseText();if(duel.mapBanner&&oaza.active){duel.mapBanner=false;banner(i18n('mt.map')+': '+mapName(oaza.map.name).toUpperCase(),'#ffe14a')}},0));
 const stakeTxt=v=>'$'+(Math.round(v*100)/100).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2});   // kwota w USD (płatna w SOL)
 const midMatch=()=>match.on&&match.phase!=='final';     // trwa mecz (po zakończeniu wyjście nic nie kosztuje)
 $('toLobby').addEventListener('click',e=>{
@@ -1709,7 +1710,7 @@ function applyOppSkin(){const e=duel.bot,sk=ON.opp&&findSkin(ON.opp.skin);if(!e)
 function restoreOppSkin(){const e=duel.bot;if(!e)return;const k={id:'bot',c:HUES[0]};applySkin(e.mats.skin,k);if(e.mats.body)applySkin(e.mats.body,k);if(e.root.userData.eyes)e.root.userData.eyes.visible=true}
 function netFail(msg){
   const wasSearch=match.phase==='search';ON.active=false;NET.close();match.abort();
-  dispatchEvent(new CustomEvent('fasolka:cancelled',{detail:{message:msg||i18n('net.offline')}}));
+  dispatchEvent(new CustomEvent('fasolka:cancelled',{detail:{message:msg?srvText(msg,getLang()):i18n('net.offline')}}));
   toLobbyBg();if(document.pointerLockElement)document.exitPointerLock();lobby.show();
 }
 NET.on('matched',m=>{ON.active=true;ON.seat=m.seat===1?1:0;ON.opp=m.opp||{nick:'Gracz'};ON.st=null;ON.hidden=true;ON.q=0;match.found(ON.opp.nick,m.map)});

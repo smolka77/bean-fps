@@ -10,7 +10,7 @@
 // aż obaj są gotowi (match.oppGo), a wyjście przeciwnika kończy mecz walkowerem (match.oppLeft).
 
 import { loader } from './loader.js';
-import { MAP_IMG, t as tr } from './lobby-ui.js';
+import { MAP_IMG, t as tr, mapName } from './lobby-ui.js';
 
 export const ROUNDS_TO_WIN = 3;
 const OPP_NAMES = ['Groszek', 'Bobek_PL', 'Fasolino', 'Cieciorka', 'Soczewica', 'Edamame', 'Pinto', 'Mung', 'Wielki Bób',
@@ -315,7 +315,7 @@ export function createMatch(g) {
       vs.classList.add('compact'); $('mt-timer').hidden = true;
       const maps = g.maps(); mapsEl.innerHTML = ''; mapsEl.style.setProperty('--n', Math.max(1, maps.length));
       maps.forEach(m => { const d = document.createElement('div'); d.className = 'mt-map'; d.style.backgroundImage = m.thumb ? `url("${m.thumb}")` : mapFallback(m.name);
-        const s = document.createElement('span'); s.textContent = m.name; d.appendChild(s); mapsEl.appendChild(d); });
+        const s = document.createElement('span'); s.textContent = mapName(m.name); d.appendChild(s); mapsEl.appendChild(d); });
       mapsEl.hidden = maps.length === 0;
     },
     load() {
@@ -326,16 +326,16 @@ export function createMatch(g) {
         mapsEl.innerHTML = ''; mapsEl.style.setProperty('--n', 1);
         const d = document.createElement('div'); d.className = 'mt-map sel'; const m = maps[i];
         d.style.backgroundImage = m && m.thumb ? `url("${m.thumb}")` : mapFallback(S.mapName);
-        const s = document.createElement('span'); s.textContent = S.mapName; d.appendChild(s); mapsEl.appendChild(d);
+        const s = document.createElement('span'); s.textContent = mapName(S.mapName); d.appendChild(s); mapsEl.appendChild(d);
         mapsEl.classList.add('done'); mapsEl.hidden = false; sfx('select');
       }
       $('mt-cancel').hidden = true; $('mt-load').hidden = false; $('mt-bar').style.width = '0%';
       $('mt-lbl').textContent = tr('mt.loadPlayers'); $('mt-lbl').className = 'mt-lbl';
       const rme = $('mt-rme'), rop = $('mt-rop'); rme.textContent = S.nick.toUpperCase(); rop.textContent = S.opp.toUpperCase(); rme.className = rop.className = '';
-      setTitle(tr('mt.map') + ': ' + esc(S.mapName.toUpperCase()), true);
+      setTitle(tr('mt.map') + ': ' + esc(mapName(S.mapName).toUpperCase()), true);
       oppReadyT = rand(.7, 1.5); curtainT = -1;
       { const m = S.mapIdx >= 0 ? g.maps()[S.mapIdx] : null;       // ekran wczytywania (loader.js) z mapą w tle
-        loader.show({ title: tr('mt.map') + ': ' + S.mapName.toUpperCase(), sub: S.nick + '   VS   ' + S.opp,
+        loader.show({ title: tr('mt.map') + ': ' + mapName(S.mapName).toUpperCase(), sub: S.nick + '   VS   ' + S.opp,
           bg: MAP_IMG[S.mapName] ? `url("${MAP_IMG[S.mapName]}")` : m && m.thumb ? `url("${m.thumb}")` : mapFallback(S.mapName), label: tr('mt.loadPlayers') });
         ldOn = true; }
     },
@@ -344,7 +344,7 @@ export function createMatch(g) {
       renderHud(); hud.classList.add('on'); dim.classList.add('on'); document.body.classList.add('mt-on');
       showStrip('intro', `<span class="mt-tag">${tr('mt.match')}</span>
         <div class="mt-vsrow"><div class="me"><span class="nm">${esc(S.nick)}</span><small>${tr('mt.you')}</small></div><div class="mt-vsx">VS</div><div class="op"><span class="nm">${esc(S.opp)}</span><small>${tr('mt.opponent')}</small></div></div>
-        <div class="mt-chips"><span class="mt-chip"><small>${tr('mt.map')}</small><b>${esc(S.mapName.toUpperCase())}</b></span>${stakeChip()}<span class="mt-chip"><small>${tr('mt.rounds')}</small><b>${tr('mt.firstTo', { n: ROUNDS_TO_WIN })}</b></span></div>
+        <div class="mt-chips"><span class="mt-chip"><small>${tr('mt.map')}</small><b>${esc(mapName(S.mapName).toUpperCase())}</b></span>${stakeChip()}<span class="mt-chip"><small>${tr('mt.rounds')}</small><b>${tr('mt.firstTo', { n: ROUNDS_TO_WIN })}</b></span></div>
         <div class="mt-clickhint">${tr('mt.clickStart')}</div>`);
     },
     count() {
@@ -368,7 +368,7 @@ export function createMatch(g) {
       const prize = !S.stake ? '' : won
         ? `<div class="mt-prize plus"><small>${tr('mt.prize')}</small>${COIN}<b>+${esc(money(g.prize ? g.prize(S.stake) : S.stake * 2))}</b></div>`
         : `<div class="mt-prize minus"><small>${tr('mt.stake')}</small>${COIN}<b>−${esc(money(S.stake))}</b></div>`;
-      showStrip((won ? 'win' : 'loss') + ' final', `<span class="mt-sub">${tr('mt.over')} · ${esc(S.mapName.toUpperCase())}</span><div class="mt-big">${tr(won ? 'mt.win' : 'mt.loss')}</div>${scoreRow()}
+      showStrip((won ? 'win' : 'loss') + ' final', `<span class="mt-sub">${tr('mt.over')} · ${esc(mapName(S.mapName).toUpperCase())}</span><div class="mt-big">${tr(won ? 'mt.win' : 'mt.loss')}</div>${scoreRow()}
         ${S.forceWin ? '<span class="mt-note">' + tr('mt.forfeit') + '</span>' : ''}
         ${prize}
         <div class="mt-actions"><button class="mt-btn pri" type="button" data-a="again">${tr('mt.again')}</button><button class="mt-btn ghost" type="button" data-a="lobby">${tr('mt.lobby')}</button></div>`);
@@ -400,7 +400,7 @@ export function createMatch(g) {
     if (roul.i >= roul.steps.length - 1 && roul.acc >= .25) {
       for (const c of cards) c.classList.remove('on');
       if (cards[S.mapIdx]) cards[S.mapIdx].classList.add('sel');
-      mapsEl.classList.add('done'); setTitle(tr('mt.map') + ': ' + esc(S.mapName.toUpperCase()), true); sfx('select');
+      mapsEl.classList.add('done'); setTitle(tr('mt.map') + ': ' + esc(mapName(S.mapName).toUpperCase()), true); sfx('select');
       roul = null; drawDone = 0;
     }
   }

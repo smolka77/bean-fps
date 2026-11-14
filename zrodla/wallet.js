@@ -153,6 +153,38 @@ const I = {
 };
 
 // local: tryb bez serwera (artefakt, GitHub Pages) – ten sam wygląd portfela, saldo i historia z konta lokalnego (testowe)
+// Serwer zwraca komunikaty błędów po polsku – tu ich tłumaczenia (EN, RU, ES); nieznany komunikat zostaje bez zmian.
+const SRV = {
+  'Zaloguj się': ['Log in', 'Войди в аккаунт', 'Inicia sesión'],
+  'Nazwa: 3–16 znaków (litery, cyfry, _)': ['Name: 3–16 characters (letters, digits, _)', 'Имя: 3–16 символов (буквы, цифры, _)', 'Nombre: 3–16 caracteres (letras, números, _)'],
+  'Hasło: co najmniej 6 znaków': ['Password: at least 6 characters', 'Пароль: минимум 6 символов', 'Contraseña: al menos 6 caracteres'],
+  'Nowe hasło: co najmniej 6 znaków': ['New password: at least 6 characters', 'Новый пароль: минимум 6 символов', 'Nueva contraseña: al menos 6 caracteres'],
+  'Ta nazwa jest zajęta': ['This name is taken', 'Это имя занято', 'Ese nombre ya está en uso'],
+  'Za dużo prób – odczekaj minutę': ['Too many attempts – wait a minute', 'Слишком много попыток – подожди минуту', 'Demasiados intentos – espera un minuto'],
+  'Za dużo prób': ['Too many attempts', 'Слишком много попыток', 'Demasiados intentos'],
+  'Zła nazwa lub hasło': ['Wrong name or password', 'Неверное имя или пароль', 'Nombre o contraseña incorrectos'],
+  'Faucet w RPC jest zamknięty – pobierz testowe SOL na faucet.solana.com (adres jest skopiowany).': ['The RPC faucet is closed – get test SOL at faucet.solana.com (the address is copied).', 'Кран RPC закрыт – получи тестовые SOL на faucet.solana.com (адрес скопирован).', 'El faucet del RPC está cerrado – consigue SOL de prueba en faucet.solana.com (la dirección está copiada).'],
+  'Nieprawidłowy adres Solana': ['Invalid Solana address', 'Неверный адрес Solana', 'Dirección de Solana no válida'],
+  'To adres Twojego portfela w grze': ['This is your in-game wallet address', 'Это адрес твоего игрового кошелька', 'Esta es la dirección de tu cartera del juego'],
+  'Za mało środków': ['Insufficient funds', 'Недостаточно средств', 'Fondos insuficientes'],
+  'Za mało środków na stawkę': ['Not enough funds for this stake', 'Недостаточно средств для ставки', 'Fondos insuficientes para la apuesta'],
+  'Wypłata nie przeszła – środki wróciły na saldo. Spróbuj za chwilę.': ['The withdrawal failed – the funds are back in your balance. Try again shortly.', 'Вывод не прошёл – средства вернулись на баланс. Попробуй чуть позже.', 'El retiro falló – los fondos han vuelto a tu saldo. Inténtalo en un momento.'],
+  'Brak kursu SOL – spróbuj za chwilę': ['No SOL price – try again shortly', 'Нет курса SOL – попробуй чуть позже', 'No hay cotización de SOL – inténtalo en un momento'],
+  'Brak dostępu do panelu admina': ['No access to the admin panel', 'Нет доступа к админ-панели', 'Sin acceso al panel de admin'],
+  'Nieprawidłowy obrazek (PNG/JPG do ~60 KB)': ['Invalid image (PNG/JPG up to ~60 KB)', 'Неверное изображение (PNG/JPG до ~60 КБ)', 'Imagen no válida (PNG/JPG hasta ~60 KB)'],
+  'Nieprawidłowy adres e-mail': ['Invalid e-mail address', 'Неверный адрес e-mail', 'Dirección de e-mail no válida'],
+  'Konto Google bez potwierdzonego e-maila': ['Google account without a verified e-mail', 'Аккаунт Google без подтверждённого e-mail', 'Cuenta de Google sin e-mail verificado'],
+  'Token Google nie jest dla tej gry': ['The Google token is not for this game', 'Токен Google не для этой игры', 'El token de Google no es para este juego'],
+  'Google nie potwierdził logowania – spróbuj ponownie': ['Google did not confirm the sign-in – try again', 'Google не подтвердил вход – попробуй ещё раз', 'Google no confirmó el inicio de sesión – inténtalo de nuevo'],
+  'Logowanie przez Google nie jest skonfigurowane': ['Google sign-in is not configured', 'Вход через Google не настроен', 'El inicio de sesión con Google no está configurado'],
+  'Nie ma takiego meczu': ['No such match', 'Такого матча нет', 'No existe esa partida'],
+  'Tylko w sieci testowej': ['Test network only', 'Только в тестовой сети', 'Solo en la red de prueba'],
+  'Obecne hasło jest nieprawidłowe': ['The current password is wrong', 'Текущий пароль неверный', 'La contraseña actual es incorrecta'],
+  'Szukasz meczu w innej karcie.': ['You are already searching for a match in another tab.', 'Ты уже ищешь матч в другой вкладке.', 'Ya estás buscando partida en otra pestaña.'],
+  'Brak opłaconej stawki – zagraj jeszcze raz z lobby.': ['No paid stake – play again from the lobby.', 'Нет оплаченной ставки – сыграй ещё раз из лобби.', 'No hay apuesta pagada – juega de nuevo desde el lobby.'],
+  'Błąd serwera': ['Server error', 'Ошибка сервера', 'Error del servidor'],
+};
+export function srvText(msg, lang) { const i = { en: 0, ru: 1, es: 2 }[lang]; return i == null || !msg || !SRV[msg] ? msg : SRV[msg][i]; }
 export function createWallet({ api, root, getLang, toast, onChange, local = null }) {
   const L = () => TXT[getLang()] || TXT.en, T = (k, v) => { let s = L()[k] ?? TXT.en[k] ?? k; if (v) for (const n in v) s = s.replace('{' + n + '}', v[n]); return s; };
   const loc = () => ({ pl: 'pl-PL', en: 'en-US', ru: 'ru-RU', es: 'es-ES' })[getLang()] || 'en-US';
@@ -163,7 +195,7 @@ export function createWallet({ api, root, getLang, toast, onChange, local = null
   try { token = localStorage.getItem('bl-token'); solFirst = localStorage.getItem('bl-solfirst') === '1'; } catch {}
   const DEMO_PRICE = 150;   // tryb testowy bez serwera: stały kurs tylko do pokazania ilości SOL
   async function localCall(method, p, body) {
-    const a = local.acct(); if (!a) { const e = new Error('Zaloguj się'); e.status = 401; throw e; }
+    const a = local.acct(); if (!a) { const e = new Error(srvText('Zaloguj się', getLang())); e.status = 401; throw e; }
     const pack = () => { const b = local.acct(), h = b.history || [];
       return { account: { username: b.username, email: b.email || '', avatar: b.avatar || '', createdAt: b.createdAt, address: '', lamports: Math.round(b.balance / DEMO_PRICE * 1e9), sol: b.balance / DEMO_PRICE,
           balance: b.balance, price: DEMO_PRICE, cluster: 'test', admin: false, stats: b.stats || {} },
@@ -182,7 +214,7 @@ export function createWallet({ api, root, getLang, toast, onChange, local = null
     if (local) return localCall(method, p, body);
     const r = await fetch(api + '/api' + p, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: body ? JSON.stringify(body) : undefined });
     let j = {}; try { j = await r.json(); } catch {}
-    if (!r.ok) { const e = new Error(j.message || 'Błąd serwera'); e.code = j.error; e.status = r.status; if (r.status === 401 && j.error === 'auth') setSession(null); throw e; }
+    if (!r.ok) { const e = new Error(srvText(j.message || 'Błąd serwera', getLang())); e.code = j.error; e.status = r.status; if (r.status === 401 && j.error === 'auth') setSession(null); throw e; }
     online = true; return j;
   }
   function setSession(tok) { if (local) return; token = tok; try { tok ? localStorage.setItem('bl-token', tok) : localStorage.removeItem('bl-token'); } catch {} if (!tok) { acct = null; hist = []; earn = null; emit(); } }
