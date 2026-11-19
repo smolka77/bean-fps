@@ -247,8 +247,7 @@ export function createWallet({ api, root, getLang, toast, onChange, local = null
     async password(oldPassword, newPassword) { await call('POST', '/password', { oldPassword, newPassword }); },
     open, close,
   };
-  // co 12 s świeże saldo (wpłaty wykrywa serwer); przy otwartym portfelu – co 8 s z wymuszeniem skanu
-  const loop = () => { clearTimeout(pollT); pollT = setTimeout(async () => { if (token && !document.hidden) await api$.refresh(!wrap.hidden); loop(); }, wrap && !wrap.hidden ? 8000 : 12000); };
+  // bez cyklicznego odpytywania: saldo z bazy przy otwarciu portfela i powrocie do lobby, skan wpłat (RPC) tylko po kliknięciu „Sprawdź”
 
   // ---------- okno ----------
   if (!document.getElementById('bl-w-css')) { const st = document.createElement('style'); st.id = 'bl-w-css'; st.textContent = CSS; document.head.appendChild(st); }
@@ -314,8 +313,8 @@ export function createWallet({ api, root, getLang, toast, onChange, local = null
     b.disabled = false; b.textContent = T('send');
   });
 
-  function open(t = 'dep') { tab = t === 'deposit' ? 'dep' : t === 'withdraw' ? 'wd' : t === 'history' ? 'hist' : t; wrap.hidden = false; render(); api$.refresh(true); if (tab === 'earn') loadEarn(); loop(); }
-  function close() { wrap.hidden = true; loop(); }
+  function open(t = 'dep') { tab = t === 'deposit' ? 'dep' : t === 'withdraw' ? 'wd' : t === 'history' ? 'hist' : t; wrap.hidden = false; render(); api$.refresh(false); if (tab === 'earn') loadEarn(); }
+  function close() { wrap.hidden = true; }
   async function loadEarn() { try { earn = (await call('GET', '/earnings')).points; } catch { earn = earn || []; } renderEarn(); }
 
   // ---------- rysowanie ----------
@@ -361,6 +360,5 @@ export function createWallet({ api, root, getLang, toast, onChange, local = null
   const earnState = {};
   function renderEarn() { renderEarnings($('bw-earn'), earn, getLang(), earnState); }
 
-  loop();
   return api$;
 }

@@ -195,7 +195,7 @@ const isOurs = new Set();                                              // podpis
 async function scanUser(u) {
   const pk = new PublicKey(u.address);
   const sigs = await conn.getSignaturesForAddress(pk, { limit: 50, ...(u.last_sig ? { until: u.last_sig } : {}) });
-  if (!sigs.length) return;
+  if (!sigs.length) return 0;
   for (const s of sigs.slice().reverse()) {                            // od najstarszego
     if (s.err || isOurs.has(s.signature) || q('SELECT 1 FROM deposits WHERE sig=?').get(s.signature)) continue;
     const t = await conn.getTransaction(s.signature, { maxSupportedTransactionVersion: 0, commitment: 'confirmed' });
@@ -214,6 +214,7 @@ async function scanUser(u) {
   }
   q('UPDATE users SET last_sig=? WHERE id=?').run(sigs[0].signature, u.id);
   await sweep(u);
+  return sigs.length;
 }
 async function sweep(u) {                                              // cały depozyt (minus opłata) idzie do skarbca
   const bal = await conn.getBalance(new PublicKey(u.address));
@@ -225,11 +226,40 @@ async function sweep(u) {                                              // cały 
   catch (e) { console.warn('[skarbiec] przeniesienie nieudane', u.username, e.message); }
 }
 let scanning = false;
+// salda adresów depozytów czytamy zbiorczo (getMultipleAccountsInfo: 1 zapytanie na 100 graczy); pełny skan historii
+// (getSignaturesForAddress + getTransaction) tylko dla adresów, których saldo zmieniło się od ostatniego skanu
+const lastBal = new Map();                                             // adres -> saldo (lamporty) przy ostatnim udanym skanie
+const misses = new Map();                                              // adres -> ile skanów z rzędu bez nowych podpisów mimo zmiany salda
 async function scanAll() {
   if (scanning) return; scanning = true;
-  try { for (const u of q('SELECT * FROM users ORDER BY last_active DESC').all()) { try { await scanUser(u); } catch (e) { console.warn('[skan]', u.username, e.message); } } }
-  finally { scanning = false; }
+  try {
+    const users = q('SELECT * FROM users WHERE address IS NOT NULL ORDER BY last_active DESC').all();
+    for (let i = 0; i < users.length; i += 100) {
+      const part = users.slice(i, i + 100);
+      let infos;
+      try { infos = await conn.getMultipleAccountsInfo(part.map(u => new PublicKey(u.address)), 'confirmed'); }
+      catch (e) { console.warn('[skan] salda', e.message); continue; }
+      for (let j = 0; j < part.length; j++) {
+        const u = part[j], bal = infos[j] ? infos[j].lamports : 0;
+        if (bal === 0 || lastBal.get(u.address) === bal) { lastBal.set(u.address, bal); continue; }   // pusto (wszystko w skarbcu) albo bez zmian
+        try {                                                          // saldo już widać, a historii jeszcze nie (opóźnienie węzła RPC) – ponawiamy, najwyżej 8 razy
+          const n = await scanUser(u), m = n ? 0 : (misses.get(u.address) || 0) + 1;
+          if (n || m >= 8) { lastBal.set(u.address, bal); misses.delete(u.address); } else misses.set(u.address, m);
+        } catch (e) { console.warn('[skan]', u.username, e.message); }
+      }
+    }
+  } finally { scanning = false; }
 }
+// „Sprawdź wpłatę” / odświeżanie otwartego portfela (co 8 s): najwyżej raz na 10 s na gracza, a pełny skan tylko gdy saldo adresu się zmieniło
+const quickAt = new Map();
+async function scanQuick(u) {
+  if (!u.address || Date.now() - (quickAt.get(u.id) || 0) < 10e3) return;
+  quickAt.set(u.id, Date.now());
+  const bal = await conn.getBalance(new PublicKey(u.address));
+  if (bal === 0 || lastBal.get(u.address) === bal) return;
+  if (await scanUser(u)) { lastBal.set(u.address, bal); misses.delete(u.address); }
+}
+setInterval(() => { const lim = Date.now() - 60e3; for (const [k, t] of quickAt) if (t < lim) quickAt.delete(k); }, 300e3).unref();
 
 // ---------------- HTTP ----------------
 const limited = OCH.makeLimiter();                                     // limity prób: klucz (IP, nick) -> czasy prób w oknie
@@ -315,7 +345,7 @@ const routes = {
   'GET /api/me': async ({ user }) => { need(user); return { account: publicUser(fresh(user.id)), history: histOf(user.id) }; },
   // jednorazowy bilet (30 s) do połączenia z /ws – token sesji nie trafia do adresu
   'POST /api/ws-ticket': async ({ user }) => { need(user); return { ticket: OCH.wsTicket(user.id) }; },
-  'POST /api/scan': async ({ user }) => { need(user); await scanUser(fresh(user.id)); return { account: publicUser(fresh(user.id)), history: histOf(user.id) }; },
+  'POST /api/scan': async ({ user }) => { need(user); await scanQuick(fresh(user.id)); return { account: publicUser(fresh(user.id)), history: histOf(user.id) }; },
   'GET /api/earnings': async ({ user }) => {
     need(user);
     const rows = q(`SELECT t, ended, state, stake_usd, payout_lamports, price, map FROM matches WHERE user_id=? AND state IN ('won','lost') ORDER BY COALESCE(ended,t)`).all(user.id);

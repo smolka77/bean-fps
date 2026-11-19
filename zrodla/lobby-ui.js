@@ -871,6 +871,7 @@ export function initLobbyUI(ctx) {
       if (activeStake && acct) { const s = activeStake; addTx(0, 'loss', usd(s)).catch(() => {}); logMatch({ stake: s, won: false, payout: 0, fee: 0, forfeit: true }); }   // wyjście z meczu o stawkę = przegrana
       else if (acct && flushCombat()) saveAcct().catch(() => {});
       activeStake = 0; lastStake = 0; renderAll();
+      if (W) W.refresh().catch(() => {});   // powrót do lobby (np. z Deathmatchu): saldo z bazy, bez zapytań do RPC
     },
     get open() { return anyOpen() || !draw.hidden; },
   };
