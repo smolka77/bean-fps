@@ -222,7 +222,7 @@ export async function openAdmin({ onClose } = {}) {
   const onKey = e => { if (e.key !== 'Escape' || !root) return; const rp = root.querySelector('.fa-rp'), d = root.querySelector('.fa-drw');
     if (rp && !rp.hidden) rp.querySelector('[data-rpx]').click(); else if (d && !d.hidden) d.hidden = true; else close(); };
   addEventListener('keydown', onKey); cleanup.push(() => removeEventListener('keydown', onKey));
-  root.innerHTML = `<div class="fa-wrap"><div class="fa-head"><div class="fa-brand"><b>BEAN<i>LADEN</i></b><span>Panel admina</span></div><div class="fa-sp"></div>
+  root.innerHTML = `<div class="fa-wrap"><div class="fa-head"><div class="fa-brand"><b>BEAN<i>GTA</i></b><span>Panel admina</span></div><div class="fa-sp"></div>
     <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div><p class="fa-empty">Ładowanie danych…</p></div>`;
   root.querySelector('[data-close]').addEventListener('click', close);
 
@@ -420,7 +420,7 @@ function relockAdmin() { admTok.set(''); cleanup.forEach(f => { try { f(); } cat
 
 function buildDashboard(db, close) {
   root.innerHTML = `<div class="fa-wrap">
-    <div class="fa-head"><div class="fa-brand"><b>BEAN<i>LADEN</i></b><span>Panel admina</span></div><span class="fa-live" id="fa-live">Łączenie…</span><div class="fa-sp"></div>
+    <div class="fa-head"><div class="fa-brand"><b>BEAN<i>GTA</i></b><span>Panel admina</span></div><span class="fa-live" id="fa-live">Łączenie…</span><div class="fa-sp"></div>
       ${SRV ? '<button class="fa-btn" type="button" id="fa-lock" title="Kończy sesję panelu – następne wejście wymaga loginu, hasła i kodu 2FA">Wyloguj z panelu</button>' : ''}
       <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div>
     <p class="fa-note" id="fa-note" hidden></p>

@@ -214,7 +214,7 @@ export function createRange(g) {
       c.beginPath(); c.moveTo(x + w * s, y); c.lineTo(x + w, y); c.lineTo(x + w * (1 - s), y + h); c.lineTo(x, y + h); c.closePath();
     };
     const vgrad = (y, h, stops) => { const gr = c.createLinearGradient(0, y, 0, y + h); stops.forEach(([p, col]) => gr.addColorStop(p, col)); return gr; };
-    const YELLOW = [[0, '#fff7a8'], [0.38, '#ffe437'], [0.7, '#ffc800'], [1, '#f5ad00']];
+    const YELLOW = [[0, '#ffc2e0'], [0.38, '#ff5fb0'], [0.7, '#ff4a7d'], [1, '#ff7a3d']];
     const RED = [[0, '#ff9a88'], [0.45, '#ee4d38'], [1, '#b92a1e']];
     const text = (s, x, y, font, color, align = 'left', ls = 0, maxW = 0) => {
       c.font = font; c.fillStyle = color; c.textAlign = align; c.textBaseline = 'middle';
@@ -230,39 +230,39 @@ export function createRange(g) {
       c.strokeStyle = 'rgba(255,255,255,0.16)'; c.lineWidth = 8; c.strokeRect(4, 4, W - 8, H - 8);
       for (const y of [16, H - 16]) {
         const gl = c.createLinearGradient(60, 0, W - 60, 0);
-        gl.addColorStop(0, 'rgba(255,225,74,0)'); gl.addColorStop(0.5, '#ffe14a'); gl.addColorStop(1, 'rgba(255,225,74,0)');
+        gl.addColorStop(0, 'rgba(255,46,147,0)'); gl.addColorStop(0.5, '#ff4fa8'); gl.addColorStop(1, 'rgba(255,46,147,0)');
         c.fillStyle = gl; c.fillRect(60, y - 2, W - 120, 4);
       }
-      c.fillStyle = '#ffe14a'; para(60, 30, 236, 38, 0.1); c.fill();
-      text(tr('rg.tag'), 60 + 118, 50, `800 21px ${FS}`, '#1d1400', 'center', 4, 210);
+      c.fillStyle = '#ff4fa8'; para(60, 30, 236, 38, 0.1); c.fill();
+      text(tr('rg.tag'), 60 + 118, 50, `800 21px ${FS}`, '#1a0614', 'center', 4, 210);
       skewed(() => {
         const ty = 122, tx = 60 + 0.14 * ty;
-        text(tr('rg.title'), tx, ty + 8, `400 72px ${FD}`, '#6e4c00', 'left', 3, 840);
-        text(tr('rg.title'), tx, ty + 4, `400 72px ${FD}`, '#a87400', 'left', 3, 840);
-        text(tr('rg.title'), tx, ty, `400 72px ${FD}`, '#ffe14a', 'left', 3, 840);
+        text(tr('rg.title'), tx, ty + 8, `400 72px ${FD}`, '#4a0c34', 'left', 3, 840);
+        text(tr('rg.title'), tx, ty + 4, `400 72px ${FD}`, '#7a1550', 'left', 3, 840);
+        text(tr('rg.title'), tx, ty, `400 72px ${FD}`, '#ff4fa8', 'left', 3, 840);
       });
       const acc = stats.shots ? Math.round((stats.hits / stats.shots) * 100) : 0;
       [[tr('rg.hits'), String(stats.hits)], [tr('rg.acc'), acc + '%']].forEach(([lab, val], i) => {
         const cx = W - 60 - 2 * 250 - 12 + i * 262;
-        c.fillStyle = 'rgba(10,22,48,0.9)'; para(cx, 46, 250, 66, 0.06); c.fill();
+        c.fillStyle = 'rgba(14,6,22,0.9)'; para(cx, 46, 250, 66, 0.06); c.fill();
         c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = 3; para(cx, 46, 250, 66, 0.06); c.stroke();
-        text(lab, cx + 28, 79, `700 21px ${FS}`, '#9fc2ff', 'left', 3, 140);
+        text(lab, cx + 28, 79, `700 21px ${FS}`, '#5ff0e2', 'left', 3, 140);
         text(val, cx + 232, 80, `400 40px ${FD}`, '#ffffff', 'right', 1);
       });
-      ROWS.forEach(([label], r) => text(tr(label).toUpperCase(), 60, rowY0 + r * pitch + bh / 2 + 3, `400 33px ${FD}`, '#cfe0ff', 'left', 2, 490));
+      ROWS.forEach(([label], r) => text(tr(label).toUpperCase(), 60, rowY0 + r * pitch + bh / 2 + 3, `400 33px ${FD}`, '#ece4f0', 'left', 2, 490));
       btns.forEach((b, i) => {
         const on = b.on(), hov = i === hv, red = b.warn && !on;
         if (on || red) {
           c.fillStyle = vgrad(b.y, b.h, red ? RED : YELLOW); para(b.x, b.y, b.w, b.h); c.fill();
           if (hov) { c.fillStyle = 'rgba(255,255,255,0.28)'; para(b.x, b.y, b.w, b.h); c.fill(); }
         } else {
-          c.fillStyle = hov ? 'rgba(52,86,150,0.98)' : 'rgba(18,36,76,0.96)'; para(b.x, b.y, b.w, b.h); c.fill();
+          c.fillStyle = hov ? 'rgba(52,86,150,0.98)' : 'rgba(30,10,40,0.96)'; para(b.x, b.y, b.w, b.h); c.fill();
           c.strokeStyle = 'rgba(255,255,255,0.3)'; c.lineWidth = 3; para(b.x + 2, b.y + 2, b.w - 4, b.h - 4); c.stroke();
         }
         if (hov) { c.strokeStyle = '#ffffff'; c.lineWidth = 5; para(b.x, b.y, b.w, b.h); c.stroke(); }
-        text(b.label().toUpperCase(), b.x + b.w / 2, b.y + b.h / 2 + 3, `400 ${b.h > 60 ? 36 : 34}px ${FD}`, red ? '#ffffff' : on ? '#2a1c00' : '#ffffff', 'center', 2, b.w - 40);
+        text(b.label().toUpperCase(), b.x + b.w / 2, b.y + b.h / 2 + 3, `400 ${b.h > 60 ? 36 : 34}px ${FD}`, red ? '#ffffff' : on ? '#1a0614' : '#ffffff', 'center', 2, b.w - 40);
       });
-      text(tr('rg.hint').toUpperCase(), 60, 750, `700 21px ${FS}`, '#9fc2ff', 'left', 3, 1400);
+      text(tr('rg.hint').toUpperCase(), 60, 750, `700 21px ${FS}`, '#5ff0e2', 'left', 3, 1400);
       tex.needsUpdate = true;
     }
     const btnAt = (px, py) => btns.findIndex((b) => px >= b.x - 6 && px <= b.x + b.w + 6 && py >= b.y - 6 && py <= b.y + b.h + 6);
