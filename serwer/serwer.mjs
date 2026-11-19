@@ -1083,9 +1083,9 @@ function dmBotRemove(room, pid) {
   if (!pid || !room.bots.has(pid)) return;
   room.bots.delete(pid); DM.leave(room.game, pid, nowS(), room.out, 'bot');
 }
-// ilu botów chcemy: lobby zapełnione do dmCfg.bots osób, zawsze z miejscem dla graczy; bez graczy – zero
+// ilu botów chcemy: dmCfg.bots (stała liczba), zawsze z miejscem dla graczy; bez graczy – zero
 function dmBalanceBots(room, t) {
-  const humans = room.entries.size, want = humans ? Math.max(0, Math.min(dmCfg.bots, dmCfg.maxPlayers) - humans) : 0;
+  const humans = room.entries.size, want = humans ? Math.max(0, Math.min(dmCfg.bots, dmCfg.maxPlayers - humans)) : 0;
   if (room.bots.size === want || t - room.botT < (room.bots.size < want ? 1.2 + Math.random() * 1.5 : 0.6)) return;   // boty wchodzą po jednym, jak gracze
   room.botT = t;
   if (room.bots.size < want && DM.playerCount(room.game) < dmCfg.maxPlayers) dmBotAdd(room, t); else if (room.bots.size > want) dmBotRemove(room);
