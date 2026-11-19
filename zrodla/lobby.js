@@ -48,6 +48,9 @@ const CSS = `
 /* wybór języka flagą w pasku */
 #lb-ui .lb-lang{position:relative;pointer-events:auto}
 #lb-ui .lb-chip.lb-lchip{padding:0 12px;gap:8px}
+#lb-ui .lb-chip.lb-xchip{width:44px;padding:0;justify-content:center;color:#fff;text-decoration:none}
+#lb-ui .lb-chip.lb-xchip[hidden]{display:none}
+#lb-ui .lb-xchip svg{width:18px;height:18px}
 #lb-ui .lb-lchip .lb-flag{width:27px;height:18px}
 #lb-ui .lb-lchip b{font:700 13px/1 Barlow,sans-serif;letter-spacing:.08em}
 #lb-ui .lb-caret{width:12px;height:12px;color:var(--mut);transition:transform .15s}
@@ -689,6 +692,7 @@ const HTML = `
   <div class="lb-logo"><b>GTASSAULT</b></div>
   <div class="lb-online" id="lb-online" hidden><i></i><span id="lb-online-t"></span></div>
   <div class="lb-sp"></div>
+  <a class="lb-chip lb-xchip" id="lb-xlink" href="#" target="_blank" rel="noopener noreferrer" aria-label="GTASSAULT na X" title="X" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.9 2H22l-7.6 8.7L23 22h-6.8l-5.3-6.9L4.8 22H1.7l8.1-9.3L1 2h7l4.8 6.3zm-1.2 18h1.7L7.4 3.9H5.6z"/></svg></a>
   <div class="lb-lang"><button class="lb-chip lb-lchip" id="lb-langbtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Language"><i class="lb-flag" id="lb-langflag"></i><b id="lb-langcode">EN</b><svg class="lb-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4.5 6 8.5 10 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
     <div class="lb-langmenu" id="lb-langmenu" role="menu" hidden></div></div>
   <button class="lb-chip lb-wchip" id="lb-walletchip" type="button" data-i18n-aria="menu.wallet"><span class="lb-coin"><svg viewBox="0 0 398 312" aria-hidden="true"><defs><linearGradient id="lbsol" x1="361" y1="-37" x2="141" y2="383" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#00ffa3"/><stop offset="1" stop-color="#dc1fff"/></linearGradient></defs><g fill="url(#lbsol)"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1z"/></g></svg></span><span class="lb-wbal"><b id="lb-bal">—</b><small data-i18n="cur.in">in SOL</small></span><span class="lb-plus">+</span></button>

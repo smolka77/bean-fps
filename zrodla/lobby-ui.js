@@ -550,6 +550,10 @@ export function initLobbyUI(ctx) {
   let acct = null, acctId = null;
   // serwer portfeli (serwer/ w repo): gdy ustawiony, konta, saldo, wpłaty, wypłaty i stawki idą przez niego (prawdziwe SOL w sieci Solana)
   const API = walletApi();
+  // kafelek X obok wyboru języka: link do strony gry na X (panel admina → Udostępnienie na X); bez linku ukryty
+  (async () => { const a = $('lb-xlink'); if (!a || !API) return;
+    try { const r = await fetch(API.replace(/\/+$/, '') + '/api/xshare', { cache: 'no-store' }); if (!r.ok) return; const j = await r.json();
+      if (j.profile && /^https:\/\/(www\.)?(x|twitter)\.com\//.test(j.profile)) { a.href = j.profile; a.hidden = false; } } catch {} })();
   const W = API ? createWallet({ api: API, root: ui, getLang: () => LANG, toast, onChange: a => { acct = a; acctId = a ? a.username.toLowerCase() : null; renderAll(); } }) : null;
   // ---- napis „150 PLAYERS ONLINE” na górze lobby: liczba i tekst z panelu admina (GET /api/online), odświeżane co minutę ----
   async function loadOnline() {
