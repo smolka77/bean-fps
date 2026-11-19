@@ -4,6 +4,8 @@
 // Wszystko, co ważne (trafienia, obrażenia, śmierć, kolejna broń), liczy serwer (serwer/dm.mjs) – tu tylko obraz i sterowanie.
 import * as THREE from 'three';
 import { createDmUi, tx, SKULL_PATH } from './dm-ui.js';
+import { srvText } from './wallet.js';
+import { getLang } from './lobby-ui.js';
 import { makeGear, EMOTES } from './dm-scenes.js';
 const EMOTE_IDS = ['', 'wave', 'dance', 'cheer'];
 
@@ -138,7 +140,8 @@ export function createDM(ctx) {
   // ---------------- sieć ----------------
   const on = (t, f) => net.on(t, f);
   on('error', (m) => {
-    const msg = (m && m.message) || 'Error';
+    const msg = srvText((m && m.message) || 'Error', getLang());
+    if (m.code === 'xshare') { exit(false); dispatchEvent(new CustomEvent('fasolka:xshare')); return; }   // brak posta na X: okno udostępniania w lobby
     if (S.phase === 'connecting') { exit(false, msg); return; }          // np. lobby pełne (20/20)
     if (m.code === 'cheat' || m.code === 'idle' || m.code === 'dup') { exit(true, msg); return; }
     ui.notify(msg, 'red');

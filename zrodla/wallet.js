@@ -189,8 +189,50 @@ const SRV = {
   'Nowe konto: stawka najwyżej $5 (więcej po 5 meczach)': ['New account: max stake $5 (more after 5 matches)', 'Новый аккаунт: ставка до $5 (больше после 5 матчей)', 'Cuenta nueva: apuesta máxima $5 (más tras 5 partidas)'],
   'Stawka najwyżej $25 – więcej po 20 meczach': ['Max stake $25 – more after 20 matches', 'Ставка до $25 – больше после 20 матчей', 'Apuesta máxima $25 – más tras 20 partidas'],
   'Stawka najwyżej $100 – więcej po 50 meczach': ['Max stake $100 – more after 50 matches', 'Ставка до $100 – больше после 50 матчей', 'Apuesta máxima $100 – más tras 50 partidas'],
+  'Za dużo prób – odczekaj chwilę': ['Too many attempts – wait a moment', 'Слишком много попыток – подожди немного', 'Demasiados intentos – espera un momento'],
+  'Nie ma takiego konta': ['No such account', 'Такого аккаунта нет', 'No existe esa cuenta'],
+  'Strona jest zablokowana hasłem': ['This site is password-protected', 'Сайт защищён паролем', 'El sitio está protegido con contraseña'],
+  'Nie udało się sprawdzić salda tokenu – spróbuj za chwilę': ['Could not check the token balance – try again shortly', 'Не удалось проверить баланс токена – попробуй чуть позже', 'No se pudo comprobar el saldo del token – inténtalo en un momento'],
+  'Za mało środków na wpisowe': ['Not enough funds for the entry fee', 'Недостаточно средств для взноса', 'Fondos insuficientes para la inscripción'],
+  'Zła kategoria zgłoszenia': ['Invalid report category', 'Неверная категория жалобы', 'Categoría de denuncia no válida'],
+  'Za późno na zgłoszenie tego meczu': ['Too late to report this match', 'Слишком поздно жаловаться на этот матч', 'Es demasiado tarde para denunciar esta partida'],
+  'Nie grałeś w tym meczu': ['You did not play in this match', 'Ты не играл в этом матче', 'No jugaste en esta partida'],
+  'Tego gracza nie było w meczu': ['This player was not in the match', 'Этого игрока не было в матче', 'Ese jugador no estaba en la partida'],
+  'Nie można zgłosić siebie': ['You cannot report yourself', 'Нельзя пожаловаться на себя', 'No puedes denunciarte a ti mismo'],
+  'Ten gracz jest już przez Ciebie zgłoszony w tym meczu': ['You have already reported this player in this match', 'Ты уже пожаловался на этого игрока в этом матче', 'Ya denunciaste a este jugador en esta partida'],
+  'Wyrzucono z meczu: serwer wykrył niedozwolony ruch.': ['Kicked from the match: the server detected illegal movement.', 'Выброшен из матча: сервер обнаружил недопустимое движение.', 'Expulsado de la partida: el servidor detectó un movimiento no permitido.'],
+  'Za długo na ekranie śmierci – wróciłeś do lobby.': ['Too long on the death screen – you are back in the lobby.', 'Слишком долго на экране смерти – ты вернулся в лобби.', 'Demasiado tiempo en la pantalla de muerte – has vuelto al lobby.'],
+  'Mecz przerwany: serwer wykrył niedozwolony ruch.': ['Match stopped: the server detected illegal movement.', 'Матч прерван: сервер обнаружил недопустимое движение.', 'Partida interrumpida: el servidor detectó un movimiento no permitido.'],
+  'Ten mecz już trwa w innej karcie.': ['This match is already running in another tab.', 'Этот матч уже идёт в другой вкладке.', 'Esta partida ya está en curso en otra pestaña.'],
+  'Żeby zagrać w Deathmatch, udostępnij grę na X.': ['To play Deathmatch, share the game on X.', 'Чтобы играть в Deathmatch, поделись игрой в X.', 'Para jugar Deathmatch, comparte el juego en X.'],
+  'Twój post o grze zniknął z X – udostępnij grę jeszcze raz.': ['Your post about the game is gone from X – share the game again.', 'Твой пост об игре пропал из X – поделись игрой ещё раз.', 'Tu publicación sobre el juego ya no está en X – compártelo de nuevo.'],
+  'Już szukasz meczu albo grasz.': ['You are already searching for a match or playing.', 'Ты уже ищешь матч или играешь.', 'Ya estás buscando partida o jugando.'],
+  'Grasz już mecz 1v1.': ['You are already playing a 1v1 match.', 'Ты уже играешь матч 1v1.', 'Ya estás jugando una partida 1v1.'],
+  'Wszedłeś do Deathmatch w innej karcie.': ['You joined Deathmatch in another tab.', 'Ты вошёл в Deathmatch в другой вкладке.', 'Entraste en Deathmatch en otra pestaña.'],
+  'Jesteś w kolejce Deathmatch albo w meczu.': ['You are in the Deathmatch queue or in a match.', 'Ты в очереди Deathmatch или в матче.', 'Estás en la cola de Deathmatch o en una partida.'],
+  'Ten post jest już przypisany do innego konta.': ['This post is already linked to another account.', 'Этот пост уже привязан к другому аккаунту.', 'Esta publicación ya está vinculada a otra cuenta.'],
+  'Nie widać tego posta – sprawdź link i czy konto na X jest publiczne.': ['This post is not visible – check the link and that your X account is public.', 'Пост не виден – проверь ссылку и что аккаунт в X публичный.', 'No se ve la publicación – revisa el enlace y que tu cuenta de X sea pública.'],
+  'X nie odpowiada – spróbuj za chwilę.': ['X is not responding – try again shortly.', 'X не отвечает – попробуй чуть позже.', 'X no responde – inténtalo en un momento.'],
+  'W poście nie ma adresu CA – opublikuj gotowy tekst z przycisku.': ['The post has no CA address – publish the ready text from the button.', 'В посте нет адреса CA – опубликуй готовый текст с кнопки.', 'La publicación no tiene la dirección CA – publica el texto listo del botón.'],
 };
-export function srvText(msg, lang) { const i = { en: 0, ru: 1, es: 2 }[lang]; return i == null || !msg || !SRV[msg] ? msg : SRV[msg][i]; }
+// komunikaty z liczbami (limity, progi) – wzorzec i tłumaczenia z $1, $2… w miejscu liczb
+const SRV_RE = [
+  [/^Hasło: co najmniej (\d+) znaków$/, ['Password: at least $1 characters', 'Пароль: минимум $1 символов', 'Contraseña: al menos $1 caracteres']],
+  [/^Nowe hasło: co najmniej (\d+) znaków$/, ['New password: at least $1 characters', 'Новый пароль: минимум $1 символов', 'Nueva contraseña: al menos $1 caracteres']],
+  [/^Wypłaty są wstrzymane przez (\d+) h po zmianie hasła lub e-maila$/, ['Withdrawals are paused for $1 h after a password or e-mail change', 'Выводы приостановлены на $1 ч после смены пароля или e-mail', 'Los retiros se pausan $1 h tras cambiar la contraseña o el e-mail']],
+  [/^Minimalna wypłata: (.+) SOL$/, ['Minimum withdrawal: $1 SOL', 'Минимальный вывод: $1 SOL', 'Retiro mínimo: $1 SOL']],
+  [/^Dzienny limit wypłat to \$(.+) – zostało \$(.+)$/, ['Daily withdrawal limit is $$$1 – $$$2 left', 'Дневной лимит вывода $$$1 – осталось $$$2', 'El límite diario de retiro es $$$1 – quedan $$$2']],
+  [/^Stawka od \$(.+) do \$(.+)$/, ['Stake from $$$1 to $$$2', 'Ставка от $$$1 до $$$2', 'Apuesta de $$$1 a $$$2']],
+  [/^Stawka najwyżej \$([\d.]+)$/, ['Max stake $$$1', 'Ставка до $$$1', 'Apuesta máxima $$$1']],
+  [/^Lobby Deathmatch jest pełne \((\d+)\/(\d+)\)\. Spróbuj za chwilę\.$/, ['The Deathmatch lobby is full ($1/$2). Try again shortly.', 'Лобби Deathmatch заполнено ($1/$2). Попробуй чуть позже.', 'El lobby de Deathmatch está lleno ($1/$2). Inténtalo en un momento.']],
+  [/^W poście nie ma Twojego kodu (\S+) – opublikuj gotowy tekst z przycisku\.$/, ['Your code $1 is not in the post – publish the ready text from the button.', 'В посте нет твоего кода $1 – опубликуй готовый текст с кнопки.', 'Tu código $1 no está en la publicación – publica el texto listo del botón.']],
+];
+export function srvText(msg, lang) {
+  const i = { en: 0, ru: 1, es: 2 }[lang]; if (i == null || !msg) return msg;
+  if (SRV[msg]) return SRV[msg][i];
+  for (const [re, tr] of SRV_RE) if (re.test(msg)) return msg.replace(re, tr[i]);
+  return msg;
+}
 export function createWallet({ api, root, getLang, toast, onChange, local = null }) {
   const L = () => TXT[getLang()] || TXT.en, T = (k, v) => { let s = L()[k] ?? TXT.en[k] ?? k; if (v) for (const n in v) s = s.replace('{' + n + '}', v[n]); return s; };
   const loc = () => ({ pl: 'pl-PL', en: 'en-US', ru: 'ru-RU', es: 'es-ES' })[getLang()] || 'en-US';

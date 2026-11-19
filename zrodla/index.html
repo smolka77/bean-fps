@@ -1004,7 +1004,7 @@ new MutationObserver(()=>{if($('overlay').style.display!=='none'){pmOpenT=perfor
 
 addEventListener('keydown',e=>{if(e.code==='KeyM'&&!playing)setMuted(!muted)});
 setMuted(muted);
-document.addEventListener('pointerlockerror',()=>{if(playing)$('lockHint').hidden=false});
+document.addEventListener('pointerlockerror',()=>{if(playing)(pmI18n(),$('lockHint').hidden=false)});
 document.addEventListener('pointerlockchange',()=>{if(document.pointerLockElement)$('lockHint').hidden=true;if(!document.pointerLockElement&&playing){/* Esc: pauza */playing=false;gun.firing=false;$('overlay').style.display='flex'}
   if(!document.pointerLockElement&&window.__match&&window.__match.cancelable)window.__match.cancel()});   // Esc podczas szukania meczu = anuluj
 addEventListener('keydown',e=>{
@@ -2021,7 +2021,7 @@ DMX=createDM({THREE,scene,camera,renderer,player,me,net:DMNET,
     wasted:()=>tone([[196,0,.5],[147,.35,.9]],'sawtooth',.07),spawn:()=>tone([[523,0,.1],[784,.08,.2]],'triangle',.1),go:()=>SFX.go(),end:()=>SFX.win(),podium:()=>SFX.win(),
     hurt:()=>sndClick(300,.08,.25),hurtHead:()=>sndClick(220,.12,.35)};if(F[n])try{F[n]()}catch(e){}},
   filter:f=>{renderer.domElement.style.transition='filter .8s ease';renderer.domElement.style.filter=f||''},
-  lock:()=>{initAudio();if(AC&&AC.state==='suspended')AC.resume();playing=true;$('overlay').style.display='none';try{const r=renderer.domElement.requestPointerLock();if(r&&r.catch)r.catch(()=>{$('lockHint').hidden=false})}catch(e){}renderer.domElement.focus({preventScroll:true})},
+  lock:()=>{initAudio();if(AC&&AC.state==='suspended')AC.resume();playing=true;$('overlay').style.display='none';try{const r=renderer.domElement.requestPointerLock();if(r&&r.catch)r.catch(()=>{(pmI18n(),$('lockHint').hidden=false)})}catch(e){}renderer.domElement.focus({preventScroll:true})},
   unlock:()=>{playing=false;gun.firing=false;adsHeld=false;$('lockHint').hidden=true;if(document.pointerLockElement)document.exitPointerLock()},
   pause:()=>{$('overlay').style.display='flex'},
   onAccount:a=>dispatchEvent(new CustomEvent('fasolka:account',{detail:a})),

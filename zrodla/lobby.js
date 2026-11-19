@@ -6,7 +6,7 @@ import { buildVillage } from './village.js';
 import { buildBattlefield } from './battlefield.js';
 import { buildHangar } from './hangar.js';
 import { buildBay } from './zatoka.js';
-import { initLobbyUI, t as tr, skinName } from './lobby-ui.js';
+import { initLobbyUI, t as tr, skinName, skinTag } from './lobby-ui.js';
 import CUSTOM_SKINS from './skins-data.js';
 
 const CSS = `
@@ -675,7 +675,7 @@ const HTML = `
   <div class="lb-sp"></div>
   <div class="lb-lang"><button class="lb-chip lb-lchip" id="lb-langbtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Language"><i class="lb-flag" id="lb-langflag"></i><b id="lb-langcode">EN</b><svg class="lb-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4.5 6 8.5 10 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
     <div class="lb-langmenu" id="lb-langmenu" role="menu" hidden></div></div>
-  <button class="lb-chip lb-wchip" id="lb-walletchip" type="button" aria-label="Portfel"><span class="lb-coin"><svg viewBox="0 0 398 312" aria-hidden="true"><defs><linearGradient id="lbsol" x1="361" y1="-37" x2="141" y2="383" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#00ffa3"/><stop offset="1" stop-color="#dc1fff"/></linearGradient></defs><g fill="url(#lbsol)"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1z"/></g></svg></span><span class="lb-wbal"><b id="lb-bal">—</b><small data-i18n="cur.in">in SOL</small></span><span class="lb-plus">+</span></button>
+  <button class="lb-chip lb-wchip" id="lb-walletchip" type="button" data-i18n-aria="menu.wallet"><span class="lb-coin"><svg viewBox="0 0 398 312" aria-hidden="true"><defs><linearGradient id="lbsol" x1="361" y1="-37" x2="141" y2="383" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#00ffa3"/><stop offset="1" stop-color="#dc1fff"/></linearGradient></defs><g fill="url(#lbsol)"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1z"/></g></svg></span><span class="lb-wbal"><b id="lb-bal">—</b><small data-i18n="cur.in">in SOL</small></span><span class="lb-plus">+</span></button>
     <button class="lb-burger" id="lb-burger" type="button" aria-label="Menu" aria-haspopup="menu" aria-expanded="false"><span></span><span></span><span></span></button>
 </header>
 <nav class="lb-menu" id="lb-menu" role="menu" hidden>
@@ -711,7 +711,7 @@ const HTML = `
   <div class="grid" id="lb-skin-grid"></div>
   <button class="lb-btn pri" id="lb-skin-close" type="button" data-i18n="done"></button>
 </div>
-<div class="lb-picker" id="lb-picker" role="dialog" aria-label="Tryb gry" hidden>
+<div class="lb-picker" id="lb-picker" role="dialog" data-i18n-aria="mode.label" hidden>
   <h2 data-i18n="picker.title"></h2>
   <div class="lb-tiles" id="lb-tiles"></div>
   <button class="lb-btn pri" id="lb-close" type="button" data-i18n="done"></button>
@@ -1478,7 +1478,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   const skinPanel = $('lb-skins'), skinGrid = $('lb-skin-grid');
   const buildSkinGrid = () => { skinGrid.innerHTML = '';
     skins.forEach(k => { const b = document.createElement('button'); b.type = 'button'; b.className = 'lb-skin'; b.dataset.id = k.id;
-      b.innerHTML = skinIcon(k) + '<span></span><small></small>'; b.querySelector('span').textContent = skinName(k); b.querySelector('small').textContent = k.tag || '';
+      b.innerHTML = skinIcon(k) + '<span></span><small></small>'; b.querySelector('span').textContent = skinName(k); b.querySelector('small').textContent = skinTag(k);
       b.classList.toggle('sel', k.id === skin.id);
       b.addEventListener('click', () => { setSkin(k); hopT = 0; }); skinGrid.appendChild(b); }); };
   buildSkinGrid();
@@ -1550,7 +1550,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
     getMode: () => mode.id,
     setName: (n, vip) => { plateName.textContent = n; plateName.classList.toggle('vip-nick', !!vip); },   // vip: złoty nick z poświatą (vip.js)
     play: (id, opts) => { if (active) onPlay(id, opts); },
-    refresh: () => { renderMode(); skinGrid.querySelectorAll('.lb-skin').forEach(b => { const k = skins.find(x => x.id === b.dataset.id); if (k) b.querySelector('span').textContent = skinName(k); }); },
+    refresh: () => { renderMode(); skinGrid.querySelectorAll('.lb-skin').forEach(b => { const k = skins.find(x => x.id === b.dataset.id); if (k) { b.querySelector('span').textContent = skinName(k); b.querySelector('small').textContent = skinTag(k); } }); },
   });
 
   // ---------- pętla ----------

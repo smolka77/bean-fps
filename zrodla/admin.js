@@ -300,6 +300,7 @@ async function srvGet(p) {
 const DM_FIELDS = [
   ['Mecz', [['maxPlayers', 'Graczy w meczu (max)', 1], ['minPlayers', 'Najmniej graczy do startu', 1], ['queueTimeout', 'Czekanie w kolejce (s)', 1], ['duration', 'Czas meczu (s)', 1], ['startDelay', 'Odliczanie przed startem (s)', 0.5], ['endDelay', 'Podium po meczu (s)', 1]]],
   ['Kasa meczu i WANTED', [['startMoney', 'Kasa na start ($)', 10], ['killReward', 'Nagroda za zabójstwo ($)', 10], ['wantedMult', 'Mnożnik za WANTED (×)', 0.5], ['wantedMinKills', 'WANTED od zabójstw', 1]]],
+  ['Boty (zapełniają lobby, gdy jest w nim co najmniej 1 gracz; ustępują miejsca graczom)', [['bots', 'Zapełniaj lobby botami do (osób, 0 = bez botów)', 1], ['botSkill', 'Poziom botów (0 = słabe, 1 = mocne)', 0.05]]],
   ['Odrodzenie', [['spawnProtect', 'Ochrona po odrodzeniu (s)', 0.5], ['minDeathTime', 'Ekran WASTED (s)', 0.1], ['idleDead', 'Ekran śmierci – powrót do lobby po (s)', 5]]],
   ['Nagrody (pula = wpisowe graczy)', [['houseFee', 'Prowizja (0–0,5)', 0.01], ['prizeSplit.0', '1. miejsce (część puli)', 0.05], ['prizeSplit.1', '2. miejsce', 0.05], ['prizeSplit.2', '3. miejsce', 0.05]]],
   ['Pancerz', [['armor.vest.price', 'Kamizelka – cena ($)', 50], ['armor.vest.hp', 'Kamizelka – punkty', 5], ['armor.helmet.price', 'Kamizelka + hełm – cena ($)', 50], ['armor.helmet.hp', 'Kamizelka + hełm – punkty', 5], ['armor.helmet.headMult', 'Hełm – obrażenia głowy (×)', 0.05]]],
@@ -344,6 +345,38 @@ function mountArsenal($) {
     try { const j = await srvPost('/api/admin/arsenal', { reset: true }); cfg = JSON.parse(JSON.stringify(j.config)); render(); msg.textContent = 'Przywrócono domyślne.'; } catch (e) { msg.textContent = e.message; }
   });
 }
+// Udostępnienie na X: włączenie, tekst posta, CA, link do gry, co ile sprawdzać post (serwer: serwer/xshare.mjs)
+function mountXShare($) {
+  const box = $('fa-xs'), msg = $('fa-xs-msg'); let cfg = null, info = null;
+  function render() {
+    box.innerHTML = `<div class="fa-row" style="gap:14px;margin:0 0 10px"><label class="fa-chk"><input type="checkbox" id="fa-xs-on" ${cfg.enabled ? 'checked' : ''}> Wymagaj posta na X przed Deathmatch</label>
+        <label class="fa-chk"><input type="checkbox" id="fa-xs-reqca" ${cfg.requireCa ? 'checked' : ''}> CA musi być w poście</label></div>
+      <div class="fa-dmg">
+        <label class="fa-dmf" style="grid-column:span 2"><span>Adres CA (puste = mint z Ekwipunku${info.ca && !cfg.ca ? ': ' + esc(info.ca) : ''})</span><input class="fa-q" id="fa-xs-ca" value="${esc(cfg.ca)}" placeholder="np. 7xKX…pump" spellcheck="false"></label>
+        <label class="fa-dmf" style="grid-column:span 2"><span>Link do gry w poście (puste = adres tej strony)</span><input class="fa-q" id="fa-xs-url" value="${esc(cfg.url)}" placeholder="https://…" spellcheck="false"></label>
+        <label class="fa-dmf"><span>Sprawdzaj post ponownie co (godz., 0 = nigdy)</span><input class="fa-q" type="number" min="0" max="720" step="1" id="fa-xs-re" value="${cfg.recheckHours}"></label>
+      </div>
+      <label class="fa-dmf" style="display:block;margin-top:10px"><span>Tekst posta</span><textarea class="fa-q" id="fa-xs-text" rows="6" maxlength="600" style="width:100%;box-sizing:border-box;resize:vertical;font:inherit">${esc(cfg.text)}</textarea></label>
+      <h4>Podgląd (z przykładowym kodem)</h4><pre class="fa-msg" style="white-space:pre-wrap;margin:0">${esc(info.preview || '')}</pre>`;
+    const s = info.stats || {};
+    $('fa-xs-sum').textContent = (cfg.enabled ? 'włączone' : 'wyłączone – Deathmatch bez posta') + ` · zweryfikowanych graczy: ${s.v || 0}` + (cfg.enabled && cfg.requireCa && !(cfg.ca || info.ca) ? ' · brak CA – sprawdzany tylko kod' : '');
+  }
+  function collect() {
+    cfg.enabled = $('fa-xs-on').checked; cfg.requireCa = $('fa-xs-reqca').checked; cfg.ca = $('fa-xs-ca').value.trim(); cfg.url = $('fa-xs-url').value.trim();
+    cfg.recheckHours = +$('fa-xs-re').value; cfg.text = $('fa-xs-text').value;
+  }
+  const load = async () => { info = await srvGet('/api/admin/xshare'); cfg = JSON.parse(JSON.stringify(info.config)); render(); };
+  load().catch((e) => { if (e.code === 'admin2fa') return relockAdmin(); box.innerHTML = `<p class="fa-empty">${esc(e.message)}</p>`; });
+  $('fa-xs-save').addEventListener('click', async () => {
+    if (!cfg) return; collect(); msg.textContent = 'Zapisywanie…';
+    try { await srvPost('/api/admin/xshare', { config: cfg }); await load(); msg.textContent = 'Zapisano. Działa od razu.'; }
+    catch (e) { msg.textContent = e.message; }
+  });
+  $('fa-xs-reset').addEventListener('click', async () => {
+    if (!confirm('Przywrócić domyślne ustawienia udostępniania na X (wyłączone, domyślny tekst)?')) return;
+    try { await srvPost('/api/admin/xshare', { reset: true }); await load(); msg.textContent = 'Przywrócono domyślne.'; } catch (e) { msg.textContent = e.message; }
+  });
+}
 function mountDeathmatch($) {
   const box = $('fa-dm'), msg = $('fa-dm-msg'); let cfg = null, defs = null;
   const field = (p, lbl, step) => `<label class="fa-dmf"><span>${esc(lbl)}</span><input class="fa-q" type="number" step="${step}" data-p="${p}" value="${esc(getP(cfg, p))}"></label>`;
@@ -371,7 +404,7 @@ function mountDeathmatch($) {
   async function pull() {
     try {
       const j = await srvGet('/api/admin/dm'); defs = j.defaults; if (!cfg) { cfg = JSON.parse(JSON.stringify(j.config)); render(); }
-      $('fa-dm-live').textContent = j.rooms.length ? 'lobby: ' + j.rooms.map((r) => `${r.map}, ${r.players}/${cfg.maxPlayers} graczy`).join(', ') : 'lobby: puste (otworzy się przy pierwszym graczu)';
+      $('fa-dm-live').textContent = j.rooms.length ? 'lobby: ' + j.rooms.map((r) => `${r.map}, ${r.players}/${cfg.maxPlayers} graczy${r.bots ? ` (w tym ${r.bots} botów)` : ''}`).join(', ') : 'lobby: puste (otworzy się przy pierwszym graczu)';
       $('fa-dm-recent').innerHTML = j.recent.length ? j.recent.map((r) => `<li><div><b>${esc(r.map || '—')} · ${esc(r.tier)} · ${r.players} graczy</b><small>${new Date(r.t).toLocaleString('pl-PL')} · pula $${r.pot.toFixed(2)} · wypłacone $${r.paid.toFixed(2)}</small></div>
         <span class="mut">${r.top.map((x) => `${x.place}. ${esc(x.name)} (${x.kills} K, ${x.damage} DMG${x.prize ? ', $' + x.prize.toFixed(2) : ''})`).join(' · ')}</span></li>`).join('') : '<li class="fa-empty">Jeszcze nie było meczów.</li>';
     } catch (e) { if (e.code === 'admin2fa') return relockAdmin(); box.innerHTML = `<p class="fa-empty">${esc(e.message)}</p>`; }
@@ -538,7 +571,12 @@ function buildDashboard(db, close) {
       <p class="fa-msg" style="margin:0 0 12px">Włączony: w 1v1 i Deathmatch gracz poniżej progu ma tylko pistolet (Glock-17). Każda broń ma próg – ile gracz musi mieć: saldo SOL w grze
         (stawka zamrożona na mecz też się liczy) albo token na adresie depozytu. Nic się nie pobiera. Bronie serwer ustala na starcie meczu. Z botem i Strzelnica – bez zmian.</p>
       <div id="fa-ars"><p class="fa-empty">Ładowanie…</p></div>
-      <div class="fa-row"><button class="fa-btn pri" type="button" id="fa-ars-save">Zapisz Ekwipunek</button><button class="fa-btn" type="button" id="fa-ars-reset">Przywróć domyślne</button><span class="fa-msg" id="fa-ars-msg"></span></div></section>` : ''}
+      <div class="fa-row"><button class="fa-btn pri" type="button" id="fa-ars-save">Zapisz Ekwipunek</button><button class="fa-btn" type="button" id="fa-ars-reset">Przywróć domyślne</button><span class="fa-msg" id="fa-ars-msg"></span></div></section>
+    <section class="fa-card" id="fa-xs-card"><div class="fa-ch"><h3>Udostępnienie na X – wejście do Deathmatch</h3><small id="fa-xs-sum"></small></div>
+      <p class="fa-msg" style="margin:0 0 12px">Włączone: przed Deathmatch gracz publikuje na X gotowy post (przycisk otwiera X z tekstem) i wkleja link. Serwer czyta post (publiczny podgląd X, bez klucza API)
+        i sprawdza unikalny kod gracza – <code>{code}</code> musi zostać w tekście – oraz CA. W tekście: <code>{ca}</code> = adres CA, <code>{url}</code> = link do gry, <code>{code}</code> = kod gracza.</p>
+      <div id="fa-xs"><p class="fa-empty">Ładowanie…</p></div>
+      <div class="fa-row"><button class="fa-btn pri" type="button" id="fa-xs-save">Zapisz</button><button class="fa-btn" type="button" id="fa-xs-reset">Przywróć domyślne</button><span class="fa-msg" id="fa-xs-msg"></span></div></section>` : ''}
     <section class="fa-grid2">
       <div class="fa-card"><div class="fa-ch"><h3>Mecze dziennie</h3><small id="fa-ch-m-sum">ostatnie 14 dni</small></div><div class="fa-chart" id="fa-ch-m"></div></div>
       <div class="fa-card"><div class="fa-ch"><h3>Prowizja dziennie</h3><small id="fa-ch-f-sum">USD (płatne w SOL) · ostatnie 14 dni</small></div><div class="fa-chart" id="fa-ch-f"></div></div>
@@ -626,6 +664,7 @@ function buildDashboard(db, close) {
     mountAnticheat($);
     mountDeathmatch($);
     mountArsenal($);
+    mountXShare($);
   } else if (db) {
     const timer = setTimeout(() => { if (!gotA) { note.hidden = false; note.textContent = 'Baza danych jeszcze nie odpowiada – dane mogą być niepełne.'; } }, 10000);
     cleanup.push(() => clearTimeout(timer));

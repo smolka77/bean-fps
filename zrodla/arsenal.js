@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { WEAPON_STATS, createWeapon } from './weaponry.js';
+import { srvText } from './wallet.js';
 
 // ---- podgląd 3D broni: obracanie (przeciągnij), przybliżanie (kółko), reset (2× klik), płynne przejście przy zmianie broni ----
 const PISTOLS = new Set(['glock17', 'deagle']);
@@ -321,7 +322,7 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     const w = W(); if (!w || !w.api) throw new Error('offline');
     const r = await fetch(w.api + '/api' + p, { method, headers: { 'Content-Type': 'application/json', ...(w.token && w.token !== 'local' ? { Authorization: 'Bearer ' + w.token } : {}) } });
     let j = {}; try { j = await r.json(); } catch {}
-    if (!r.ok) throw new Error(j.message || 'HTTP ' + r.status);
+    if (!r.ok) throw new Error(j.message ? srvText(j.message, getLang()) : 'HTTP ' + r.status);
     return j;
   }
   async function load(force) {

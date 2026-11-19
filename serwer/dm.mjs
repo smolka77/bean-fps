@@ -28,6 +28,7 @@ export const DEFAULTS = {
     { id: 'free', name: 'Free', entry: 0 },           // tryb jest darmowy: jedno lobby, bez wpisowego
   ],
   maps: ['Oaza', 'Magazyn', 'Baza'],
+  bots: 8, botSkill: 0.5,                               // boty: lobby z co najmniej jednym graczem zapełniane botami do tylu osób (0 = bez botów); poziom 0–1
   armor: {
     vest: { name: 'Body Armor', price: 650, hp: 100 },
     helmet: { name: 'Body Armor + Helmet', price: 1000, hp: 100, headMult: 0.55 },   // hełm: obrażenia głowy ×0,55 i najpierw z pancerza
@@ -69,6 +70,8 @@ export function sanitizeConfig(src = {}) {
   o.houseFee = num(s.houseFee, 0, 0.5, D.houseFee);
   const sp = Array.isArray(s.prizeSplit) && s.prizeSplit.length === 3 ? s.prizeSplit.map((v, i) => num(v, 0, 1, D.prizeSplit[i])) : D.prizeSplit.slice();
   const sum = sp.reduce((a, b) => a + b, 0) || 1; o.prizeSplit = sp.map((v) => Math.round((v / sum) * 1000) / 1000);
+  o.bots = Math.round(num(s.bots, 0, o.maxPlayers, D.bots));
+  o.botSkill = num(s.botSkill, 0, 1, D.botSkill);
   o.tiers = D.tiers.map((t) => ({ ...t }));            // Deathmatch jest full free to play – wpisowe zawsze 0 (stare ustawienia z poziomami są pomijane)
   const maps = Array.isArray(s.maps) ? s.maps.filter((m) => D.maps.includes(m)) : []; o.maps = maps.length ? maps : D.maps.slice();
   o.armor = {};
@@ -157,6 +160,9 @@ function spawnGrid(map) {
   const list = out.length >= 8 ? out : [...seen].map((k) => free.get(k));
   SPAWNS.set(map, list); return list;
 }
+
+// punkty do chodzenia po mapie (boty): jak przy odradzaniu – punkty startu mapy Deathmatch albo siatka podłogi
+export const navPoints = (map) => { const sp = map.spawns || []; return sp.length >= 8 ? sp.map((s) => [s.x, s.z, s.y || 0]) : spawnGrid(map); };
 
 // ---------------- pokój ----------------
 const RW = 0.12;                                            // ile s po śmierci przeciwnik jeszcze jest w historii (żeby strzał oddany chwilę przed śmiercią się liczył)

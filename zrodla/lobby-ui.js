@@ -5,8 +5,9 @@
 import { createSfx } from './sfx.js';
 import { weaponSfx, setWeaponAccess, weaponAccessFor } from './weaponry.js';
 import { createArsenal } from './arsenal.js';
+import { createXShare } from './xshare.js';
 import { isVip, ensureVipCss } from './vip.js';
-import { createWallet } from './wallet.js';
+import { createWallet, srvText } from './wallet.js';
 import { walletApi } from './wallet-config.js';
 import { createProfile, paintAvatar } from './profile.js';
 import { pointsFromHistory } from './earnings.js';
@@ -192,6 +193,12 @@ export const AUTH_TXT = {
 };
 for (const l in AUTH_TXT) if (DICT[l]) Object.assign(DICT[l], AUTH_TXT[l]);   // zakładka Business w ustawieniach
 export function t(key, vars) { let s = (DICT[LANG] && DICT[LANG][key]) ?? DICT.pl[key] ?? key; if (vars) for (const k in vars) s = s.replace('{' + k + '}', vars[k]); return s; }
+const SKIN_TAGS = {   // napisy pod skinami (tag z panelu admina); nieznany tag zostaje bez zmian
+  en: { 'WŁASNY': 'CUSTOM', 'WOJSKO': 'MILITARY', 'RZADKI': 'RARE', 'LEGENDA': 'LEGENDARY' },
+  ru: { 'WŁASNY': 'СВОЙ', 'WOJSKO': 'АРМИЯ', 'RZADKI': 'РЕДКИЙ', 'LEGENDA': 'ЛЕГЕНДА' },
+  es: { 'WŁASNY': 'PROPIO', 'WOJSKO': 'MILITAR', 'RZADKI': 'RARO', 'LEGENDA': 'LEYENDA' },
+};
+export function skinTag(sk) { const g = sk.tag || ''; return (SKIN_TAGS[LANG] && SKIN_TAGS[LANG][g]) || g; }
 export function skinName(sk) { return (SKIN_NAMES[LANG] && SKIN_NAMES[LANG][sk.id]) || sk.name; }
 
 // ---------------- sterowanie ----------------
@@ -375,6 +382,7 @@ export function initLobbyUI(ctx) {
     ui.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
     ui.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = t(el.dataset.i18nPh));
     ui.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); el.setAttribute('aria-label', el.title); });
+    ui.querySelectorAll('[data-i18n-aria]').forEach(el => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
     renderTop(); renderStake(); renderSettings(); renderAuth(); renderWallet(); ctx.refresh(); ARSX.render();
   };
 
@@ -390,7 +398,11 @@ export function initLobbyUI(ctx) {
   const ARSX = createArsenal({ root: ui, getLang: () => LANG, toast, sfx: SFX, wallet: () => W, acct: () => acct, art: ctx.weaponArt || null, openAuth: () => openModal('lb-auth'), openWallet: () => openWallet() });
 
   // ---- okna dialogowe ----
-  const modals = ['lb-set', 'lb-auth', 'lb-wallet', 'lb-arsenal'].map($);
+  // Deathmatch: udostępnienie gry na X jako warunek wejścia (xshare.js; serwer sprawdza post). W tworzony niżej – okno woła go dopiero przy otwarciu
+  const XSX = createXShare({ root: ui, getLang: () => LANG, toast, sfx: SFX, wallet: () => W });
+  let xsOk = false;                                       // post zweryfikowany w tej sesji (serwer i tak sprawdza przy wejściu)
+  addEventListener('fasolka:xshare', () => { xsOk = false; if (acct) XSX.open(() => { xsOk = true; requestPlay(); }); });   // serwer odrzucił wejście (brak / usunięty post)
+  const modals = ['lb-set', 'lb-auth', 'lb-wallet', 'lb-arsenal', 'lb-xshare'].map($);
   const openModal = id => { modals.forEach(m => m.hidden = m.id !== id); SFX.open(); };
   const closeAll = () => { if (modals.some(m => !m.hidden)) SFX.close(); modals.forEach(m => m.hidden = true); openMenu(false); Object.values(keyEls).forEach(k => k.classList.remove('down')); if (rebinding) { rebinding = null; renderSettings(); } };
   const anyOpen = () => modals.some(m => !m.hidden) || !menu.hidden;
@@ -756,6 +768,7 @@ export function initLobbyUI(ctx) {
       if (!W) return toast(t('dm.noServer'), 'err');
       if (!dmInfo) { await loadDmInfo(true); if (!dmInfo) return toast(t('net.offline'), 'err'); }
       const tier = dmTierSel(); if (!tier) return;
+      if (dmInfo.xshare && !xsOk) { XSX.open(() => { xsOk = true; requestPlay(); }); return; }   // najpierw post o grze na X
       if (dmInfo.full) { await loadDmInfo(true); if (dmInfo.full) return toast(t('dm.fullMsg', { max: dmInfo.maxPlayers || 20 }), 'err'); }   // serwer i tak sprawdza komplet przy wejściu
       lastStake = 0; SFX.play(); ctx.play('dm', { tier, info: dmInfo }); return;
     }
@@ -783,7 +796,7 @@ export function initLobbyUI(ctx) {
   addEventListener('fasolka:cancelled', e => {
     activeStake = 0; lastStake = 0; activeMatch = null; busy = false;
     if (W) W.refresh().catch(() => {}); renderAll();
-    const msg = e.detail && e.detail.message; if (msg) toast(msg, 'err');
+    const msg = e.detail && e.detail.message; if (msg) toast(srvText(msg, LANG), 'err');
   });
   addEventListener('fasolka:rematch', e => {
     if (!lastStake) return;
