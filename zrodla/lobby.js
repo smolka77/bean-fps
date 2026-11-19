@@ -671,7 +671,7 @@ const X_BTN = `<button class="lb-x" type="button" aria-label="Zamknij">${IC.x}</
 const HTML = `
 <div class="lb-shade"></div>
 <header class="lb-top">
-  <div class="lb-logo"><b>GTA</b>ssault</div>
+  <div class="lb-logo"><b>GT</b>ASSAULT</div>
   <div class="lb-sp"></div>
   <div class="lb-lang"><button class="lb-chip lb-lchip" id="lb-langbtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Language"><i class="lb-flag" id="lb-langflag"></i><b id="lb-langcode">EN</b><svg class="lb-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4.5 6 8.5 10 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
     <div class="lb-langmenu" id="lb-langmenu" role="menu" hidden></div></div>
@@ -754,7 +754,7 @@ const HTML = `
   <aside class="lb-aart" id="lb-aart" aria-hidden="true">
     <div class="lb-abg" id="lb-abg"></div>
     <div class="lb-ashade"></div>
-    <div class="lb-atop"><div class="lb-alogo">BEAN<b>GTA</b></div><p data-i18n="auth.tag"></p></div>
+    <div class="lb-atop"><div class="lb-alogo"><b>GT</b>ASSAULT</div><p data-i18n="auth.tag"></p></div>
     <ul class="lb-afeat"><li><i>🏆</i><span data-i18n="auth.f1"></span></li><li><i><svg viewBox="0 0 398 312" width="14" height="11"><defs><linearGradient id="lbasol" x1="361" y1="-37" x2="141" y2="383" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#00ffa3"/><stop offset="1" stop-color="#dc1fff"/></linearGradient></defs><g fill="url(#lbasol)"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1z"/></g></svg></i><span data-i18n="auth.f2"></span></li><li><i>⚡</i><span data-i18n="auth.f3"></span></li></ul>
   </aside>
   <div class="lb-aform">

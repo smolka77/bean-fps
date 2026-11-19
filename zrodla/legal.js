@@ -2,7 +2,7 @@
 // UZUPEŁNIJ pola w OPERATOR (puste = w dokumentach widać „[do uzupełnienia]”). Dokumenty są szablonem –
 // przed startem na prawdziwe pieniądze powinien je sprawdzić prawnik z jurysdykcji spółki.
 export const OPERATOR = {
-  brand: 'BEANGTA',
+  brand: 'GTASSAULT',
   company: '',            // pełna nazwa spółki, np. „… Ltd.” / „… N.V.”
   country: '',            // kraj rejestracji na Karaibach, np. Curaçao / Saint Lucia / Anguilla
   regNo: '',              // numer rejestrowy spółki
