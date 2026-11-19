@@ -251,23 +251,28 @@ function boardMsg(room) {
 function pickSpawn(room, p, now, initial) {
   // mapy z wieloma punktami startu (mapy Deathmatch: ≥ 8) – tylko z nich; inne mapy – siatka podłogi
   const sp = room.map.spawns || [], grid = sp.length >= 8 ? sp.map((s) => [s.x, s.z, s.y || 0, s.yaw]) : spawnGrid(room.map), foes = alivePlayers(room).filter((q) => q !== p);
-  const recent = room.recentSpawns.filter((s) => now - s.t < 6);
-  let best = null, bestScore = -Infinity;
-  const N = Math.min(grid.length, initial ? 80 : 48);
+  const recent = room.recentSpawns.filter((s) => now - s.t < 6), kq = p.killer ? room.p.get(p.killer) : null;
+  // 1) odległość: jak najdalej od NAJBLIŻSZEGO żywego gracza/bota (liczy się do 60 m), trochę też od wszystkich naraz (średnia),
+  //    z dala od świeżych odrodzeń i od zabójcy; ocenianych do 400 punktów
+  const N = Math.min(grid.length, 400), all = N === grid.length, cand = [];
   for (let k = 0; k < N; k++) {
-    const c = grid[(Math.random() * grid.length) | 0];
-    let dMin = 40; for (const q of foes) { const d = Math.hypot(q.x - c[0], q.z - c[1]); if (d < dMin) dMin = d; }
-    let score = Math.min(dMin, 28) * 2;
-    if (dMin < 6) score -= 60;
-    for (const s of recent) { const d = Math.hypot(s.x - c[0], s.z - c[1]); if (d < 6) score -= (6 - d) * 6; }
-    if (p.killer) { const kq = room.p.get(p.killer); if (kq && kq.alive) score += Math.min(25, Math.hypot(kq.x - c[0], kq.z - c[1])) * 0.6; }
-    if (score > bestScore - 40 && foes.length) {
-      const head = [c[0], (c[2] || 0) + 1.4, c[1]]; let seen = 0;
-      for (const q of foes) { if (Math.hypot(q.x - c[0], q.z - c[1]) > 45) continue; if (lineClear(room.map, [q.x, MECZ.EYE(q), q.z], head)) { seen++; if (seen > 1) break; } }
-      score -= seen * 45;
-    }
-    score += Math.random() * 3;
-    if (score > bestScore) { bestScore = score; best = c; }
+    const c = all ? grid[k] : grid[(Math.random() * grid.length) | 0];
+    let dMin = 80, dSum = 0; for (const q of foes) { const d = Math.hypot(q.x - c[0], q.z - c[1]); dSum += Math.min(d, 60); if (d < dMin) dMin = d; }
+    let score = Math.min(dMin, 60) * 3 + (foes.length ? dSum / foes.length : 0) * 0.6;
+    if (dMin < 10) score -= 90 - dMin * 6;                            // bardzo blisko kogoś – prawie nigdy
+    for (const s of recent) { const d = Math.hypot(s.x - c[0], s.z - c[1]); if (d < 8) score -= (8 - d) * 8; }
+    if (kq && kq.alive) score += Math.min(40, Math.hypot(kq.x - c[0], kq.z - c[1])) * 0.8;
+    cand.push({ c, score: score + Math.random() * 3 });
+  }
+  // 2) widoczność tylko dla najlepszych kandydatów (droższe sprawdzanie): odrodzenie na oczach przeciwnika = duża kara
+  cand.sort((a, b) => b.score - a.score);
+  let best = null, bestScore = -Infinity;
+  for (const k of cand.slice(0, 12)) {
+    let score = k.score;
+    if (foes.length) { const head = [k.c[0], (k.c[2] || 0) + 1.4, k.c[1]]; let seen = 0;
+      for (const q of foes) { if (Math.hypot(q.x - k.c[0], q.z - k.c[1]) > 60) continue; if (lineClear(room.map, [q.x, MECZ.EYE(q), q.z], head)) seen++; }
+      score -= seen * 70; }
+    if (score > bestScore) { bestScore = score; best = k.c; }
   }
   if (!best) best = [room.map.spawns[0].x, room.map.spawns[0].z, room.map.spawns[0].y || 0];
   // kierunek z mapy albo w stronę środka mapy
