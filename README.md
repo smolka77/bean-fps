@@ -14,7 +14,9 @@ Pobierz go i otwórz dwuklikiem w Chrome, Edge albo Firefoksie. Działa bez serw
   - **1v1:** mecz z prawdziwym graczem o stawkę do 3 wygranych rund (serwer meczów), na jednej z trzech map.
   - **Deathmatch:** do 20 graczy, 3 minuty, widok z 3. osoby (wymaga serwera gry – szczegóły niżej).
 - **Mapy:** Bagno (dawna Oaza), Magazyn, Salon (dawna Baza), Strzelnica.
-  Bagno to miasteczko z drewnianych chat na mokradłach (cyprysy z mchem, trzciny, aligatory); wygląd ustawia `zrodla/klimaty.js` (tylko grafika).
+  Bagno to przystań na bagnie budowana w kodzie (`zrodla/oaza-data.js` – kolizje i spawny, `zrodla/bagno-scena.js` – wygląd): sklepik z przynętą na palach,
+  pomosty, dwa hydroplany, przyczepy kempingowe, dęby z korzeniami, beczki i rozlewisko, którym się brodzi; niebo i światło ustawia `zrodla/klimaty.js`.
+  Po zmianie kolizji mapy serwer meczów trzeba zrestartować (czyta `zrodla/*-data.js` przy starcie).
   Salon to wielka hala salonu luksusowych aut w klimacie Vice City: auta sportowe na wystawie, obrotowa platforma, witryna na wieczorną ulicę,
   serwisy na obu końcach (tu startują gracze) i pokoje (szatnia z szafkami, biuro, poczekalnia, gabinet). Hala i kolizje są budowane w kodzie
   w `zrodla/baza-data.js` (serwer czyta tę samą mapę, w kodzie nadal „Baza”), ulica i miasto wokół są w `zrodla/klimaty.js`.

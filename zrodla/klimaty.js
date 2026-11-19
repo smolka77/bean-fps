@@ -1,6 +1,7 @@
 // Klimaty map 1v1 – tylko grafika. Kolizje, spawny, drabiny i wszystko, co liczy serwer meczów, zostają bez zmian.
 //  • Baza → „Salon”: salon luksusowych aut wieczorem (zachód słońca, ulica z ruchem, kamienice z neonami, palmy, reflektory na niebie)
-//  • Oaza → „Bagno”: mokradła w upale (mętna woda z wysepkami, cyprysy z mchem, trzciny, lilie wodne, aligatory, łódź ślizgowa)
+//  • Oaza → „Bagno”: złote, wilgotne popołudnie nad przystanią na bagnie (woda, mgiełka, panorama miasta, ptaki, helikopter, aligatory);
+//    sama mapa (sklepik na palach, pomosty, hydroplany, drzewa) jest budowana w kodzie: zrodla/bagno-scena.js + dane w zrodla/oaza-data.js
 // Styl fasolki: low poly, płaskie kolory, cieniowanie płaskie. Dekoracje leżą poza polem gry (albo płasko na ziemi), kule ich nie widzą.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -116,105 +117,6 @@ function makeWater({ size = 900, seg = 150, y, color, rough = 0.2, metal = 0.3, 
   return { mesh: m, tick: (t) => { uT.value = t; } };
 }
 
-// ---------------- teren: zmiana wysokości i kolory w wierzchołkach (tylko wygląd – ziemia gracza to kolizje) ----------------
-function reshapeGround(mesh, fnY, fnCol) {
-  const geo = mesh.geometry, P = geo.attributes.position; mesh.updateWorldMatrix(true, false);
-  const inv = mesh.matrixWorld.clone().invert(), w = V3(), col = new Float32Array(P.count * 3);
-  for (let i = 0; i < P.count; i++) {
-    w.fromBufferAttribute(P, i).applyMatrix4(mesh.matrixWorld);
-    w.y = fnY(w.x, w.z, w.y);
-    const c = _c.set(fnCol(w.x, w.z, w.y, i)); col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
-    w.applyMatrix4(inv); P.setXYZ(i, w.x, w.y, w.z);
-  }
-  P.needsUpdate = true;
-  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  geo.computeVertexNormals(); geo.computeBoundingBox(); geo.computeBoundingSphere();
-  const m = mesh.material; m.vertexColors = true; m.color.set('#ffffff'); m.flatShading = true; m.needsUpdate = true;
-}
-
-// ściany chat na bagnie: pionowe deski i ślad wysokiej wody (omszały pas przy ziemi) – liczone w shaderze z pozycji w świecie
-function floodWalls(meshes, names) {
-  const seen = new Set();
-  for (const o of meshes) for (const m of [].concat(o.material)) {
-    if (!m || seen.has(m) || !names.includes(m.name)) continue; seen.add(m);
-    m.onBeforeCompile = (sh) => {
-      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;\nfloat bh(float n){ return fract(sin(n) * 43758.5453); }')
-        .replace('#include <color_fragment>', `#include <color_fragment>
-          float bs = (vWP.x + vWP.z) * 2.6, bid = floor(bs), bf = fract(bs);
-          diffuseColor.rgb *= 0.88 + 0.18 * bh(bid * 7.13 + floor(vWP.y / 2.4) * 3.7);
-          diffuseColor.rgb *= mix(0.7, 1.0, smoothstep(0.0, 0.08, bf) * smoothstep(1.0, 0.92, bf));
-          float wl = 0.8 + 0.16 * sin(vWP.x * 1.7 + vWP.z * 0.9) + 0.08 * sin(vWP.x * 4.3 - vWP.z * 3.1);
-          float st = 1.0 - smoothstep(wl - 0.05, wl + 0.05, vWP.y);
-          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.5, 0.58, 0.36), st * 0.9);
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.22, 0.27, 0.15), smoothstep(0.06, 0.0, abs(vWP.y - wl)) * 0.55);`);
-    };
-    m.customProgramCacheKey = () => 'bean-flood-wall';
-    m.needsUpdate = true;
-  }
-}
-
-// ---------------- mapa zajętości (gdzie stoją budynki i rzeczy) – do rozstawiania dekoracji ----------------
-function occupancy(meshes, ground, R = 220, C = 1) {
-  const N = Math.ceil((2 * R) / C), H = new Float32Array(N * N), v = V3();
-  for (const o of meshes) {
-    if (o === ground || !o.geometry || !o.geometry.attributes.position) continue;
-    o.updateWorldMatrix(true, false);
-    const P = o.geometry.attributes.position, idx = o.geometry.index, W = new Float32Array(P.count * 3);
-    for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i).applyMatrix4(o.matrixWorld); W[i * 3] = v.x; W[i * 3 + 1] = v.y; W[i * 3 + 2] = v.z; }
-    const nt = idx ? idx.count / 3 : P.count / 3;
-    for (let t = 0; t < nt; t++) {
-      const a = idx ? idx.getX(t * 3) : t * 3, b = idx ? idx.getX(t * 3 + 1) : t * 3 + 1, c = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
-      const my = Math.max(W[a * 3 + 1], W[b * 3 + 1], W[c * 3 + 1]); if (my < 0.25) continue;
-      const x0 = Math.min(W[a * 3], W[b * 3], W[c * 3]), x1 = Math.max(W[a * 3], W[b * 3], W[c * 3]);
-      const z0 = Math.min(W[a * 3 + 2], W[b * 3 + 2], W[c * 3 + 2]), z1 = Math.max(W[a * 3 + 2], W[b * 3 + 2], W[c * 3 + 2]);
-      const gx0 = Math.max(0, Math.floor((x0 + R) / C)), gx1 = Math.min(N - 1, Math.floor((x1 + R) / C));
-      const gz0 = Math.max(0, Math.floor((z0 + R) / C)), gz1 = Math.min(N - 1, Math.floor((z1 + R) / C));
-      for (let gx = gx0; gx <= gx1; gx++) for (let gz = gz0; gz <= gz1; gz++) { const k = gx * N + gz; if (H[k] < my) H[k] = my; }
-    }
-  }
-  const at = (x, z) => { const gx = Math.floor((x + R) / C), gz = Math.floor((z + R) / C); return gx < 0 || gz < 0 || gx >= N || gz >= N ? 0 : H[gx * N + gz]; };
-  const free = (x, z, r) => { for (let dx = -r; dx <= r; dx += C) for (let dz = -r; dz <= r; dz += C) if (at(x + dx, z + dz) > 0) return false; return true; };
-  return { at, free };
-}
-// wysokość terenu w siatce 1 m (trójkąty terenu wpisane w siatkę – szybciej niż promień na każde zapytanie)
-function groundProbe(ground, R = 200, C = 1) {
-  const N = Math.ceil((2 * R) / C), H = new Float32Array(N * N).fill(NaN), v = V3();
-  ground.updateWorldMatrix(true, false);
-  const P = ground.geometry.attributes.position, idx = ground.geometry.index, W = new Float32Array(P.count * 3);
-  for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i).applyMatrix4(ground.matrixWorld); W[i * 3] = v.x; W[i * 3 + 1] = v.y; W[i * 3 + 2] = v.z; }
-  const nt = idx ? idx.count / 3 : P.count / 3;
-  for (let t = 0; t < nt; t++) {
-    const a = idx ? idx.getX(t * 3) : t * 3, b = idx ? idx.getX(t * 3 + 1) : t * 3 + 1, c = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
-    const ax = W[a * 3], az = W[a * 3 + 2], bx = W[b * 3], bz = W[b * 3 + 2], cx = W[c * 3], cz = W[c * 3 + 2];
-    const den = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz); if (Math.abs(den) < 1e-9) continue;
-    const gx0 = Math.max(0, Math.floor((Math.min(ax, bx, cx) + R) / C)), gx1 = Math.min(N - 1, Math.floor((Math.max(ax, bx, cx) + R) / C));
-    const gz0 = Math.max(0, Math.floor((Math.min(az, bz, cz) + R) / C)), gz1 = Math.min(N - 1, Math.floor((Math.max(az, bz, cz) + R) / C));
-    for (let gx = gx0; gx <= gx1; gx++) for (let gz = gz0; gz <= gz1; gz++) {
-      const px = gx * C - R + C / 2, pz = gz * C - R + C / 2;
-      const l1 = ((bz - cz) * (px - cx) + (cx - bx) * (pz - cz)) / den, l2 = ((cz - az) * (px - cx) + (ax - cx) * (pz - cz)) / den, l3 = 1 - l1 - l2;
-      if (l1 < -1e-4 || l2 < -1e-4 || l3 < -1e-4) continue;
-      H[gx * N + gz] = l1 * W[a * 3 + 1] + l2 * W[b * 3 + 1] + l3 * W[c * 3 + 1];
-    }
-  }
-  return (x, z) => { const gx = Math.floor((x + R) / C), gz = Math.floor((z + R) / C); const h = gx < 0 || gz < 0 || gx >= N || gz >= N ? NaN : H[gx * N + gz]; return Number.isNaN(h) ? 0 : h; };
-}
-
-function recolor(meshes, table) {
-  const seen = new Set();
-  for (const o of meshes) for (const m of [].concat(o.material)) {
-    if (!m || seen.has(m)) continue; seen.add(m);
-    const r = table[m.name]; if (!r) continue;
-    if (typeof r === 'string') { m.color.set(r); continue; }
-    if (r.c) m.color.set(r.c);
-    if (r.e) { m.emissive.set(r.e); m.emissiveIntensity = r.ei ?? 1; }
-    if (r.r != null) m.roughness = r.r;
-    if (r.m != null) m.metalness = r.m;
-    m.needsUpdate = true;
-  }
-}
-
 // ======================================================================================================
 //                                       elementy low poly
 // ======================================================================================================
@@ -241,47 +143,35 @@ function addPalm(K, x, y, z, h, rand, C) {
   for (let k = 0; k < 3; k++) K.add(new THREE.IcosahedronGeometry(0.22, 0), C.nut, M4(top.x + Math.cos(k * 2.1) * 0.3, top.y - 0.3, top.z + Math.sin(k * 2.1) * 0.3));
 }
 
-function addCypress(K, x, y, z, h, rand) {
-  const T = ['#5b4a3a', '#4e4032'][rand() < 0.5 ? 0 : 1];
-  K.add(new THREE.CylinderGeometry(0.3, 0.75, h * 0.8, 7, 1), T, M4(x, y + h * 0.4 - 0.4, z));
-  K.add(new THREE.CylinderGeometry(0.7, 1.5, 1.6, 7, 1), T, M4(x, y + 0.2, z, 0, rand() * 3));
-  for (let k = 0; k < 3; k++) {                                   // „kolana” cyprysów wystające z wody
-    const a = rand() * Math.PI * 2, d = 1.6 + rand() * 1.4;
-    K.add(new THREE.ConeGeometry(0.18 + rand() * 0.12, 0.6 + rand() * 0.6, 5), T, M4(x + Math.cos(a) * d, y + 0.15, z + Math.sin(a) * d));
-  }
-  const blobs = 3 + Math.floor(rand() * 2), G = ['#4f5f2c', '#425226', '#5b6c33', '#3a4a22'];
-  for (let b = 0; b < blobs; b++) {
-    const by = y + h * (0.62 + (b / blobs) * 0.38), bx = x + (rand() - 0.5) * 2.6, bz = z + (rand() - 0.5) * 2.6;
-    const sx = 2.4 + rand() * 1.4, sy = 0.9 + rand() * 0.5, sz = 2.4 + rand() * 1.4;
-    K.add(jitter(new THREE.IcosahedronGeometry(1, 0), 0.35, rand), G[Math.floor(rand() * G.length)], M4(bx, by, bz, 0, rand() * 6, 0, sx, sy, sz));
-    if (b < 2) K.add(new THREE.CylinderGeometry(0.08, 0.14, Math.hypot(bx - x, bz - z) + 0.5, 4), T, between(V3(x, by - 1.2, z), V3(bx, by - 0.2, bz))[0]);
-    for (let s = 0; s < 5; s++) {                                 // hiszpański mech zwisający z gałęzi
-      const a = rand() * Math.PI * 2, r = sx * (0.4 + rand() * 0.5), mx = bx + Math.cos(a) * r, mz = bz + Math.sin(a) * r, top = by - sy * 0.5;
-      const len = 1.2 + rand() * 1.8, w = 0.22 + rand() * 0.18, t = V3(-Math.sin(a), 0, Math.cos(a)).multiplyScalar(w);
-      K.tris([V3(mx - t.x, top, mz - t.z), V3(mx + t.x, top, mz + t.z), V3(mx + (rand() - 0.5) * 0.3, top - len, mz + (rand() - 0.5) * 0.3)], rand() < 0.5 ? '#8f9a78' : '#7d8a68');
+function addLily(K, x, y, z, rand, G = ['#4f7a2e', '#5f8a36'], F = ['#f4a6c8', '#f6f1e6'], pf = 0.22) {
+  const r = 0.35 + rand() * 0.45, cut = 0.5;
+  K.add(new THREE.CircleGeometry(r, 8, cut / 2, Math.PI * 2 - cut), G[Math.floor(rand() * G.length)], M4(x, y, z, -Math.PI / 2, rand() * 6, 0));
+  if (rand() < pf) K.add(new THREE.ConeGeometry(0.13, 0.18, 6), F[Math.floor(rand() * F.length)], M4(x, y + 0.08, z, Math.PI));
+}
+
+// szuwary: gęsta kępa trzcin i pałek wodnych (brązowe kolby), czasem kwitnący kosaciec albo krwawnica
+const REED_G = ['#6fae2e', '#86c23a', '#5a9a26', '#9cc84a', '#4e8a22', '#b5c75a'];
+function addRushes(K, x, y, z, rand, n = 22, hmax = 2.6, rad = 1.6, flowers = true) {
+  for (let i = 0; i < n; i++) {
+    const a = rand() * Math.PI * 2, r = Math.sqrt(rand()) * rad, bx = x + Math.cos(a) * r, bz = z + Math.sin(a) * r;
+    const h = hmax * (0.5 + rand() * 0.5) * (1 - 0.35 * (r / rad));
+    const la = rand() * Math.PI * 2, lean = 0.08 + rand() * 0.3, tip = V3(bx + Math.cos(la) * lean, y + h, bz + Math.sin(la) * lean);
+    const s = V3(-Math.sin(la), 0, Math.cos(la)).multiplyScalar(0.045 + rand() * 0.03);
+    K.tris([V3(bx - s.x, y - 0.15, bz - s.z), V3(bx + s.x, y - 0.15, bz + s.z), tip], REED_G[Math.floor(rand() * REED_G.length)]);
+    if (hmax > 1.2 && rand() < 0.22) {                                                // pałka wodna (tylko w wysokich szuwarach)
+      const k = 0.78 + rand() * 0.08, cx = bx + (tip.x - bx) * k, cz = bz + (tip.z - bz) * k, cy = y + h * k;
+      K.add(new THREE.CylinderGeometry(0.07, 0.07, 0.38, 4), rand() < 0.5 ? '#6a3a1c' : '#7a4524', M4(cx, cy, cz, 0, 0, lean * 0.6));
     }
   }
-}
-
-function addReeds(K, x, y, z, rand, n = 9, hmax = 1.9) {
-  const G = ['#6f8a3a', '#7f9a44', '#9aa456', '#5f7a30'];
-  for (let i = 0; i < n; i++) {
-    const a = rand() * Math.PI * 2, r = rand() * 0.7, bx = x + Math.cos(a) * r, bz = z + Math.sin(a) * r, h = hmax * (0.45 + rand() * 0.55);
-    const la = rand() * Math.PI * 2, lean = 0.1 + rand() * 0.35, tip = V3(bx + Math.cos(la) * lean, y + h, bz + Math.sin(la) * lean);
-    const s = V3(-Math.sin(la), 0, Math.cos(la)).multiplyScalar(0.05);
-    K.tris([V3(bx - s.x, y - 0.1, bz - s.z), V3(bx + s.x, y - 0.1, bz + s.z), tip], G[Math.floor(rand() * G.length)]);
-    if (rand() < 0.35) K.add(new THREE.CylinderGeometry(0.055, 0.055, 0.3, 5), '#5a3a22', M4(bx + (tip.x - bx) * 0.82, y + h * 0.82, bz + (tip.z - bz) * 0.82, 0, 0, lean * 0.8));
+  if (flowers && rand() < 0.55) {
+    const iris = rand() < 0.55;
+    for (let k = 0, m = 2 + Math.floor(rand() * 4); k < m; k++) {
+      const a = rand() * Math.PI * 2, r = rad * (0.7 + rand() * 0.5), fx = x + Math.cos(a) * r, fz = z + Math.sin(a) * r, fh = 0.7 + rand() * 0.5;
+      K.add(new THREE.CylinderGeometry(0.025, 0.035, fh, 4), '#4e8a22', M4(fx, y + fh / 2 - 0.1, fz));
+      if (iris) K.add(new THREE.ConeGeometry(0.16, 0.22, 5), rand() < 0.75 ? '#ffd23a' : '#ffe680', M4(fx, y + fh, fz, Math.PI));          // żółty kosaciec
+      else K.add(new THREE.ConeGeometry(0.07, 0.5, 5), rand() < 0.6 ? '#c04ad8' : '#e46ab8', M4(fx, y + fh + 0.1, fz));                  // krwawnica (fioletowy kłos)
+    }
   }
-}
-
-function addLily(K, x, y, z, rand) {
-  const r = 0.35 + rand() * 0.45, cut = 0.5;
-  K.add(new THREE.CircleGeometry(r, 8, cut / 2, Math.PI * 2 - cut), rand() < 0.5 ? '#4f7a2e' : '#5f8a36', M4(x, y, z, -Math.PI / 2, rand() * 6, 0));
-  if (rand() < 0.22) K.add(new THREE.ConeGeometry(0.13, 0.18, 6), rand() < 0.5 ? '#f4a6c8' : '#f6f1e6', M4(x, y + 0.08, z, Math.PI));
-}
-
-function addRock(K, x, y, z, s, rand, col = '#6d6a58') {
-  K.add(jitter(new THREE.IcosahedronGeometry(1, 0), 0.45, rand), col, M4(x, y, z, 0, rand() * 6, 0, s * (1 + rand() * 0.5), s * (0.5 + rand() * 0.3), s * (1 + rand() * 0.5)));
 }
 
 // aligator: osobna siatka (pływa), wynurzone tylko grzbiet, łeb i oczy
@@ -295,19 +185,6 @@ function gatorGeometry(scale = 1) {
   K.box(0.55, 0.24, 0.85, B, M4(0, 0, -1.3)); K.box(0.36, 0.2, 0.85, D, M4(0, 0, -2.1)); K.box(0.2, 0.16, 0.85, B, M4(0, 0, -2.9));
   for (const [sx, sz] of [[1, 0.6], [-1, 0.6], [1, -0.6], [-1, -0.6]]) K.box(0.3, 0.14, 0.42, D, M4(sx * 0.52, -0.1, sz, 0, sx * 0.4));
   const g = K.geometry('solid'); g.scale(scale, scale, scale); return g;
-}
-
-function airboat(K, x, y, z, yaw) {
-  const m = (lx, ly, lz) => { const c = Math.cos(yaw), s = Math.sin(yaw); return [x + lx * c + lz * s, y + ly, z - lx * s + lz * c]; };
-  const P = (lx, ly, lz, rx = 0, ry = 0, rz = 0) => { const [a, b, c] = m(lx, ly, lz); return M4(a, b, c, rx, yaw + ry, rz); };
-  K.box(2.1, 0.35, 4.4, '#d9d4c4', P(0, 0.1, 0));
-  K.box(2.12, 0.12, 4.42, '#2f6f8a', P(0, 0.2, 0));
-  K.box(2.0, 0.3, 1.0, '#d9d4c4', P(0, 0.22, 2.4, -0.45));
-  K.box(0.9, 0.12, 0.9, '#3a3a3a', P(0, 1.2, -0.6)); K.box(0.12, 1.0, 0.12, '#555', P(-0.35, 0.75, -0.6)); K.box(0.12, 1.0, 0.12, '#555', P(0.35, 0.75, -0.6));
-  K.box(0.7, 0.5, 0.6, '#444', P(0, 0.6, -1.4));
-  K.add(new THREE.TorusGeometry(1.05, 0.06, 4, 12), '#333333', P(0, 1.35, -1.85));
-  K.box(2.0, 0.18, 0.05, '#7a5a3c', P(0, 1.35, -1.8, 0, 0, 0.6)); K.box(2.0, 0.18, 0.05, '#7a5a3c', P(0, 1.35, -1.8, 0, 0, -0.95));
-  K.box(0.08, 1.1, 0.7, '#2f6f8a', P(0, 1.2, -2.15));
 }
 
 function car(K, x, y, z, yaw, body, body2, { pickup = false, muddy = '#6b5a3c' } = {}) {
@@ -544,153 +421,78 @@ function themeDealer(M, root) {
 }
 
 // ======================================================================================================
-//                                    OAZA → BAGNO (mokradła w upale)
+//              OAZA → BAGNO (przystań na bagnie w złotym, wilgotnym świetle późnego popołudnia)
+//   Sama mapa (teren, sklepik, pomosty, hydroplany, drzewa) jest w zrodla/bagno-scena.js; tu niebo, światło, woda i daleki świat.
 // ======================================================================================================
-function themeSwamp(M, root, meshes, ground) {
-  const rand = rng(1977), WL = -0.15;
-  const sunOff = V3(-20, 30, 13);
-  const FOG = '#c9d0b4';
+function themeBayou(M, root) {
+  const rand = rng(1984), WL = 0.32;
+  const sunOff = V3(-26, 21, -9);                         // słońce nisko z zachodu – z boku dla obu stron mapy
+  const FOG = '#dad8c0';
   const sky = skyTexture({
-    stops: [[90, '#4f8fcf'], [45, '#73a8da'], [20, '#a6c8e2'], [7, '#d4e0dc'], [0, FOG], [-8, '#8f9a76'], [-90, '#3c4630']],
-    sun: { dir: sunOff.clone().normalize(), r: 26, disc: '#fffbe8', glow: [[420, 'rgba(255,250,220,.35)'], [130, 'rgba(255,252,236,.85)']] },
+    stops: [[90, '#3a82d6'], [55, '#5a9ce2'], [30, '#8cbfea'], [14, '#c0dbe9'], [6, '#e2e6d8'], [2, '#f3e4c4'], [0, FOG], [-6, '#a8b08a'], [-90, '#3a4a2a']],
+    sun: { dir: sunOff.clone().normalize(), r: 30, disc: '#fff4d2', glow: [[640, 'rgba(255,212,150,.34)'], [260, 'rgba(255,224,168,.5)'], [110, 'rgba(255,244,212,.95)']] },
     paint: (x, W, H, px, wrap) => {
-      const r = rng(31);
-      for (let i = 0; i < 60; i++) {                         // kłębiaste chmury z płaskim spodem
-        const el = 3 + r() * 16, cy = elevY(H, el), cx = r() * W, s = (0.5 + r() * 0.9) * (1 - el / 50), puffs = [];
-        for (let k = 0; k < 7; k++) { const br = (10 + r() * 13) * s; puffs.push([(k - 3) * 12 * s + (r() - 0.5) * 8 * s, br, cy - br * 0.25 - r() * 5 * s, 0.75 + r() * 0.2]); }
+      const r = rng(41);
+      for (let i = 0; i < 54; i++) {                         // kłębiaste chmury z płaskim spodem, nisko nad horyzontem
+        const el = 4 + r() * 20, cy = elevY(H, el), cx = r() * W, s = (0.5 + r() * 0.9) * (1 - el / 46), puffs = [];
+        for (let k = 0; k < 7; k++) { const br = (10 + r() * 13) * s; puffs.push([(k - 3) * 12 * s + (r() - 0.5) * 8 * s, br, cy - br * 0.25 - r() * 5 * s, 0.7 + r() * 0.25]); }
         wrap((o) => {
           x.save(); x.beginPath(); x.rect(cx + o - 120 * s, 0, 240 * s, cy); x.clip();
-          for (const [dx, br, by, al] of puffs) { x.fillStyle = `rgba(255,255,255,${al})`; x.beginPath(); x.arc(cx + o + dx, by, br, 0, Math.PI * 2); x.fill(); }
+          for (const [dx, br, by, al] of puffs) { x.fillStyle = `rgba(255,${246 + r() * 9 | 0},${232 + r() * 20 | 0},${al})`; x.beginPath(); x.arc(cx + o + dx, by, br, 0, Math.PI * 2); x.fill(); }
           x.restore();
         });
       }
+      const y0 = elevY(H, 9), y1 = elevY(H, -1), g = x.createLinearGradient(0, y0, 0, y1);   // wilgotna, ciepła mgiełka nad horyzontem
+      g.addColorStop(0, 'rgba(244,230,200,0)'); g.addColorStop(1, 'rgba(244,230,200,.8)'); x.fillStyle = g; x.fillRect(0, y0, W, y1 - y0);
     },
   });
 
-  recolor(meshes, {
-    M_plaster: '#7f9a8c', M_plaster2: '#9b8461', M_plaster3: '#a49c8a', M_trim: '#5e4e3a',
-    M_brick: '#5a4e3c', M_brick2: '#4a4032', M_blueTrim: '#3f6f6a',
-    M_terracotta: '#7c5a3e', M_terracotta2: '#6a4630', M_cloth: '#8a3b2c',
-    M_tarp: '#6a7044', M_tarpDark: '#525834',
-    M_tileLight: '#7d7a5e', M_tileMid: '#66654c', M_tileDark: '#3d4234', M_stone: '#6e6b58',
-    M_grass: '#5d7a2e', M_bush: '#3f5d24', M_cactus: '#35522a', M_agave: '#4e6a2c',
-    M_leaf: '#5b7f2a', M_leafDark: '#34561c', M_soil: '#3b2e1e',
-    M_wood: '#5a4030', M_woodLight: '#6e5038', M_woodDark: '#3a2a1e', M_beam: '#3e2c20', M_shutter: '#33403a',
-  });
-
-  floodWalls(meshes, ['M_plaster', 'M_plaster2', 'M_plaster3']);
-
-  // ---- teren: miasteczko na grząskiej wyspie, wydmy → porośnięte wysepki w płytkiej wodzie ----
-  const inTown = (x, z) => Math.abs(x) <= 31 && Math.abs(z) <= 45;
-  const gcol = (x, z, y, i) => {
-    const v = ((i * 2654435761) >>> 0) % 100 / 100;
-    if (inTown(x, z)) return v < 0.5 ? '#76674a' : '#6e6044';
-    if (y < -0.25) return '#3a3a24';
-    if (y < 0.5) return v < 0.5 ? '#5d5436' : '#665c3a';
-    if (y < 2) return v < 0.5 ? '#6f8a3c' : '#62803a';
-    return v < 0.33 ? '#557a2e' : v < 0.66 ? '#4c6e2a' : '#5f8434';
-  };
-  reshapeGround(ground, (x, z, y) => (inTown(x, z) ? y : y * 0.22 - 0.9), gcol);
-  const water = makeWater({ y: WL, color: '#3b4a24', rough: 0.2, metal: 0.18, env: sky, envI: 0.5, amp: 0.035, freq: 0.3, speed: 0.6, opacity: 0.95 });
+  // ---- woda rozlewiska: zielonkawa, z odbiciem nieba ----
+  const water = makeWater({ y: WL, color: '#3f6a46', rough: 0.08, metal: 0.3, env: sky, envI: 0.85, amp: 0.03, freq: 0.32, speed: 0.5, opacity: 0.92 });
   root.add(water.mesh);
 
-  const occ = occupancy(meshes, ground), gy = groundProbe(ground), K = new Kit();
-  const PC = { trunk: '#5b4a3a', trunk2: '#4e4032', leaf: '#4f7a2a', leaf2: '#3c6222', nut: '#4a3a24' };
-  const farTown = (x, z, m) => Math.abs(x) > 31 + m || Math.abs(z) > 45 + m;
+  // ---- daleko: pas lasu na horyzoncie i panorama miasta w mgle (północny wschód) ----
+  const far = new Kit();
+  for (let i = 0; i < 420; i++) {                           // daleki las: niskie, spłaszczone korony (nie „góry”)
+    const a = rand() * Math.PI * 2, d = 128 + rand() * 80, s = 3.5 + rand() * 3.5, y = 1.5 + s * 0.6 + rand() * 2.5;
+    far.add(jitter(new THREE.IcosahedronGeometry(1, 0), 0.3, rand), ['#4f7a3a', '#5a8642', '#467236'][i % 3], M4(Math.cos(a) * d, y, Math.sin(a) * d, 0, rand() * 6, 0, s * 1.5, s * 0.75, s * 1.5));
+  }
+  // panorama miasta: sine, płaskie sylwetki w wilgotnej mgiełce (bez cieniowania i bez mgły sceny – sama jest „za mgłą”)
+  const city = new Kit(), HAZE = ['#b4c3c9', '#aabbc3', '#bfcace', '#a5b6bf', '#c6cfcf'];
+  for (let i = 0; i < 52; i++) {
+    const az = 1.0 + (rand() - 0.5) * 1.15, dist = 232 + rand() * 52, x = Math.cos(az) * dist, z = Math.sin(az) * dist;   // kamera widzi do 300 m
+    const w = 6 + rand() * 10, d = 6 + rand() * 10, h = 14 + Math.pow(rand(), 1.8) * 44, ry = rand() * 0.6, c = HAZE[Math.floor(rand() * HAZE.length)];
+    city.box(w, h, d, c, M4(x, h / 2 - 2, z, 0, ry));
+    if (rand() < 0.45) { const h2 = h * (0.12 + rand() * 0.2); city.box(w * 0.65, h2, d * 0.65, c, M4(x, h - 2 + h2 / 2, z, 0, ry)); }
+    if (rand() < 0.2) city.add(new THREE.CylinderGeometry(0.3, 0.6, 8, 5), c, M4(x, h - 2 + 4, z));
+  }
+  const cityMesh = new THREE.Mesh(city.geometry('solid'), new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, transparent: true, opacity: 0.82 }));
+  cityMesh.renderOrder = -2; root.add(cityMesh);
+  far.meshes(false).forEach((m) => root.add(m));
 
-  // ---- cyprysy z mchem i palmy sabałowe na brzegach ----
-  let n = 0;
-  for (let i = 0; i < 1400 && n < 60; i++) {
-    const a = rand() * Math.PI * 2, d = 40 + rand() * 120, x = Math.cos(a) * d, z = Math.sin(a) * d * 1.15;
-    if (!farTown(x, z, 4) || !occ.free(x, z, 3)) continue;
-    const h = gy(x, z); if (h < -1.2 || h > 3.5) continue;
-    if (rand() < 0.78) addCypress(K, x, Math.max(h, WL), z, 9 + rand() * 7, rand); else addPalm(K, x, Math.max(h, WL), z, 6 + rand() * 4, rand, PC);
-    n++;
-  }
-  // ---- trzciny przy brzegu i pod murami ----
-  let r = 0;
-  for (let i = 0; i < 4000 && r < 190; i++) {
-    const a = rand() * Math.PI * 2, d = 30 + rand() * 75, x = Math.cos(a) * d, z = Math.sin(a) * d * 1.2;
-    if (!farTown(x, z, 0.5) || !occ.free(x, z, 1)) continue;
-    const h = gy(x, z); if (h < -0.75 || h > 0.9) continue;
-    addReeds(K, x, Math.max(h, WL), z, rand, 6 + Math.floor(rand() * 8)); r++;
-  }
-  // ---- lilie wodne, rzęsa i kamienie ----
-  let l = 0;
-  for (let i = 0; i < 4000 && l < 260; i++) {
-    const a = rand() * Math.PI * 2, d = 33 + rand() * 80, x = Math.cos(a) * d, z = Math.sin(a) * d * 1.2;
-    if (!farTown(x, z, 1)) continue; if (gy(x, z) > WL - 0.15) continue;
-    if (rand() < 0.8) addLily(K, x, WL + 0.04, z, rand);
-    else { const rr = 0.7 + rand() * 1.1; K.add(jitter(new THREE.CircleGeometry(rr, 9), rr * 0.5, rand), '#6a8a34', M4(x, WL + 0.03, z, -Math.PI / 2, rand() * 6, 0, 1, 0.6 + rand() * 0.6, 1)); }
-    l++;
-  }
-  for (let i = 0; i < 40; i++) { const a = rand() * 6.28, d = 36 + rand() * 60, x = Math.cos(a) * d, z = Math.sin(a) * d * 1.2; if (farTown(x, z, 1) && occ.free(x, z, 2)) addRock(K, x, gy(x, z), z, 0.5 + rand() * 0.9, rand, rand() < 0.5 ? '#6d6a58' : '#5a5f48'); }
-
-  // ---- kałuże na placach miasteczka (płasko na ziemi – nic nie zasłaniają) ----
-  const pud = new Kit();
-  let p = 0;
-  for (let i = 0; i < 3000 && p < 42; i++) {
-    const x = (rand() * 2 - 1) * 26, z = (rand() * 2 - 1) * 40, rr = 0.6 + rand() * 1.1;
-    if (!occ.free(x, z, 1)) continue;
-    if (Math.abs(gy(x, z)) > 0.05) continue;
-    const g = new THREE.CircleGeometry(rr, 14), gp = g.attributes.position;           // brzeg lekko nieregularny, środek płaski
-    const ph = rand() * 6; for (let k = 1; k < gp.count; k++) { const j = ((k - 1) % 14) * (Math.PI * 2 / 14), f = 1 + 0.13 * Math.sin(j * 2 + ph) + 0.08 * Math.sin(j * 3 + ph * 2); gp.setXY(k, gp.getX(k) * f, gp.getY(k) * f); }
-    pud.add(g, '#2f3826', M4(x, 0.028, z, -Math.PI / 2, rand() * 6, 0, 1, 0.55 + rand() * 0.5, 1)); p++;
-  }
-  // kępki trawy pod murami (niskie, nic nie zasłaniają)
-  let tf = 0;
-  for (let i = 0; i < 6000 && tf < 160; i++) {
-    const x = (rand() * 2 - 1) * 27, z = (rand() * 2 - 1) * 41;
-    if (occ.at(x, z) > 0 || occ.free(x, z, 1) || Math.abs(gy(x, z)) > 0.05) continue;
-    addReeds(K, x, 0.1, z, rand, 4 + Math.floor(rand() * 4), 0.42); tf++;
-  }
-  const pudGeo = pud.geometry('solid');
-  if (pudGeo) {
-    const pm = new THREE.Mesh(pudGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.1, metalness: 0.2, envMap: sky, envMapIntensity: 0.55, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
-    pm.receiveShadow = true; root.add(pm);
-  }
-
-  // ---- łódź ślizgowa, pickup i radiowóz na brzegu ----
-  const spot = (minD, maxD, lo, hi, seed) => {
-    const rr = rng(seed);
-    for (let i = 0; i < 3000; i++) { const a = rr() * 6.28, d = minD + rr() * (maxD - minD), x = Math.cos(a) * d, z = Math.sin(a) * d * 1.2; if (!farTown(x, z, 3) || !occ.free(x, z, 4)) continue; const h = gy(x, z); if (h >= lo && h <= hi) return [x, h, z, a]; }
-    return null;
-  };
-  const ab = spot(36, 60, -3, WL - 0.4, 3); if (ab) airboat(K, ab[0], WL + 0.05, ab[2], ab[3] + 1.4);
-  const pk = spot(34, 70, -0.1, 0.7, 8); if (pk) car(K, pk[0], pk[1], pk[2], pk[3] + 2.2, '#6b6a52', '#5c5b46', { pickup: true });
-  const pc = spot(34, 70, -0.1, 0.7, 21); let bar = null;
-  if (pc) {
-    car(K, pc[0], pc[1], pc[2], pc[3] - 0.6, '#e8e8e4', '#24262c');
-    const bk = new Kit(); bk.box(0.6, 0.18, 0.35, '#ff2a2a', M4(-0.35, 0, 0), 'glow'); const bk2 = new Kit(); bk2.box(0.6, 0.18, 0.35, '#2a5cff', M4(0.35, 0, 0), 'glow');
-    const { GLOW } = mats(); bar = [new THREE.Mesh(bk.geometry('glow'), GLOW), new THREE.Mesh(bk2.geometry('glow'), GLOW)];
-    bar.forEach((b) => { b.position.set(pc[0], pc[1] + 1.9, pc[2]); b.rotation.y = pc[3] - 0.6; root.add(b); });
-  }
-
-  // ---- aligatory: pływają po kółku (te na brzegu się wygrzewają) ----
-  const gGeo = gatorGeometry(1.25), { SOLID } = mats(), gators = [];
-  for (let i = 0; i < 6; i++) {
-    const s = spot(38, 90, -3, -0.7, 100 + i * 7); if (!s) continue;
-    const m = new THREE.Mesh(gGeo, SOLID); m.castShadow = true; m.userData = { cx: s[0], cz: s[2], r: 2.5 + rand() * 3.5, a: rand() * 6.28, sp: (rand() < 0.5 ? -1 : 1) * (0.05 + rand() * 0.06) };
+  // ---- ruch: czaple i pelikany, helikopter nad miastem, aligatory poza polem gry ----
+  const egrets = birds(10, rand, '#f6f4ec'), pelicans = birds(5, rand, '#6a6458');
+  egrets.forEach((b) => root.add(b)); pelicans.forEach((b) => { b.scale.setScalar(1.8); root.add(b); });
+  const heli = helicopter('#24425e', '#ffd23a'); heli.g.scale.setScalar(1.3); root.add(heli.g);
+  const gGeo = gatorGeometry(1.2), { SOLID } = mats(), gators = [];
+  for (const [cx, cz] of [[34, 2], [46, 6], [-36, -3], [-50, -6], [58, 10]]) {
+    const m = new THREE.Mesh(gGeo, SOLID); m.castShadow = true; m.userData = { cx, cz, r: 3 + rand() * 4, a: rand() * 6.28, sp: (rand() < 0.5 ? -1 : 1) * (0.05 + rand() * 0.05) };
     root.add(m); gators.push(m);
   }
-  for (let i = 0; i < 3; i++) { const s = spot(36, 80, 0, 0.8, 300 + i * 13); if (!s) continue; const m = new THREE.Mesh(gGeo, SOLID); m.castShadow = true; m.position.set(s[0], s[1] + 0.12, s[2]); m.rotation.y = s[3]; root.add(m); }
-
-  K.meshes(true).forEach((m) => root.add(m));
-
-  const heli = helicopter('#2c3a2a', '#d8d2b0'); heli.g.scale.setScalar(1.25); root.add(heli.g);
-  const flock = birds(14, rand, '#f2f0e8'); flock.forEach((b) => root.add(b));
-  return {
-    sky, fog: FOG, near: 32, far: 230,
-    hemi: ['#dbe8f2', '#56603a', 1.25], sun: ['#fff0cc', 2.45], sunOff, env: sky, envI: 0.45,
-    update(t, dt) {
+  const T = {
+    sky, fog: FOG, near: 35, far: 290,
+    hemi: ['#d2eaff', '#86784a', 1.05], sun: ['#ffd69a', 2.95], sunOff, env: sky, envI: 0.55,
+    update(t) {
       water.tick(t);
-      for (const g of gators) { const u = g.userData, a = u.a + t * u.sp; g.position.set(u.cx + Math.cos(a) * u.r, WL - 0.05 + Math.sin(t * 0.8 + u.a) * 0.03, u.cz + Math.sin(a) * u.r); g.rotation.y = -a + (u.sp > 0 ? Math.PI : 0); }
-      const ha = t * 0.05; heli.g.position.set(-60 + Math.cos(ha) * 90, 38 + Math.sin(t * 0.5) * 2, 80 + Math.sin(ha) * 60); heli.g.rotation.set(0.1, -ha - Math.PI, 0.1);
+      for (const g of gators) { const u = g.userData, a = u.a + t * u.sp; g.position.set(u.cx + Math.cos(a) * u.r, WL - 0.04 + Math.sin(t * 0.8 + u.a) * 0.03, u.cz + Math.sin(a) * u.r); g.rotation.y = -a + (u.sp > 0 ? Math.PI : 0); }
+      const ha = t * 0.045; heli.g.position.set(150 + Math.cos(ha) * 70, 55 + Math.sin(t * 0.4) * 3, 190 + Math.sin(ha) * 50); heli.g.rotation.set(0.08, -ha - Math.PI, 0.1);
       heli.rotor.rotation.y = t * 28; heli.tail.rotation.x = t * 40; heli.light.visible = Math.sin(t * 6) > 0.6;
-      if (bar) { const k = Math.floor(t * 4) % 2; bar[0].visible = !!k; bar[1].visible = !k; }
-      flock.forEach((b) => { const u = b.userData, a = u.a + t * 0.13 * u.s; b.position.set(-40 + Math.cos(a) * 34 * u.r, 22 + u.h, -50 + Math.sin(a) * 24 * u.r); b.rotation.y = -a; b.scale.set(1.3, 1.3 * Math.sin(t * 7 + u.ph), 1.3); });
+      egrets.forEach((b) => { const u = b.userData, a = u.a + t * 0.12 * u.s; b.position.set(-30 + Math.cos(a) * 40 * u.r, 20 + u.h, 40 + Math.sin(a) * 26 * u.r); b.rotation.y = -a; b.scale.set(1.3, 1.3 * Math.sin(t * 7 + u.ph), 1.3); });
+      pelicans.forEach((b, i) => { const u = b.userData, x = ((t * 5 + i * 9 + u.ph * 10) % 260) - 130; b.position.set(x, 26 + u.h + i * 1.4, -45 + i * 2.2); b.rotation.y = -Math.PI / 2; b.scale.set(1.8, 1.8 * (0.35 + 0.65 * Math.abs(Math.sin(t * 2.2 + u.ph))), 1.8); });
     },
   };
+  T.update(0);                                              // helikopter, aligatory i ptaki od razu na swoich trasach (nie w środku mapy)
+  return T;
 }
 
 // ======================================================================================================
@@ -803,7 +605,10 @@ function themeYachts(M, root) {
     },
   };
 }
-const THEMES = { Baza: themeDealer, Oaza: themeSwamp, Magazyn: themeYachts };
+const THEMES = { Baza: themeDealer, Oaza: themeBayou, Magazyn: themeYachts };
+
+// klocki low poly wspólne z mapami budowanymi w kodzie (zrodla/bagno-scena.js)
+export { Kit, M4, V3, between, jitter, rng, mats, addPalm, addRushes, addLily, neonSign };
 
 // ======================================================================================================
 //   createClimates: dekorowanie map po wczytaniu + przełączanie nieba, mgły i świateł przy zmianie mapy

@@ -1604,7 +1604,7 @@ function setPauseText(){pmI18n()}
 function setHp(v){duel.hp=Math.max(0,v);const w=duel.hp+'%';$('hpbar').style.width=w;$('hpghost').style.width=w;$('hpnum').textContent=Math.ceil(duel.hp);const h=$('hp');h.classList.toggle('low',duel.hp<=20);h.classList.toggle('mid',duel.hp>20&&duel.hp<=50)}
 function banner(t,c){const b=$('banner');b.textContent=t;b.style.color=c||'#fff';b.classList.remove('show');void b.offsetWidth;b.classList.add('show')}
 function resetPlayer(){player.pos.set(0,0,-14);player.vel.set(0,0,0);player.yaw=Math.PI;if(oaza.active){const s=oaza.spawns[TEAM.me===1&&oaza.spawns[1]?1:0];player.pos.set(s.x,s.y||0,s.z);player.yaw=s.yaw}player.pitch=0;refillAll();setHud();setHp(100);duel.inv=1.2}
-function duelSpawn(e){Object.assign(e,{hp:100,dead:0,fall:0,cd:1,react:.8,strafe:rnd()<.5?1:-1,turn:1.5,counted:false});e.root.rotation.z=0;if(oaza.active){const s=oaza.spawns[TEAM.me===1?0:1];e.root.position.set(s.x+(rnd()-.5)*2,0,s.z-Math.sign(s.z||1)*rnd()*2)}else e.root.position.set((rnd()-.5)*16,0,12+rnd()*8)}
+function duelSpawn(e){Object.assign(e,{hp:100,dead:0,fall:0,cd:1,react:.8,strafe:rnd()<.5?1:-1,turn:1.5,counted:false});e.root.rotation.z=0;if(oaza.active){const s=oaza.spawns[TEAM.me===1?0:1];e.root.position.set(s.x+(rnd()-.5)*2,s.y||0,s.z-Math.sign(s.z||1)*rnd()*2)}else e.root.position.set((rnd()-.5)*16,0,12+rnd()*8)}
 function setMode(m,mi,quiet){
   range.leave();
   MODE=m==='1v1'?'1v1':'range';document.body.classList.toggle('duel',MODE==='1v1');
@@ -1653,7 +1653,7 @@ function stepDuelBot(e,dt){
     return;
   }
   const dx=player.pos.x-r.position.x,dz=player.pos.z-r.position.z,dist=Math.hypot(dx,dz)||1;
-  _be.set(r.position.x,1.25,r.position.z);_bp.set(player.pos.x,player.pos.y+1.1-player.crouch*.4,player.pos.z);
+  _be.set(r.position.x,r.position.y+1.25,r.position.z);_bp.set(player.pos.x,player.pos.y+1.1-player.crouch*.4,player.pos.z);
   const see=!player.dead&&(oaza.active?!segHitsBoxes(_be,_bp,oaza.boxes):true);
   let moving=0;
   if(playing&&!match.frozen){
@@ -1667,6 +1667,7 @@ function stepDuelBot(e,dt){
     const stuck=blocked(ox,oz);
     const tryMove=(x,z)=>{if(!blocked(x,z)||(stuck&&!blocked(x,z,.3))){r.position.x=x;r.position.z=z;moving=1;return true}return false};
     if(!tryMove(ox+sx,oz+sz)&&!tryMove(ox+sx,oz)&&!tryMove(ox,oz+sz)){e.strafe*=-1;e.turn=1}
+    if(oaza.active){let gy=0;for(const b of boxes)if(b.bottom<.05&&b.top<=r.position.y+.55&&b.top>gy&&r.position.x>b.minX-.2&&r.position.x<b.maxX+.2&&r.position.z>b.minZ-.2&&r.position.z<b.maxZ+.2)gy=b.top;r.position.y=damp(r.position.y,gy,14,dt)}   // bot wchodzi na niskie stopnie (ląd, pomosty) jak gracz
     e.react=see?e.react-dt:.55;e.cd-=dt;
     if(see&&e.react<=0&&e.cd<=0&&dist<45){
       e.cd=.32+rnd()*.35;
@@ -1785,10 +1786,10 @@ const loadMaps=(async()=>{                         // mapy ładują się w tle, 
   await Promise.all(ALLMAPS.map(async M=>{
     try{
       const mod=await import(M.src),D=mod.MAP||mod.OAZA,B=mod.GLB||mod.OAZA_GLB;
-      const g=mod.build?{scene:mod.build(THREE)}:await new Promise((res,rej)=>ld.parse(Uint8Array.from(atob(B),c=>c.charCodeAt(0)).buffer,'',res,rej));   // mapa z kodu (Jachty, bunkier) albo z GLB
-      if(!M.range)try{stripSpawnDecor(g.scene,D.spawns)}catch(e){console.warn('Podesty:',e)}
+      const g=mod.build?{scene:await mod.build(THREE)}:await new Promise((res,rej)=>ld.parse(Uint8Array.from(atob(B),c=>c.charCodeAt(0)).buffer,'',res,rej));   // mapa z kodu (Jachty, bunkier) albo z GLB
+      if(!M.range&&!mod.build)try{stripSpawnDecor(g.scene,D.spawns)}catch(e){console.warn('Podesty:',e)}   // tylko mapy z GLB (podesty startowe z eksportu)
       M.meshes=[];let roof=null;g.scene.traverse(o=>{if(o.name==='Dach')roof=o});M.roof=roof;
-      g.scene.traverse(o=>{if(!o.isMesh)return;const c=o.material&&o.material.color;
+      g.scene.traverse(o=>{if(!o.isMesh||o.userData.deco)return;const c=o.material&&o.material.color;   // ozdoby z map budowanych w kodzie (trawa, liście, kable) nie zatrzymują kul
         if(c&&c.r>.99&&c.g<.01&&c.b>.99){o.visible=false;return}     // siatka kolizji z eksportu – niewidoczna
         if(o.userData.noHit)return;                                   // ozdoby (relingi, kadłub pod pokładem) nie zatrzymują kul – jak na serwerze
         let inRoof=false;for(let p=o;p;p=p.parent)if(p===roof)inRoof=true;
