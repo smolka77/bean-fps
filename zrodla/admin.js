@@ -406,6 +406,49 @@ function mountXShare($) {
     try { await srvPost('/api/admin/xshare', { reset: true }); await load(); msg.textContent = 'Przywrócono domyślne.'; } catch (e) { msg.textContent = e.message; }
   });
 }
+// prowizja domu: stan skarbca, nadwyżka do wypłaty, wypłata na adres admina (serwer: GET/POST /api/admin/house…)
+function mountHouse($) {
+  const msg = $('fa-house-msg'), go = $('fa-house-go'); let st = null, all = false;
+  const sol = (l) => (l / 1e9).toLocaleString('pl-PL', { maximumFractionDigits: 6 }) + ' SOL';
+  const inUsd = (l) => st && st.price ? ' · ' + usd(l / 1e9 * st.price) : '';
+  const kv = (k, v, sub) => `<div class="fa-dmf"><span>${esc(k)}</span><b style="font-size:15px;color:var(--fg,#fff)">${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+  async function pull() {
+    try {
+      st = await srvGet('/api/admin/house');
+      const o = st.owed;
+      $('fa-house-sum').textContent = `skarbiec ${st.address.slice(0, 4)}…${st.address.slice(-4)} · ${st.cluster}`;
+      $('fa-house-kv').innerHTML = kv('Saldo skarbca', sol(st.treasury) + inUsd(st.treasury))
+        + kv('Należy się graczom', sol(o.total), `salda ${sol(o.balances)} · stawki ${sol(o.stakes)} · wypłaty ${sol(o.withdrawals)}`)
+        + kv('Do wypłaty (nadwyżka)', `<span style="color:#3ce38a">${sol(st.available)}</span>` + inUsd(st.available))
+        + kv('Prowizja z meczów / wypłacone', `${sol(st.fees)} / ${sol(st.sent)}`);
+      $('fa-house-hist').innerHTML = st.history.length ? st.history.map((w) => `<li><div><b>${sol(w.lamports)} → <code>${esc(w.to_addr.slice(0, 6) + '…' + w.to_addr.slice(-6))}</code></b>
+          <small>${new Date(w.t).toLocaleString('pl-PL')} · ${esc(w.admin)}${w.note ? ' · ' + esc(w.note) : ''}</small></div>
+          <span class="mut">${w.state === 'sent' ? `<a href="${esc(w.url)}" target="_blank" rel="noopener">wysłane ↗</a>` : w.state === 'failed' ? 'nieudane' : 'w toku'}</span></li>`).join('')
+        : '<li class="fa-empty">Jeszcze nie było wypłat prowizji.</li>';
+    } catch (e) { if (e.code === 'admin2fa') return relockAdmin(); $('fa-house-sum').textContent = e.message; }
+  }
+  $('fa-house-sol').addEventListener('input', () => { all = false; });
+  $('fa-house-max').addEventListener('click', () => { if (!st) return; all = true; $('fa-house-sol').value = (st.available / 1e9).toFixed(9).replace(/.?0+$/, ''); });
+  go.addEventListener('click', async () => {
+    const to = $('fa-house-to').value.trim(), amount = +$('fa-house-sol').value, code = $('fa-house-code').value.trim();
+    if (!to) return (msg.textContent = 'Podaj adres portfela.');
+    if (!all && !(amount > 0)) return (msg.textContent = 'Podaj kwotę albo kliknij „Cała nadwyżka”.');
+    if (!/^d{6}$/.test(code)) return (msg.textContent = 'Wpisz 6-cyfrowy kod 2FA.');
+    const label = all ? 'całą nadwyżkę (' + sol(st ? st.available : 0) + ')' : amount + ' SOL';
+    if (!confirm(`Wysłać ${label} ze skarbca na adres
+${to}?
+
+Przelewu w sieci Solana nie da się cofnąć.`)) return;
+    go.disabled = true; msg.textContent = 'Wysyłanie…';
+    try {
+      const j = await srvPost('/api/admin/house/withdraw', { to, code, ...(all ? { all: true } : { sol: amount }) });
+      msg.innerHTML = `Wysłano ${sol(j.lamports)}. <a href="${esc(j.url)}" target="_blank" rel="noopener">Zobacz w eksploratorze ↗</a>`;
+      $('fa-house-sol').value = ''; $('fa-house-code').value = ''; all = false;
+    } catch (e) { if (e.code === 'admin2fa') return relockAdmin(); msg.textContent = e.message; }
+    go.disabled = false; pull();
+  });
+  pull(); const iv = setInterval(pull, 30000); cleanup.push(() => clearInterval(iv));
+}
 function mountDeathmatch($) {
   const box = $('fa-dm'), msg = $('fa-dm-msg'); let cfg = null, defs = null;
   const field = (p, lbl, step) => `<label class="fa-dmf"><span>${esc(lbl)}</span><input class="fa-q" type="number" step="${step}" data-p="${p}" value="${esc(getP(cfg, p))}"></label>`;
@@ -583,7 +626,18 @@ function buildDashboard(db, close) {
       <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div>
     <p class="fa-note" id="fa-note" hidden></p>
     <section class="fa-kpis" id="fa-kpis" aria-label="Liczby ogólne"></section>
-    ${SRV ? `<section class="fa-grid2">
+    ${SRV ? `<section class="fa-card" id="fa-house-card"><div class="fa-ch"><h3>Prowizja domu – wypłata ze skarbca</h3><small id="fa-house-sum">Ładowanie…</small></div>
+      <p class="fa-msg" style="margin:0 0 12px">Prowizja z meczów zostaje w skarbcu razem z pieniędzmi graczy. Wypłacić można tylko <b>nadwyżkę</b>: saldo skarbca minus to, co należy się graczom
+        (salda w grze, stawki w trwających meczach, wypłaty w toku) i 0,001 SOL rezerwy. Każda wypłata wymaga aktualnego kodu 2FA.</p>
+      <div class="fa-dmg" id="fa-house-kv"></div>
+      <div class="fa-dmg" style="margin-top:12px">
+        <label class="fa-dmf" style="grid-column:span 2"><span>Adres portfela Solana (dokąd)</span><input class="fa-q" id="fa-house-to" placeholder="np. 7xKX…" spellcheck="false" autocomplete="off"></label>
+        <label class="fa-dmf"><span>Kwota (SOL)</span><input class="fa-q" id="fa-house-sol" type="number" min="0" step="any" placeholder="0.0"></label>
+        <label class="fa-dmf"><span>Kod 2FA</span><input class="fa-q" id="fa-house-code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="123456"></label>
+      </div>
+      <div class="fa-row"><button class="fa-btn" type="button" id="fa-house-max">Cała nadwyżka</button><button class="fa-btn pri" type="button" id="fa-house-go">Wypłać</button><span class="fa-msg" id="fa-house-msg"></span></div>
+      <ul class="fa-list" id="fa-house-hist" style="max-height:220px;overflow:auto;margin-top:8px"></ul></section>
+    <section class="fa-grid2">
       <div class="fa-card"><div class="fa-ch"><h3>Wypłaty do akceptacji</h3><small id="fa-wd-sum"></small></div><ul class="fa-list" id="fa-wd"><li class="fa-empty">Ładowanie…</li></ul></div>
       <div class="fa-card"><div class="fa-ch"><h3>Dziennik admina</h3><small>ostatnie 50 zdarzeń</small></div><ul class="fa-list" id="fa-audit" style="max-height:320px;overflow:auto"></ul></div>
     </section>
@@ -694,6 +748,7 @@ function buildDashboard(db, close) {
       pull();
     });
     $('fa-lock').addEventListener('click', async () => { try { await srvPost('/api/admin/logout'); } catch {} admTok.set(''); close(); });
+    mountHouse($);
     mountAnticheat($);
     mountDeathmatch($);
     mountArsenal($);

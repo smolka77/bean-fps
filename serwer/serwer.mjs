@@ -301,6 +301,30 @@ function newAdminToken(adminId, ip) { const tok = crypto.randomBytes(32).toStrin
 const adminSetups = new Map();                                         // pierwsze logowanie: token -> {id, secret, exp} (10 min na zeskanowanie kodu QR)
 const ADMIN_BAD = 'Zły login, hasło lub kod 2FA';
 
+// numer adresu wpłat dla nowego konta: nigdy nie wraca do numeru dawnego (np. skasowanego przy resecie bazy) konta – stare wpłaty na ten adres
+// nie mogą trafić na saldo nowego gracza; 'idxFloor' w config = najwyższy numer, jaki kiedykolwiek był użyty
+const nextIdx = () => { const r = q("SELECT value FROM config WHERE key='idxFloor'").get(); return Math.max(q('SELECT MAX(idx) m FROM users').get().m || 0, r ? +r.value || 0 : 0) + 1; };
+
+// ---------------- prowizja domu: wypłata nadwyżki skarbca (panel admina) ----------------
+// Skarbiec (indeks 0) trzyma pieniądze graczy i prowizję. Do wypłaty jest tylko nadwyżka: saldo skarbca on-chain minus wszystko, co należy się graczom
+// (salda w grze, stawki w trwających i wstrzymanych meczach, wypłaty w toku, wpisowe DM) i rezerwa na opłaty sieci. Każda wypłata wymaga kodu 2FA admina.
+db.exec(`CREATE TABLE IF NOT EXISTS house_wd(id INTEGER PRIMARY KEY, t INTEGER NOT NULL, admin TEXT NOT NULL, to_addr TEXT NOT NULL, lamports INTEGER NOT NULL,
+  sig TEXT, state TEXT NOT NULL DEFAULT 'sending', note TEXT NOT NULL DEFAULT '')`);
+const HOUSE_RESERVE = 1_000_000;                                      // 0,001 SOL zostaje w skarbcu (minimum konta Solana + opłaty)
+function houseOwed() {
+  const g = (sql) => q(sql).get().s || 0;
+  const balances = g('SELECT COALESCE(SUM(lamports),0) s FROM users');
+  const stakes = g("SELECT COALESCE(SUM(CASE WHEN state='held' THEN stake_lamports*2 ELSE stake_lamports END),0) s FROM matches WHERE state IN ('open','held')");   // wstrzymana wygrana: cała pula
+  const wds = g("SELECT COALESCE(SUM(lamports),0) s FROM withdrawals WHERE state IN ('review','sending')");
+  let dm = 0; try { dm = g("SELECT COALESCE(SUM(lamports),0) s FROM dm_entries WHERE state IN ('queued','waiting','playing')"); } catch {}
+  return { balances, stakes, withdrawals: wds, dm, total: balances + stakes + wds + dm };
+}
+async function houseState() {
+  const treasury = await conn.getBalance(TREASURY.publicKey, 'confirmed'), owed = houseOwed();
+  return { treasury, owed, reserve: HOUSE_RESERVE, available: Math.max(0, treasury - owed.total - HOUSE_RESERVE) };
+}
+let houseBusy = false;
+
 // wypłata ze skarbca dla zapisanej operacji (txs.id); błąd = zwrot na saldo
 async function payout(txId, userId, to, lam) {
   try {
@@ -328,7 +352,7 @@ const routes = {
     if (q('SELECT 1 FROM users WHERE username=?').get(u)) throw new E('exists', 'Ta nazwa jest zajęta', 409);
     const pass = await hashPass(p);
     const id = tx(() => {
-      const idx = (q('SELECT MAX(idx) m FROM users').get().m || 0) + 1;
+      const idx = nextIdx();
       const address = keypairAt(idx).publicKey.toBase58();
       return Number(q('INSERT INTO users(username,pass,created,idx,address,last_active) VALUES(?,?,?,?,?,?)').run(u, pass, Date.now(), idx, address, Date.now()).lastInsertRowid);
     });
@@ -445,7 +469,7 @@ const routes = {
       let name = base; for (let i = 0; q('SELECT 1 FROM users WHERE username=?').get(name); i++) name = base + (Math.floor(Math.random() * 9000) + 1000);
       const pass = await hashPass(crypto.randomBytes(24).toString('base64'));   // hasło losowe – logowanie przez Google
       const id = tx(() => {
-        const idx = (q('SELECT MAX(idx) m FROM users').get().m || 0) + 1, address = keypairAt(idx).publicKey.toBase58();
+        const idx = nextIdx(), address = keypairAt(idx).publicKey.toBase58();
         return Number(q('INSERT INTO users(username,pass,created,idx,address,last_active,email,google_sub) VALUES(?,?,?,?,?,?,?,?)').run(name, pass, Date.now(), idx, address, Date.now(), email, info.sub).lastInsertRowid);
       });
       u = fresh(id); created = true; console.log('[konto google]', name, u.address);
@@ -505,6 +529,50 @@ const routes = {
     const sig = await payout(w.tx_id, w.user_id, new PublicKey(w.to_addr), w.lamports);
     q('UPDATE withdrawals SET state=? WHERE id=?').run(sig ? 'sent' : 'failed', w.id);
     return { ok: !!sig, state: sig ? 'sent' : 'failed', url: sig ? explorer(sig) : '' };
+  },
+  // prowizja domu: stan skarbca, ile należy się graczom, ile można wypłacić, historia wypłat domu
+  'GET /api/admin/house': async ({ req }) => {
+    adminGate(req);
+    let st; try { st = await houseState(); } catch (e) { throw new E('rpc', 'Nie udało się odczytać salda skarbca – spróbuj za chwilę', 503); }
+    const fees = q("SELECT COALESCE(SUM(fee_lamports),0) s FROM matches WHERE state IN ('won','held')").get().s || 0;
+    const sent = q("SELECT COALESCE(SUM(lamports),0) s FROM house_wd WHERE state='sent'").get().s || 0;
+    return { ...st, address: TREASURY.publicKey.toBase58(), cluster: CLUSTER, price: PRICE, fees, sent,
+      history: q('SELECT * FROM house_wd ORDER BY id DESC LIMIT 30').all().map((w) => ({ ...w, url: w.sig ? explorer(w.sig) : '' })) };
+  },
+  // wypłata prowizji domu na podany adres: kwota w SOL albo all=true (cała dostępna nadwyżka); wymaga aktualnego kodu 2FA
+  'POST /api/admin/house/withdraw': async ({ body, req, ip }) => {
+    const adm = adminGate(req);
+    if (limited('house:' + adm.id, 5, 10 * 60e3)) throw new E('rate', 'Za dużo prób – odczekaj chwilę', 429);
+    const a = q('SELECT * FROM admins WHERE id=?').get(adm.id);
+    const step = a && a.totp ? OCH.totpCheck(a.totp, body.code, a.totp_step) : 0;
+    if (!step) throw new E('code', 'Zły kod 2FA', 400);
+    q('UPDATE admins SET totp_step=? WHERE id=?').run(step, a.id);   // ten sam kod nie zadziała drugi raz
+    let to; try { to = new PublicKey(String(body.to || '').trim()); } catch { throw new E('addr', 'Nieprawidłowy adres Solana'); }
+    if (!PublicKey.isOnCurve(to.toBytes())) throw new E('addr', 'To nie jest adres portfela (adres programu lub konta pochodnego)');
+    if (to.equals(TREASURY.publicKey)) throw new E('addr', 'To adres samego skarbca');
+    if (q('SELECT 1 FROM users WHERE address=?').get(to.toBase58())) throw new E('addr', 'To adres wpłat konta gracza w grze – podaj własny portfel');
+    if (houseBusy) throw new E('busy', 'Inna wypłata domu jest w toku', 409);
+    houseBusy = true;
+    try {
+      let st; try { st = await houseState(); } catch { throw new E('rpc', 'Nie udało się odczytać salda skarbca – spróbuj za chwilę', 503); }
+      const lam = body.all ? st.available : Math.floor(+body.sol * LAMPORTS_PER_SOL);
+      if (!(lam >= 100000)) throw new E('amount', body.all ? 'Nie ma nadwyżki do wypłaty' : 'Najmniejsza wypłata: 0,0001 SOL');
+      if (lam > st.available) throw new E('amount', `Do wypłaty jest najwyżej ${st.available / LAMPORTS_PER_SOL} SOL (reszta należy do graczy)`);
+      const id = Number(q("INSERT INTO house_wd(t,admin,to_addr,lamports) VALUES(?,?,?,?)").run(Date.now(), adm.username, to.toBase58(), lam).lastInsertRowid);
+      audit(adm.username, ip, 'house_wd', `#${id} ${lam / LAMPORTS_PER_SOL} SOL -> ${to.toBase58()}`);
+      try {
+        const t = new Transaction().add(SystemProgram.transfer({ fromPubkey: TREASURY.publicKey, toPubkey: to, lamports: lam }));
+        const sig = await sendAndConfirmTransaction(conn, t, [TREASURY], { commitment: 'confirmed' });
+        q("UPDATE house_wd SET state='sent', sig=? WHERE id=?").run(sig, id);
+        console.log(`[dom] ${adm.username}: wypłata prowizji ${lam / LAMPORTS_PER_SOL} SOL -> ${to.toBase58()} (${sig})`);
+        return { ok: true, sig, url: explorer(sig), lamports: lam };
+      } catch (e) {
+        // przy przekroczonym czasie przelew mógł jednak dojść – saldo skarbca i tak czytamy z sieci, więc nic nie wypłaci się drugi raz
+        q("UPDATE house_wd SET state='failed', note=? WHERE id=?").run(String(e && e.message || e).slice(0, 200), id);
+        console.warn('[dom] wypłata nieudana', e && e.message);
+        throw new E('send', 'Przelew się nie udał: ' + String(e && e.message || e).slice(0, 120) + ' – sprawdź saldo skarbca w eksploratorze', 502);
+      }
+    } finally { houseBusy = false; }
   },
   'POST /api/admin/config': async ({ body, req, ip }) => {
     const adm = adminGate(req); audit(adm.username, ip, 'config', Object.keys(body || {}).join(','));
