@@ -9,8 +9,9 @@ Pobierz go i otwórz dwuklikiem w Chrome, Edge albo Firefoksie. Działa bez serw
 
 - **Lobby:** konto i testowy portfel USDT (zapisywane w przeglądarce), stawki, losowanie mapy, skiny, ustawienia (dźwięk, FOV, język).
 - **Tryby:**
-  - **Strzelnica:** trening solo z celami-fasolkami i tablicą ustawień.
-  - **1v1:** mecz z botem do 3 wygranych rund, na jednej z trzech map.
+  - **Strzelnica:** trening solo w podziemnym bunkrze (tunel w skale, tory, świetlówki), tarcze-fasolki na stojakach i tablica ustawień.
+  - **Z botem:** mecz 1v1 z botem do 3 wygranych rund, bez serwera i stawki.
+  - **1v1:** mecz z prawdziwym graczem o stawkę do 3 wygranych rund (serwer meczów), na jednej z trzech map.
 - **Mapy:** Bagno (dawna Oaza), Magazyn, Zatoka (dawna Baza), Strzelnica.
   Bagno to miasteczko z drewnianych chat na mokradłach (cyprysy z mchem, trzciny, aligatory), Zatoka to neonowy port o zachodzie słońca
   (ocean, panorama wieżowców, palmy, diabelski młyn). Wygląd tych dwóch map ustawia `zrodla/klimaty.js`: tylko grafika, kolizje i spawny są te same.

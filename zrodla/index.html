@@ -1003,7 +1003,8 @@ addEventListener('mousemove',e=>{
 
 // ================= strzelanie =================
 const ray=new THREE.Raycaster();ray.far=250;
-const hitTargets=()=>[...enemyMeshes.filter(m=>m.userData.enemy.dead===0&&!m.userData.enemy.off),...boxMeshes,window.__ground];
+// Strzelnica: celem jest karton tarczy, nie ukryta fasolka (paperMode)
+const hitTargets=()=>[...enemyMeshes.filter(m=>m.userData.enemy.dead===0&&!m.userData.enemy.off&&(!m.userData.enemy.paperMode||m.userData.paper)),...boxMeshes,window.__ground];
 const _o=V3(),_dir=V3(),_mz=V3(),_n=V3(),_e=new THREE.Euler();
 function startReload(){
   const w=inv[curW],st=WEAPON_STATS[w.id];
@@ -1634,10 +1635,11 @@ function stepRemote(e,dt){
 const arenaBoxes=boxes.slice(),arenaMeshes=boxMeshes.slice(),arenaGround=window.__ground;
 const MAPS=[{name:'Oaza',src:'./oaza-data.js'},{name:'Magazyn',src:'./magazyn-data.js'},{name:'Baza',src:'./baza-data.js'}];
 // Strzelnica: mapa treningowa trybu solo (nie wchodzi do rotacji 1v1). Cele, tablica ustawień i statystyki: range.js
-const RANGE_MAP={name:'Strzelnica',src:'./strzelnica-data.js',range:true};
+const RANGE_MAP={name:'Strzelnica',src:'./bunkier-data.js',range:true};   // podziemna strzelnica w bunkrze (budowana w kodzie)
 const ALLMAPS=[...MAPS,RANGE_MAP];
 const range=createRange({scene,camera,player,enemies,pose:poseTarget,click:()=>sndClick(2400,.03,.12),
-  isSound:()=>!muted,setSound:on=>{initAudio();setMuted(!on)},resetKills:()=>{kills=0;$('kills').textContent=0}});
+  isSound:()=>!muted,setSound:on=>{initAudio();setMuted(!on)},resetKills:()=>{kills=0;$('kills').textContent=0},
+  addHit:(m,e)=>{m.userData.enemy=e;m.userData.paper=true;enemyMeshes.push(m)}});
 window.__range=range;
 let mapIdx=-1,mapsSettled=false;const thumbQ=[];
 const oaza={active:false,map:null,boxes:[],meshes:[],spawns:null,ladders:[],bx:17.4,bz:30.4};   // stan aktywnej mapy 1v1
@@ -1709,7 +1711,7 @@ const loadMaps=(async()=>{                         // mapy ładują się w tle, 
   await Promise.all(ALLMAPS.map(async M=>{
     try{
       const mod=await import(M.src),D=mod.MAP||mod.OAZA,B=mod.GLB||mod.OAZA_GLB;
-      const g=await new Promise((res,rej)=>ld.parse(Uint8Array.from(atob(B),c=>c.charCodeAt(0)).buffer,'',res,rej));
+      const g=mod.build?{scene:mod.build()}:await new Promise((res,rej)=>ld.parse(Uint8Array.from(atob(B),c=>c.charCodeAt(0)).buffer,'',res,rej));   // mapa z kodu (bunkier) albo z GLB
       if(!M.range)try{stripSpawnDecor(g.scene,D.spawns)}catch(e){console.warn('Podesty:',e)}
       M.meshes=[];let roof=null;g.scene.traverse(o=>{if(o.name==='Dach')roof=o});M.roof=roof;
       g.scene.traverse(o=>{if(!o.isMesh)return;const c=o.material&&o.material.color;

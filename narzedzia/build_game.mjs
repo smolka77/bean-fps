@@ -36,7 +36,7 @@ html = html.slice(0, a) + '@@BUNDLE@@' + html.slice(b + '</script>'.length);
 html = html.replace(/<script type="importmap">[\s\S]*?<\/script>\s*/, '');
 
 // 2) mapy: dynamiczny import(M.src) -> statyczne importy (esbuild wbudowuje je w plik)
-const maps = ['oaza', 'magazyn', 'baza', 'strzelnica'];
+const maps = ['oaza', 'magazyn', 'baza', 'bunkier'];
 patch('main.js', 'const MAPS=[', 'const MAP_MODS={' + maps.map((m) => `'./${m}-data.js':()=>import('./${m}-data.js')`).join(',') + '};\nconst MAPS=[');
 patch('main.js', 'await import(M.src)', 'await MAP_MODS[M.src]()');
 

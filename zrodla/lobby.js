@@ -1013,7 +1013,7 @@ function skinIcon(sk) {
     <ellipse cx="18.6" cy="16.2" rx="1.6" ry="2.2" fill="#15161a"/><ellipse cx="25.4" cy="16.2" rx="1.6" ry="2.2" fill="#15161a"/></svg>`;   // oczy jak w grze
 }
 const DEFAULT_MODES = [
-  { id: 'range', name: 'Strzelnica', desc: 'Solo · zestrzel czerwone fasolki', icon: 'range', tag: 'SOLO' },
+  { id: 'range', name: 'Strzelnica', desc: 'Solo · strzelnica w bunkrze, tarcze-fasolki', icon: 'range', tag: 'SOLO' },
   { id: '1v1', name: '1v1', desc: 'Mapa Bagno · bot · do 5 trafień', icon: 'duel', tag: '1 NA 1' },
   // tryb „Z botem” schowany na razie za kafelkiem „Więcej wkrótce” (kod trybu zostaje w grze); żeby go przywrócić, zamień { soon: true } na:
   // { id: 'bot', name: 'Z botem', desc: 'Trening 1 na 1 · bez stawki i serwera · do 3 wygranych rund', icon: 'bot', tag: 'BOT' },
