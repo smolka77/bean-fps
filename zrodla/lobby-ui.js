@@ -20,7 +20,7 @@ const DICT = {
     'mode.label': 'Tryb gry', 'mode.change': 'Zmień', 'mode.range.name': 'Strzelnica', 'mode.range.desc': 'Trening solo – strzelnica w bunkrze, tarcze-fasolki',
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Pojedynek · do 3 wygranych rund · Bagno / Jachty / Salon',
     'tag.range': 'SOLO', 'tag.bot': 'BOT', 'mode.bot.name': 'Z botem', 'mode.bot.desc': 'Trening 1 na 1 · bez stawki i serwera · do 3 wygranych rund', 'tag.1v1': '1 NA 1', 'soon': 'WKRÓTCE', 'soon.art': 'WIĘCEJ WKRÓTCE',
-    'mode.dm.name': 'Deathmatch', 'mode.dm.desc': 'Do 20 graczy · 3 minuty · top 3 zgarnia pulę', 'tag.dm': 'FFA', 'dm.tier': 'Poziom (wpisowe)', 'dm.free': 'FREE', 'dm.entry': 'Wpisowe', 'dm.top1': 'Za 1. miejsce do', 'dm.wait': '{n} w kolejce', 'dm.noServer': 'Deathmatch wymaga serwera gry',
+    'mode.dm.name': 'Deathmatch', 'mode.dm.desc': 'Za darmo · do 20 graczy · wchodzisz kiedy chcesz', 'tag.dm': 'FFA', 'dm.tier': 'Lobby', 'dm.free': 'FREE', 'dm.entry': 'Wpisowe', 'dm.top1': 'Za 1. miejsce do', 'dm.wait': '{n}/{max} w lobby', 'dm.full': 'PEŁNE', 'dm.fullMsg': 'Lobby Deathmatch jest pełne ({max}/{max}). Spróbuj za chwilę.', 'dm.noServer': 'Deathmatch wymaga serwera gry',
     'cur.tag': 'USD · płatność w SOL', 'cur.in': 'w SOL', 'stake.label': 'Stawka', 'stake.custom': 'Własna', 'stake.win': 'Możliwa wygrana', 'stake.free': 'Trening – bez stawki', 'stake.range': 'Kwota $1–$1000', 'stake.invalid': 'Podaj stawkę od $1 do $1000',
     'play': 'GRAJ', 'play.login': 'ZALOGUJ SIĘ', 'picker.title': 'Wybierz tryb', 'done': 'Gotowe', 'skins.title': 'Skiny', 'close': 'Zamknij',
     'set.title': 'Ustawienia', 'set.general': 'Ogólne', 'set.audio': 'Dźwięk', 'set.controls': 'Sterowanie', 'set.lang': 'Język', 'set.volume': 'Głośność', 'set.fov': 'Pole widzenia (FOV)',
@@ -52,7 +52,7 @@ const DICT = {
     'mode.label': 'Game mode', 'mode.change': 'Change', 'mode.range.name': 'Shooting range', 'mode.range.desc': 'Solo practice – bunker range, bean targets',
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Duel · first to 3 rounds · Swamp / Yachts / Dealership',
     'tag.range': 'SOLO', 'tag.bot': 'BOT', 'mode.bot.name': 'Vs bot', 'mode.bot.desc': 'Practice duel · no stake, no server · first to 3 rounds', 'tag.1v1': '1 VS 1', 'soon': 'SOON', 'soon.art': 'MORE SOON',
-    'mode.dm.name': 'Deathmatch', 'mode.dm.desc': 'Up to 20 players · 3 minutes · top 3 take the pot', 'tag.dm': 'FFA', 'dm.tier': 'Tier (entry)', 'dm.free': 'FREE', 'dm.entry': 'Entry', 'dm.top1': '1st place up to', 'dm.wait': '{n} in queue', 'dm.noServer': 'Deathmatch needs the game server',
+    'mode.dm.name': 'Deathmatch', 'mode.dm.desc': 'Free · up to 20 players · drop in any time', 'tag.dm': 'FFA', 'dm.tier': 'Lobby', 'dm.free': 'FREE', 'dm.entry': 'Entry', 'dm.top1': '1st place up to', 'dm.wait': '{n}/{max} in lobby', 'dm.full': 'FULL', 'dm.fullMsg': 'The Deathmatch lobby is full ({max}/{max}). Try again soon.', 'dm.noServer': 'Deathmatch needs the game server',
     'cur.tag': 'USD · paid in SOL', 'cur.in': 'in SOL', 'stake.label': 'Stake', 'stake.custom': 'Custom', 'stake.win': 'Potential win', 'stake.free': 'Practice – no stake', 'stake.range': 'Amount $1–$1000', 'stake.invalid': 'Enter a stake between $1 and $1000',
     'play': 'PLAY', 'play.login': 'LOG IN', 'picker.title': 'Choose mode', 'done': 'Done', 'skins.title': 'Skins', 'close': 'Close',
     'set.title': 'Settings', 'set.general': 'General', 'set.audio': 'Audio', 'set.controls': 'Controls', 'set.lang': 'Language', 'set.volume': 'Volume', 'set.fov': 'Field of view (FOV)',
@@ -84,7 +84,7 @@ const DICT = {
     'mode.label': 'Режим игры', 'mode.change': 'Сменить', 'mode.range.name': 'Стрельбище', 'mode.range.desc': 'Соло-тренировка – тир в бункере, мишени-фасолины',
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Дуэль · до 3 выигранных раундов · Болото / Яхты / Автосалон',
     'tag.range': 'СОЛО', 'tag.bot': 'БОТ', 'mode.bot.name': 'С ботом', 'mode.bot.desc': 'Тренировочная дуэль · без ставки и сервера · до 3 побед', 'tag.1v1': '1 НА 1', 'soon': 'СКОРО', 'soon.art': 'СКОРО БОЛЬШЕ',
-    'mode.dm.name': 'Deathmatch', 'mode.dm.desc': 'До 20 игроков · 3 минуты · топ-3 забирают банк', 'tag.dm': 'FFA', 'dm.tier': 'Уровень (взнос)', 'dm.free': 'FREE', 'dm.entry': 'Взнос', 'dm.top1': 'За 1 место до', 'dm.wait': '{n} в очереди', 'dm.noServer': 'Для Deathmatch нужен игровой сервер',
+    'mode.dm.name': 'Deathmatch', 'mode.dm.desc': 'Бесплатно · до 20 игроков · заходи когда хочешь', 'tag.dm': 'FFA', 'dm.tier': 'Лобби', 'dm.free': 'FREE', 'dm.entry': 'Взнос', 'dm.top1': 'За 1 место до', 'dm.wait': '{n}/{max} в лобби', 'dm.full': 'ЗАПОЛНЕНО', 'dm.fullMsg': 'Лобби Deathmatch заполнено ({max}/{max}). Попробуй чуть позже.', 'dm.noServer': 'Для Deathmatch нужен игровой сервер',
     'cur.tag': 'USD · оплата в SOL', 'cur.in': 'в SOL', 'stake.label': 'Ставка', 'stake.custom': 'Своя', 'stake.win': 'Возможный выигрыш', 'stake.free': 'Тренировка – без ставки', 'stake.range': 'Сумма $1–$1000', 'stake.invalid': 'Введите ставку от $1 до $1000',
     'play': 'ИГРАТЬ', 'play.login': 'ВОЙТИ', 'picker.title': 'Выбери режим', 'done': 'Готово', 'skins.title': 'Скины', 'close': 'Закрыть',
     'set.title': 'Настройки', 'set.general': 'Общие', 'set.audio': 'Звук', 'set.controls': 'Управление', 'set.lang': 'Язык', 'set.volume': 'Громкость', 'set.fov': 'Поле зрения (FOV)',
@@ -116,7 +116,7 @@ const DICT = {
     'mode.label': 'Modo de juego', 'mode.change': 'Cambiar', 'mode.range.name': 'Campo de tiro', 'mode.range.desc': 'Práctica en solitario – galería en un búnker, dianas de judía',
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Duelo · a 3 rondas ganadas · Pantano / Yates / Concesionario',
     'tag.range': 'SOLO', 'tag.bot': 'BOT', 'mode.bot.name': 'Contra bot', 'mode.bot.desc': 'Duelo de práctica · sin apuesta ni servidor · a 3 rondas', 'tag.1v1': '1 VS 1', 'soon': 'PRONTO', 'soon.art': 'MÁS, MUY PRONTO',
-    'mode.dm.name': 'Deathmatch', 'mode.dm.desc': 'Hasta 20 jugadores · 3 minutos · el top 3 se lleva el bote', 'tag.dm': 'FFA', 'dm.tier': 'Nivel (entrada)', 'dm.free': 'FREE', 'dm.entry': 'Entrada', 'dm.top1': '1.er puesto hasta', 'dm.wait': '{n} en cola', 'dm.noServer': 'Deathmatch necesita el servidor del juego',
+    'mode.dm.name': 'Deathmatch', 'mode.dm.desc': 'Gratis · hasta 20 jugadores · entra cuando quieras', 'tag.dm': 'FFA', 'dm.tier': 'Lobby', 'dm.free': 'FREE', 'dm.entry': 'Entrada', 'dm.top1': '1.er puesto hasta', 'dm.wait': '{n}/{max} en el lobby', 'dm.full': 'LLENO', 'dm.fullMsg': 'El lobby de Deathmatch está lleno ({max}/{max}). Inténtalo en un rato.', 'dm.noServer': 'Deathmatch necesita el servidor del juego',
     'cur.tag': 'USD · pago en SOL', 'cur.in': 'en SOL', 'stake.label': 'Apuesta', 'stake.custom': 'Otra', 'stake.win': 'Ganancia posible', 'stake.free': 'Práctica – sin apuesta', 'stake.range': 'Importe $1–$1000', 'stake.invalid': 'Introduce una apuesta entre $1 y $1000',
     'play': 'JUGAR', 'play.login': 'ACCEDER', 'picker.title': 'Elige modo', 'done': 'Listo', 'skins.title': 'Skins', 'close': 'Cerrar',
     'set.title': 'Ajustes', 'set.general': 'General', 'set.audio': 'Sonido', 'set.controls': 'Controles', 'set.lang': 'Idioma', 'set.volume': 'Volumen', 'set.fov': 'Campo de visión (FOV)',
@@ -672,7 +672,7 @@ export function initLobbyUI(ctx) {
   stakeBox.querySelectorAll('[data-stake]').forEach(b => b.addEventListener('click', () => { stakeSel = b.dataset.stake; ls.set('fasolka-stake-sel', stakeSel); renderStake(); if (stakeSel === 'custom') customIn.focus(); }));
   customIn.addEventListener('input', () => { stakeCustom = Math.floor(+customIn.value); ls.set('fasolka-stake-custom', String(stakeCustom)); renderStake(true); });
   const getStake = () => stakeSel === 'custom' ? stakeCustom : +stakeSel;
-  // ---- Deathmatch: poziomy (wpisowe) z serwera gry, ilu graczy czeka w kolejce każdego poziomu ----
+  // ---- Deathmatch: jedno stałe, darmowe lobby na serwerze gry – ilu graczy jest teraz w środku (komplet = pełne) ----
   let dmInfo = null, dmTier = ls.get('fasolka-dm-tier') || '', dmFetchT = 0;
   const tierBox = document.createElement('div'); tierBox.className = 'lb-stake'; tierBox.id = 'lb-tiers'; tierBox.hidden = true; stakeBox.after(tierBox);
   tierBox.addEventListener('click', e => { const b = e.target.closest('[data-tier]'); if (!b) return; dmTier = b.dataset.tier; ls.set('fasolka-dm-tier', dmTier); renderStake(); });
@@ -684,13 +684,11 @@ export function initLobbyUI(ctx) {
   const dmTierSel = () => dmInfo && (dmInfo.tiers.find(x => x.id === dmTier) || dmInfo.tiers[0]);
   function renderTiers() {
     if (!dmInfo) { tierBox.innerHTML = '<button type="button" disabled><b>…</b><small>DEATHMATCH</small></button>'; loadDmInfo(); return; }
-    const sel = dmTierSel(), cols = Math.min(4, dmInfo.tiers.length);
-    tierBox.style.gridTemplateColumns = `repeat(${cols},1fr)`;
-    tierBox.innerHTML = dmInfo.tiers.map(x => `<button type="button" data-tier="${x.id}" class="${x === sel ? 'on' : ''}"><b>${x.entry ? '<i>$</i>' + x.entry : t('dm.free')}</b><small>${t('dm.wait', { n: (dmInfo.queues || {})[x.id] || 0 })}</small></button>`).join('');
-    const pot = sel ? sel.entry * dmInfo.maxPlayers * (1 - dmInfo.houseFee) : 0;
-    $('lb-stake-fee').textContent = sel && sel.entry ? '−' + usd(sel.entry) : usd(0);
-    $('lb-stake-win').textContent = usd(pot * (dmInfo.prizeSplit[0] || 0)); $('lb-stake-x').textContent = '';
-    $('lb-stake-feerow').querySelector('span').textContent = t('dm.entry'); $('lb-stake-winrow').querySelector('span').textContent = t('dm.top1');
+    const sel = dmTierSel(), n = +dmInfo.players || 0, max = dmInfo.maxPlayers || 20, full = !!dmInfo.full || n >= max;
+    tierBox.style.gridTemplateColumns = '1fr';
+    tierBox.innerHTML = `<button type="button" data-tier="${sel ? sel.id : 'free'}" class="on"${full ? ' disabled' : ''}><b>${full ? t('dm.full') : t('dm.free')}</b><small>${t('dm.wait', { n, max })}</small></button>`;
+    $('lb-stake-x').textContent = '';
+    $('lb-stake-feerow').hidden = true; $('lb-stake-winrow').hidden = true; $('lb-stake-slip').hidden = true;   // tryb darmowy: bez wpisowego i nagród
   }
   function renderStake(keepInput) {
     const dm = ctx.getMode() === 'dm';
@@ -746,12 +744,12 @@ export function initLobbyUI(ctx) {
   async function requestPlay() {
     if (busy) return;
     const m = ctx.getMode();
-    if (m === 'dm') {                                    // Deathmatch: konto i serwer gry; wpisowe pobiera serwer przy wejściu do kolejki
+    if (m === 'dm') {                                    // Deathmatch: konto i serwer gry; wejście do stałego lobby (za darmo)
       if (!acct) { toast(t('err.loginToPlay')); openModal('lb-auth'); showTab('lb-auth', 'login'); return; }
       if (!W) return toast(t('dm.noServer'), 'err');
       if (!dmInfo) { await loadDmInfo(true); if (!dmInfo) return toast(t('net.offline'), 'err'); }
       const tier = dmTierSel(); if (!tier) return;
-      if (tier.entry > 0 && acct.balance < tier.entry) { toast(t('err.funds'), 'err'); openWallet('deposit'); return; }
+      if (dmInfo.full) { await loadDmInfo(true); if (dmInfo.full) return toast(t('dm.fullMsg', { max: dmInfo.maxPlayers || 20 }), 'err'); }   // serwer i tak sprawdza komplet przy wejściu
       lastStake = 0; SFX.play(); ctx.play('dm', { tier, info: dmInfo }); return;
     }
     if (m !== '1v1') { lastStake = 0; SFX.play(); ctx.play(m, {}); return; }

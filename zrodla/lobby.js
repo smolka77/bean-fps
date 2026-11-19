@@ -958,6 +958,10 @@ export const BUILTIN_SKINS = [
 ];
 // skiny z kreatora: najpierw te wbudowane w plik gry (skins-data.js), potem lobby wczytuje aktualne ./skins.json z repo
 export const SKINS = [...BUILTIN_SKINS, ...CUSTOM_SKINS];
+// skins.json z serwera: jedno pobranie na stronę (lobby i gra dzielą wynik); cache 'no-cache' = przeglądarka pyta serwer,
+// czy plik się zmienił (304 bez treści), więc nowe skiny widać od razu po odświeżeniu, a niezmieniony plik nie leci ponownie
+let skinsJsonP = null;
+export const loadSkinsJson = () => skinsJsonP || (skinsJsonP = fetch('./skins.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null));
 const SKIN_GLSL = `uniform float uPat,uRim,uHasTex;uniform vec3 uC2,uC3,uRimC;uniform sampler2D uTex;uniform vec4 uProj;uniform float uVmap[129],uVmapOn;varying vec3 vObj;
   float skinV(float y){float t=clamp((y-uProj.z)/(uProj.w-uProj.z),0.,1.);if(uVmapOn<.5)return t;t*=128.;int i=int(min(floor(t),127.));return mix(uVmap[i],uVmap[i+1],t-float(i));}
   float h3(vec3 p){return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453);}
@@ -1031,7 +1035,7 @@ function skinIcon(sk) {
 const DEFAULT_MODES = [
   { id: 'range', name: 'Strzelnica', desc: 'Solo · strzelnica w bunkrze, tarcze-fasolki', icon: 'range', tag: 'SOLO' },
   { id: '1v1', name: '1v1', desc: 'Mapa Bagno · bot · do 5 trafień', icon: 'duel', tag: '1 NA 1' },
-  { id: 'dm', name: 'Deathmatch', desc: 'Do 20 graczy · 3 minuty · top 3 wygrywa', icon: 'dm', tag: 'FFA' },
+  { id: 'dm', name: 'Deathmatch', desc: 'Za darmo · do 20 graczy · wchodzisz kiedy chcesz', icon: 'dm', tag: 'FFA' },
   // tryb „Z botem” schowany (kod trybu zostaje w grze); żeby go przywrócić, dopisz kafelek:
   // { id: 'bot', name: 'Z botem', desc: 'Trening 1 na 1 · bez stawki i serwera · do 3 wygranych rund', icon: 'bot', tag: 'BOT' },
 ];
@@ -1488,8 +1492,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
     else { const same = skins.find(k => k.id === skin.id); if (same !== skin) setSkin(same, true); }
     buildSkinGrid();
   };
-  fetch('./skins.json?v=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.json() : null)
-    .then(list => { if (Array.isArray(list)) setCustomSkins(list); }).catch(() => {});
+  loadSkinsJson().then(list => { if (Array.isArray(list)) setCustomSkins(list); }).catch(() => {});
   addEventListener('fasolka:skins', e => { if (Array.isArray(e.detail)) setCustomSkins(e.detail); });   // panel admina: podgląd zmian na żywo
   const openSkins = () => { skinPanel.hidden = false; picker.hidden = true; };
   const closeSkins = () => { skinPanel.hidden = true; };

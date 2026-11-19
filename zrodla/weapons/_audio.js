@@ -2,15 +2,12 @@
 // Pliki <id>-snd.js generuje narzedzia/assety/przygotuj-bronie.mjs (lista plików źródłowych: SOUNDS w tym skrypcie).
 // Klucze: shot (strzał), far (strzał z daleka), draw (wyjęcie), magOut / magIn / magHit (magazynek),
 // bolt / boltFwd (zamek do tyłu / do przodu), pump (pompka), shell (nabój do rury); wspólne: dryPistol / dryRifle.
-import akm from './akm-snd.js';
-import m4a1 from './m4a1-snd.js';
-import glock17 from './glock17-snd.js';
-import deagle from './deagle-snd.js';
-import spas12 from './spas12-snd.js';
-import mp5k from './mp5k-snd.js';
-import common from './_wspolne-snd.js';
-
-const DATA = { akm, m4a1, glock17, deagle, spas12, mp5k, common };
+// Próbki doczytują się osobno w tle (nie są w głównym pliku gry): do czasu wczytania has() zwraca false i gra używa dźwięków zastępczych.
+const DATA = {};
+const DATA_READY = Promise.all([
+  ['akm', import('./akm-snd.js')], ['m4a1', import('./m4a1-snd.js')], ['glock17', import('./glock17-snd.js')], ['deagle', import('./deagle-snd.js')],
+  ['spas12', import('./spas12-snd.js')], ['mp5k', import('./mp5k-snd.js')], ['common', import('./_wspolne-snd.js')],
+].map(([id, p]) => p.then((m) => { DATA[id] = m.default; }, (e) => console.warn('Dźwięki broni', id, e && e.message))));
 const banks = new WeakMap();
 const bytes = (b64) => { const s = atob(b64), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u.buffer; };
 // starsze Safari znają tylko wersję z callbackami
@@ -18,16 +15,20 @@ const decode = (AC, ab) => new Promise((res, rej) => { try { const p = AC.decode
 
 export function weaponAudio(AC) {
   let B = banks.get(AC); if (B) return B;
-  const buf = {}, jobs = [], last = {};
-  for (const id in DATA) {
-    buf[id] = {};
-    for (const key in DATA[id]) {
-      const list = buf[id][key] = [];
-      DATA[id][key].forEach((b64, i) => jobs.push(decode(AC, bytes(b64)).then((ab) => { list[i] = ab; }, () => {})));
+  const buf = {}, last = {};
+  const ready = DATA_READY.then(() => {
+    const jobs = [];
+    for (const id in DATA) {
+      buf[id] = {};
+      for (const key in DATA[id]) {
+        const list = buf[id][key] = [];
+        DATA[id][key].forEach((b64, i) => jobs.push(decode(AC, bytes(b64)).then((ab) => { list[i] = ab; }, () => {})));
+      }
     }
-  }
+    return Promise.all(jobs);
+  });
   B = {
-    ready: Promise.all(jobs),
+    ready,
     has: (id, key) => !!(buf[id] && buf[id][key] && buf[id][key].some(Boolean)),
     // losowy wariant (nie ten sam dwa razy z rzędu); lp = filtr dolnoprzepustowy [Hz], at = opóźnienie [s]
     play(id, key, { out, vol = 1, rate = 1, lp = 0, at = 0 } = {}) {

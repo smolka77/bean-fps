@@ -1,9 +1,10 @@
-// Deathmatch – tryb po stronie przeglądarki: kolejka, mecz do 20 graczy, płynne pokazywanie przeciwników (bufor paczek
-// z serwera i interpolacja ~100 ms wstecz), kasa i WANTED, ekran WASTED, sklep po śmierci, odrodzenie, podium i powrót do lobby.
-// Wszystko, co ważne (trafienia, obrażenia, śmierć, kasa, zakupy, zegar, wynik), liczy serwer (serwer/dm.mjs) – tu tylko obraz i sterowanie.
+// Deathmatch – tryb po stronie przeglądarki: stałe, darmowe lobby do 20 graczy (wchodzisz od razu do trwającej gry),
+// płynne pokazywanie przeciwników (bufor paczek z serwera i interpolacja ~100 ms wstecz), WANTED, broń za zabójstwa,
+// ekran WASTED (Spacja – odrodzenie, Esc – wyjście do lobby).
+// Wszystko, co ważne (trafienia, obrażenia, śmierć, kolejna broń), liczy serwer (serwer/dm.mjs) – tu tylko obraz i sterowanie.
 import * as THREE from 'three';
 import { createDmUi, tx, SKULL_PATH } from './dm-ui.js';
-import { createShopScene, createPodiumScene, makeGear, EMOTES } from './dm-scenes.js';
+import { makeGear, EMOTES } from './dm-scenes.js';
 const EMOTE_IDS = ['', 'wave', 'dance', 'cheer'];
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -27,11 +28,10 @@ export function createDM(ctx) {
   attachGear(ctx.me);
   const skullMat = new THREE.SpriteMaterial({ map: skullTexture(), depthWrite: false, transparent: true, fog: false });
   const mySkull = new THREE.Sprite(skullMat); mySkull.scale.setScalar(0.42); mySkull.position.y = 2.05; mySkull.visible = false; ctx.me.add(mySkull);
-  let shopScene = null, podScene = null;
 
   const S = {
     active: false, phase: 'idle', tier: null, info: null, cfg: null, pid: 0, map: '', mapLabel: '', players: new Map(), names: new Map(),
-    board: [], wanted: 0, wantedPos: null, endT: 0, liveT: 0, off: null, deadT: 0, deathMsg: null, minDeath: 2.4, shopT: 0, shopTimeout: 30, endMsg: null, podT: 0,
+    board: [], wanted: 0, wantedPos: null, off: null, deadT: 0, deathMsg: null, minDeath: 2.4, deadReady: false,
     me: { life: 0, money: 0, owned: [ctx.PISTOL_ID], armor: 0, armorMax: 100, helmet: false, hp: 100, kills: 0, deaths: 0, damage: 0, protUntil: 0, rank: 0 },
     q: 0, sendT: 0, statsBackup: null, boardOpen: false, deploying: false, lastAmmoKey: '', tabHeld: false,
   };
@@ -70,6 +70,7 @@ export function createDM(ctx) {
     p.holder.add(g.group); p.gun = g; p.gunId = id;
   }
   function clearRemotes() { for (const p of S.players.values()) { scene.remove(p.root); } S.players.clear(); }
+  function dropRemote(id) { const p = S.players.get(id); if (p) { scene.remove(p.root); S.players.delete(id); } }
   const _a = V3(), _b = V3(), _gr = V3(), _gl = V3();
   function poseRemote(p, s, dt) {
     const r = p.root, ud = r.userData;
@@ -136,21 +137,21 @@ export function createDM(ctx) {
 
   // ---------------- sieć ----------------
   const on = (t, f) => net.on(t, f);
-  on('dmqueued', (m) => { if (m.account && ctx.onAccount) ctx.onAccount(m.account); });
-  on('dmq', (m) => { if (S.phase === 'queue') ui.updateQueue(m); });
-  on('dmcancelled', () => { exit(false); });
   on('error', (m) => {
     const msg = (m && m.message) || 'Error';
-    if (S.phase === 'queue' || S.phase === 'connecting') { exit(false, msg); return; }
-    if (m.code === 'cheat') { exit(true, msg); return; }
+    if (S.phase === 'connecting') { exit(false, msg); return; }          // np. lobby pełne (20/20)
+    if (m.code === 'cheat' || m.code === 'idle' || m.code === 'dup') { exit(true, msg); return; }
     ui.notify(msg, 'red');
   });
-  on('close', () => { if (S.active && S.phase !== 'podium') exit(true, tx('lost')); });
+  on('close', () => { if (S.active) exit(true, tx('lost')); });
   on('pi', (m) => net.send({ t: 'po', s: m.s }));
   on('dm', (m) => startMatch(m));
   on('spawn', (m) => onSpawn(m));
-  on('go', (m) => { S.phase = player.dead ? 'dead' : 'live'; S.endT = now() + m.left; S.liveT = now(); ctx.sfx('go'); setTimeout(() => ui.countdown(null), 900); });
-  on('tm', (m) => { S.endT = now() + m.left; });
+  on('joined', (m) => {                                    // nowy gracz w trwającym lobby
+    if (!S.active || m.id === S.pid || S.players.has(m.id)) return;
+    S.names.set(m.id, m.nick); S.players.set(m.id, makeRemote(m));
+    ui.notify(esc(m.nick) + ' · ' + esc(tx('joined')), '');
+  });
   on('s', (m) => {
     const L = now(), off = L - m.T;
     S.off = S.off == null ? off : off < S.off ? off : S.off + (off - S.off) * 0.01;
@@ -188,16 +189,13 @@ export function createDM(ctx) {
     if (p) { p.alive = false; p.dying = 2.6; p.fall = 0; p.deadY = p.root.position.y; p.buf.length = 0; }
     if (m.k === S.pid) { S.me.kills++; if (m.h) ui.notify(tx('head'), 'gold', false, 'head'); else ui.notify(tx('kill') + ' · ' + esc(nameOf(m.v)), ''); ctx.sfx('kill'); }
   });
-  on('reward', (m) => { S.me.money = m.money; ui.setMoney(m.money, m.plus); if (m.wanted) ui.notify(tx('wantedKill', { m: S.cfg.wantedMult }), 'red', true, 'skull'); ctx.sfx('cash'); });
-  on('dead', (m) => die(m));
-  on('inv', (m) => {
-    Object.assign(S.me, { money: m.money, owned: m.owned, armor: m.armor, helmet: m.helmet });
-    if (m.armor > 0) S.me.armorMax = m.armor;
-    ui.setMoney(m.money, 0);
-    if (ui.shopOpen) ui.updateShop(shopState(), m.ok ? tx('bought', { n: itemName(m.item) }) : m.why === 'funds' ? tx('noFunds') : '');
-    if (shopScene) shopScene.setLoadout(null, S.me.armor, S.me.helmet);
-    if (m.ok) ctx.sfx('buy');
+  // zabójstwo: serwer od razu daje następną broń z drabinki (pełny magazynek) – w rękach bez animacji
+  on('upgrade', (m) => {
+    S.me.owned = m.owned;
+    if (m.up && !player.dead) { ctx.upgrade(m.up); ui.notify(`${esc(tx(m.level >= S.cfg.guns.length - 1 ? 'maxGun' : 'upgrade'))}<small>${esc(gunName(m.up))}</small>`, 'gold', true); ctx.sfx('buy'); }
+    if (m.wanted) ui.notify(tx('wantedKill', { m: S.cfg.wantedMult }), 'red', true, 'skull');
   });
+  on('dead', (m) => die(m));
   on('wanted', (m) => {
     const prev = S.wanted; S.wanted = m.id; if (!m.id) S.wantedPos = null;
     if (m.id === S.pid && prev !== S.pid) { ui.notify(`${tx('youWanted')}<small>${esc(tx('youWantedSub', { m: S.cfg.wantedMult }))}</small>`, 'red', true, 'skull'); ctx.sfx('wanted'); }
@@ -212,27 +210,23 @@ export function createDM(ctx) {
     ui.setBoard(m.r, S.pid, S.wanted, nameOf);
     if (S.boardOpen) ui.showBoard(true, S.board, S.pid, S.wanted, nameOf, S.mapLabel);
   });
-  on('left', (m) => { const p = S.players.get(m.id); if (p) { p.left = true; p.root.visible = false; } });
+  on('left', (m) => { dropRemote(m.id); S.names.delete(m.id); });
   on('fix', (m) => { if (Array.isArray(m.p) && !player.dead) { player.pos.set(+m.p[0], +m.p[1], +m.p[2]); player.vel.set(0, 0, 0); } });
-  on('end', (m) => onEnd(m));
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const itemName = (id) => S.cfg ? (S.cfg.weapons[id] ? S.cfg.weapons[id].name : S.cfg.armor[id] ? S.cfg.armor[id].name : id) : id;
 
   // ---------------- przebieg ----------------
+  // wejście do stałego lobby: bez kolejki – serwer od razu wpuszcza (albo odpowiada, że lobby jest pełne)
   async function join(tier, info) {
     if (S.active) return;
-    S.active = true; S.phase = 'connecting'; S.tier = tier; S.info = info;
-    ui.showQueue(tier, info, cancel); document.body.classList.add('dm-queue');
-    try { await net.connect(); net.send({ t: 'dmq', tier: tier.id, skin: ctx.skinId() || '' }); S.phase = 'queue'; }
+    S.active = true; S.phase = 'connecting'; S.tier = tier || null; S.info = info;
+    try { await net.connect(); net.send({ t: 'dmq', skin: ctx.skinId() || '' }); }
     catch (e) { exit(false, (e && e.message) || 'offline'); }
   }
-  function cancel() { if (S.phase === 'queue' || S.phase === 'connecting') { net.send({ t: 'dmc' }); setTimeout(() => { if (S.phase === 'queue' || S.phase === 'connecting') exit(false); }, 1500); } }
+  function cancel() { if (S.phase === 'connecting') exit(false); }
 
   function startMatch(m) {
-    ui.hideQueue(); document.body.classList.remove('dm-queue');
-    S.phase = 'count'; S.pid = m.you; S.cfg = m.cfg; S.map = m.map; S.mapLabel = ctx.mapLabel(m.map);
+    S.phase = 'live'; S.pid = m.you; S.cfg = m.cfg; S.map = m.map; S.mapLabel = ctx.mapLabel(m.map);
     S.names = new Map(m.players.map((p) => [p.id, p.nick])); S.board = []; S.wanted = 0; S.wantedPos = null; S.off = null; S.q = 0;
-    S.endT = now() + m.liveIn + m.duration; S.liveT = now() + m.liveIn;
     Object.assign(S.me, { life: 0, money: m.money, owned: m.owned, armor: 0, armorMax: 100, helmet: false, hp: 100, kills: 0, deaths: 0, damage: 0, rank: 0 });
     patchStats(m.cfg);
     clearRemotes();
@@ -240,69 +234,46 @@ export function createDM(ctx) {
     ui.setIcons(ctx.icons());
     const md = ctx.enter(m.map);                               // tryb 'dm' w grze, mapa, widok z 3. osoby
     if (md) ui.mapBase(md.boxes, md.bx, md.bz);
-    ui.show(true); ui.setMoney(m.money, 0); ui.setWantedMe(false); mySkull.visible = false;
+    ui.show(true); ui.setWantedMe(false); mySkull.visible = false;
     ui.setBoard(m.players.map((p) => [p.id, 0, 0, 0, 0]), S.pid, 0, nameOf);
-    ctx.lock();
+    ui.notify(S.mapLabel, 'pink', true);
+    ctx.lock(); ctx.sfx('go');
   }
   function onSpawn(m) {
     S.me.life = m.life; Object.assign(S.me, { money: m.money, owned: m.owned, armor: m.armor, helmet: m.helmet, hp: 100, protUntil: now() + (m.prot || 0) });
     if (m.armor > 0) S.me.armorMax = m.armor;
-    ui.hideWasted(); ui.closeShop(); ctx.filter('');
-    document.body.classList.remove('dm-shop', 'dm-dead');
-    ctx.respawn(m.p, m.yaw, m.owned);                          // pozycja, pełne HP, amunicja i broń w rękach (najlepsza kupiona)
+    ui.hideWasted(); ctx.filter('');
+    document.body.classList.remove('dm-dead');
+    ctx.respawn(m.p, m.yaw, m.owned);                          // pozycja, pełne HP, amunicja i broń w rękach (najlepsza z drabinki)
     ctx.me.rotation.z = 0; ctx.me.userData.gear.set(m.armor > 0, m.helmet && m.armor > 0);
-    ui.setMoney(m.money, 0);
-    if (S.phase === 'dead' || S.phase === 'shop') { S.phase = 'live'; ctx.lock(); ctx.sfx('spawn'); }
+    if (S.phase === 'dead') { S.phase = 'live'; ctx.lock(); ctx.sfx('spawn'); }
     S.deploying = false;
   }
   function die(m) {
-    S.phase = 'dead'; S.deadT = now(); S.deathMsg = m; S.minDeath = m.minDeath || 2.4; S.shopTimeout = m.shopTimeout || 30;
-    S.me.hp = 0; S.me.armor = 0; S.me.helmet = false; S.me.owned = [ctx.PISTOL_ID]; S.me.money = m.money;
+    S.phase = 'dead'; S.deadT = now(); S.deathMsg = m; S.minDeath = m.minDeath || 2.4; S.deadReady = false; S.deploying = false; S.emote = null;
+    S.me.hp = 0; S.me.armor = 0; S.me.helmet = false; S.me.owned = [ctx.PISTOL_ID];
     ctx.setDead(true); ctx.setHp(0); document.body.classList.add('dm-dead'); ctx.me.userData.gear.set(false, false);
-    ui.scope(false);
+    ui.scope(false); S.boardOpen = false; ui.showBoard(false);
+    ctx.unlock();                                              // kursor wolny: Esc trafia do gry (wyjście do lobby), a nie tylko zwalnia mysz
     ctx.filter('grayscale(1) contrast(1.08) brightness(.82)');
     const k = m.by ? nameOf(m.by) : '';
     ui.showWasted({ killer: k, weapon: ctx.WEAPON_IDS[m.w] || ctx.PISTOL_ID, head: !!m.h, dist: m.d, killerHp: m.killerHp, killerAr: m.killerAr,
-      kills: m.stats.kills, deaths: m.stats.deaths, damage: m.stats.damage, money: m.money });
+      kills: m.stats.kills, deaths: m.stats.deaths, damage: m.stats.damage });
     ctx.sfx('wasted');
   }
-  const shopState = () => ({ money: S.me.money, owned: S.me.owned.slice(), armor: S.me.armor, helmet: S.me.helmet });
-  function openShop() {
-    S.phase = 'shop'; S.shopT = now();
-    ui.hideWasted(); ctx.filter(''); ctx.unlock(); document.body.classList.add('dm-shop');
-    if (!shopScene) shopScene = createShopScene(ctx);
-    shopScene.setLoadout(null, S.me.armor, S.me.helmet, ctx.mySkin());
-    ui.openShop(shopState(), S.cfg, { onBuy: (id) => net.send({ t: 'buy', item: id }), onDeploy: deploy, onPreview: (id) => shopScene.preview(id) });
-    net.send({ t: 'shop' });
-  }
+  // Spacja na ekranie śmierci: odrodzenie (blokada kursora w geście gracza – keydown)
   function deploy() {
-    if (S.phase !== 'shop' || S.deploying) return;
-    S.deploying = true; ctx.lock();                            // blokada kursora w geście gracza (klawisz / klik)
+    if (S.phase !== 'dead' || !S.deadReady || S.deploying) return;
+    S.deploying = true; ctx.lock();
     net.send({ t: 'deploy' });
     setTimeout(() => { S.deploying = false; }, 1500);
-  }
-  function onEnd(m) {
-    S.endMsg = m; S.phase = 'end';
-    if (m.account && ctx.onAccount) ctx.onAccount(m.account);
-    ui.scope(false); ui.closeShop(); ui.hideWasted(); ctx.filter(''); ui.showBoard(false); document.body.classList.remove('dm-dead', 'dm-shop');
-    ui.notify(tx('timeUp'), 'pink', true); ctx.sfx('end');
-    setTimeout(() => {
-      if (S.phase !== 'end') return;
-      S.phase = 'podium'; S.podT = now(); ctx.unlock(); document.body.classList.add('dm-shop');
-      ui.show(false); document.body.classList.add('dm-on');
-      if (!podScene) podScene = createPodiumScene(ctx);
-      const top = m.podium.map((id) => { const st = m.standings.find((s) => s.id === id), sk = id === S.pid ? ctx.mySkin() : ctx.findSkin(st && st.skin); return { skin: sk, color: sk && sk.c != null ? sk.c : 0xf0b440 }; });
-      podScene.setup(top);
-      ui.showPodium(m, S.pid, () => exit(true));
-      ctx.sfx('podium');
-    }, 2400);
   }
   function exit(toLobby, msg) {
     const was = S.active; S.active = false; S.phase = 'idle';
     try { if (net.open) net.send({ t: 'leave' }); } catch {}
     net.close();
-    ui.hideQueue(); ui.hideWasted(); ui.closeShop(); ui.hidePodium(); ui.showBoard(false); ui.scope(false); ui.countdown(null); ui.show(false);
-    ctx.filter(''); document.body.classList.remove('dm-shop', 'dm-on', 'dm-dead', 'dm-queue');
+    ui.hideWasted(); ui.showBoard(false); ui.scope(false); ui.countdown(null); ui.show(false);
+    ctx.filter(''); document.body.classList.remove('dm-on', 'dm-dead');
     clearRemotes(); restoreStats(); mySkull.visible = false; ctx.me.userData.gear.set(false, false); ctx.me.rotation.z = 0;
     if (was) ctx.exit(msg);
   }
@@ -312,14 +283,8 @@ export function createDM(ctx) {
   function update(dt) {
     if (!S.active) return;
     const L = now();
-    if (S.phase === 'count') ui.countdown(Math.max(0, S.liveT - L), S.mapLabel);
-    if (S.phase === 'dead' && L - S.deadT >= S.minDeath) openShop();
-    if (S.phase === 'shop') ui.shopTick(S.shopTimeout - (L - S.deadT - S.minDeath));
-    if (S.phase === 'podium') {
-      ui.podiumCd(S.cfg ? 14 - (L - S.podT) : 0);
-      if (L - S.podT > 14) exit(true);
-      return;
-    }
+    if (S.phase === 'connecting') return;
+    if (S.phase === 'dead' && !S.deadReady && L - S.deadT >= S.minDeath) { S.deadReady = true; ui.wastedReady(true); }
     stepRemotes(dt);
     // własna fasolka: padanie po śmierci (widok z 3. osoby)
     if (player.dead) { S.fallK = Math.min(1, (S.fallK || 0) + dt * 3); ctx.me.rotation.z = S.fallK * (Math.PI / 2); } else S.fallK = 0;
@@ -327,8 +292,7 @@ export function createDM(ctx) {
     const w = ctx.curWeapon(), st = ctx.WEAPON_STATS[w.id];
     ui.setAmmo(w.mag, w.reserve, w.id, ctx.gunState(), w.mag <= Math.ceil(st.mag * 0.2), ctx.reloading());
     ui.setVitals(S.me.hp, 1 - (player.fatigue || 0), S.me.armor, S.me.armorMax, S.me.helmet);
-    const left = Math.max(0, S.endT - L);
-    ui.setTimer(S.phase === 'count' ? S.cfg.duration : left, S.me.kills, S.me.rank, S.total || S.names.size);
+    ui.setTimer(S.names.size, S.cfg.maxPlayers, S.me.kills, S.me.rank, S.total || S.names.size);
     ui.setProt(!player.dead && S.me.protUntil > L ? S.me.protUntil - L : 0);
     const scoped = !player.dead && !!st.scope && player.ads > 0.6 && S.phase === 'live'; ui.scope(scoped); S.scoped = scoped;
     // minimapa: widoczni przeciwnicy + WANTED (serwer podaje jego pozycję zawsze)
@@ -338,7 +302,7 @@ export function createDM(ctx) {
   }
   // paczka ruchu do serwera (20/s)
   function send(dt) {
-    if (!S.active || !net.open || player.dead || !(S.phase === 'live' || S.phase === 'count') || !S.me.life) return;
+    if (!S.active || !net.open || player.dead || S.phase !== 'live' || !S.me.life) return;
     S.sendT -= dt; if (S.sendT > 0) return; S.sendT = 0.05;
     const p = player, f2 = (v) => +(+v || 0).toFixed(2), f3 = (v) => +(+v || 0).toFixed(3);
     net.send({ t: 'st', s: [f3(p.pos.x), f3(p.pos.y), f3(p.pos.z), f3(p.yaw), f3(p.pitch), f2(p.crouch), f2(p.run), f2(p.air), f2(p.slideK), f2(p.legYaw), ctx.WEAPON_IDS.indexOf(ctx.curWeapon().id), p.ads > 0.5 ? 1 : 0, S.me.life, S.emote ? S.emote.id : 0] });
@@ -352,18 +316,17 @@ export function createDM(ctx) {
     w.inst.group.visible = false;
     if (player.view !== 'fps') { ctx.me.userData.baseY = player.pos.y; EMOTES[EMOTE_IDS[S.emote.id]](ctx, ctx.me, L - S.emote.t0); }
   }
-  function render(renderer, dt) {
-    if (S.phase === 'shop' && shopScene) { shopScene.render(renderer, dt); return true; }
-    if (S.phase === 'podium' && podScene) { ui.podiumPlates(podScene.render(renderer, dt)); return true; }
-    return false;
-  }
+  function render() { return false; }
   function key(e, down) {
     if (!S.active) return false;
-    if (down && S.phase === 'shop' && e.code === 'Escape') { ctx.pause(); return true; }   // menu (wyjście z meczu) także ze sklepu
-    if (down && ui.shopKey(e)) return true;
+    // ekran śmierci: Spacja – odrodzenie, Esc – wyjście do lobby
+    if (S.phase === 'dead' && (e.code === 'Space' || e.code === 'Escape')) {
+      e.preventDefault();
+      if (down && !e.repeat) { if (e.code === 'Space') deploy(); else exit(true); }
+      return true;
+    }
     if (down && e.code === 'KeyG' && S.phase === 'live' && !player.dead) { S.emote = { id: 1 + ((S.emoteN = (S.emoteN || 0) + 1) - 1) % 3, t0: now() }; return true; }
-    if (e.code === 'Tab' && (S.phase === 'live' || S.phase === 'dead' || S.phase === 'count')) { e.preventDefault(); S.boardOpen = down; ui.showBoard(down, S.board, S.pid, S.wanted, nameOf, S.mapLabel); return true; }
-    if (S.phase === 'podium' && down && (e.code === 'Enter' || e.code === 'Space' || e.code === 'Escape')) { e.preventDefault(); exit(true); return true; }
+    if (e.code === 'Tab' && (S.phase === 'live' || S.phase === 'dead')) { e.preventDefault(); S.boardOpen = down; ui.showBoard(down, S.board, S.pid, S.wanted, nameOf, S.mapLabel); return true; }
     return false;
   }
   const hitMeshes = () => { const out = []; for (const p of S.players.values()) if (p.root.visible && p.dying <= 0) out.push(...p.meshes); return out; };
@@ -372,8 +335,8 @@ export function createDM(ctx) {
   return {
     join, cancel, leave, update, send, shot, render, key, hitMeshes, ui, postPose,
     reload() { if (S.active && S.phase === 'live') net.send({ t: 'rl' }); },
-    get active() { return S.active; }, get phase() { return S.phase; }, get inMatch() { return S.active && ['count', 'live', 'dead', 'shop', 'end'].includes(S.phase); },
+    get active() { return S.active; }, get phase() { return S.phase; }, get inMatch() { return S.active && (S.phase === 'live' || S.phase === 'dead'); },
     get frozen() { return S.active && S.phase !== 'live'; }, get scoped() { return !!S.scoped; }, get owned() { return S.me.owned; }, get cfg() { return S.cfg; },
-    get tier() { return S.tier; }, get shopOpen() { return S.phase === 'shop'; }, get overlay() { return S.phase === 'shop' || S.phase === 'podium'; },
+    get tier() { return null; }, get overlay() { return S.phase === 'dead'; },   // ekran śmierci: kursor wolny (klik nie blokuje myszy)
   };
 }

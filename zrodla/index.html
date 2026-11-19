@@ -335,7 +335,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import glbB64 from './bean-data.js';
-import {createLobby,applySkin,SKINS} from './lobby.js';
+import {createLobby,applySkin,SKINS,loadSkinsJson} from './lobby.js';
 import {payout,t as i18n,getLang,mapName} from './lobby-ui.js';
 import {srvText} from './wallet.js';   // komunikaty serwera w języku gry   // i18n: słownik lobby (PL/EN/RU/ES) – menu pauzy
 import {loader} from './loader.js';
@@ -343,7 +343,7 @@ import {createClimates} from './klimaty.js';   // wygląd map 1v1: Baza = salon 
 import {createMatch} from './match.js';
 import {createNet} from './net.js';
 import {createRange} from './range.js';
-import {createDM} from './dm.js';            // tryb Deathmatch (do 20 graczy): HUD, WASTED, sklep po śmierci, podium
+import {createDM} from './dm.js';            // tryb Deathmatch (stałe lobby do 20 graczy): HUD, WASTED, broń za zabójstwa
 import {WEAPON_IDS,WEAPON_STATS,PISTOL_ID,weaponAllowed,loadWeaponModels,createWeapon,applyParts,reloadPose,drawPose,magGrabPoint,pouchPoint,createShells,weaponSound,weaponSfx,cyclePose,EJECT_AT} from './weaponry.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {gunEnvironment} from './weapons/_env.js';   // odbicia dla broni w widoku z pierwszej osoby
@@ -362,7 +362,7 @@ const renderer=new THREE.WebGLRenderer({antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.setSize(innerWidth,innerHeight);
 renderer.outputColorSpace=THREE.SRGBColorSpace;
-renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;   // PCF zamiast PCFSoft: kilka razy mniej próbek cienia na piksel
 renderer.domElement.tabIndex=0;
 document.body.prepend(renderer.domElement);
 const scene=new THREE.Scene();
@@ -778,7 +778,7 @@ function refillAll(){
 //      w Strzelnicy bez drużyn – wszystkie bronie ----
 const TEAM={me:null};                                      // 0 = niebieska, 1 = czerwona, null = bez drużyn
 const TEAM_GUNS=[['m4a1','deagle'],['akm','glock17']];
-let DMX=null;                                              // tryb Deathmatch (createDM niżej); bronie w slotach = kupione w tym życiu
+let DMX=null;                                              // tryb Deathmatch (createDM niżej); bronie w slotach = Glock + broń z drabinki (za zabójstwa)
 const DM_ORDER=['glock17','deagle','spas12','mp5k','akm','m4a1'];
 function slotList(){
   if(DMX&&DMX.active&&MODE==='dm')return DM_ORDER.filter(id=>DMX.owned.includes(id)).map(id=>inv.findIndex(w=>w.id===id)).filter(i=>i>=0);
@@ -922,7 +922,7 @@ function spawnSparks(p,n,color){
 const keys={};let playing=false;
 function startPlay(){
   initAudio();if(AC&&AC.state==='suspended')AC.resume();
-  if(DMX&&DMX.overlay){$('overlay').style.display='none';return}   // Deathmatch: sklep / podium – kursor zostaje wolny
+  if(DMX&&DMX.overlay){$('overlay').style.display='none';return}   // Deathmatch: ekran śmierci – kursor zostaje wolny (Spacja / Esc)
   playing=true;$('overlay').style.display='none';
   try{const r=renderer.domElement.requestPointerLock();if(r&&r.catch)r.catch(()=>{})}catch(e){}
   renderer.domElement.focus({preventScroll:true});
@@ -985,7 +985,7 @@ document.addEventListener('pointerlockerror',()=>{if(playing)$('lockHint').hidde
 document.addEventListener('pointerlockchange',()=>{if(document.pointerLockElement)$('lockHint').hidden=true;if(!document.pointerLockElement&&playing){/* Esc: pauza */playing=false;gun.firing=false;$('overlay').style.display='flex'}
   if(!document.pointerLockElement&&window.__match&&window.__match.cancelable)window.__match.cancel()});   // Esc podczas szukania meczu = anuluj
 addEventListener('keydown',e=>{
-  if(DMX&&DMX.key(e,true))return;                          // Deathmatch: sklep, tabela (Tab), podium
+  if(DMX&&DMX.key(e,true))return;                          // Deathmatch: ekran śmierci (Spacja / Esc), tabela (Tab)
   keys[e.code]=true;
   if(['Space','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();
   if(!playing)return;
@@ -1561,8 +1561,20 @@ function updateCross(){updateFatigue();
 }
 const OVL=$('overlay');
 const live=()=>playing||(OVL.style.display!=='none'&&!duel.mapBanner&&!document.body.classList.contains('in-lobby'));   // gra trwa (też przy menu pod Esc)
+// ---- płynność: rozdzielczość renderu sama dopasowuje się do komputera (jak w CryptoStrike) ----
+// średni czas klatki > 22 ms przez ~1,2 s → mniej pikseli (do 0,55 rozdzielczości ekranu); < 14 ms przez 5 s → z powrotem ostrzej
+const QUAL={max:Math.min(devicePixelRatio||1,1.5),scale:Math.min(devicePixelRatio||1,1),ema:16,slow:0,fast:0};
+renderer.setPixelRatio(QUAL.scale);
+function adaptQuality(ms){
+  if(ms>250||document.hidden)return;
+  QUAL.ema+=(ms-QUAL.ema)*.05;
+  if(QUAL.ema>22){QUAL.slow+=ms;QUAL.fast=0}else if(QUAL.ema<14){QUAL.fast+=ms;QUAL.slow=0}else QUAL.slow=QUAL.fast=0;
+  if(QUAL.slow>1200&&QUAL.scale>.56){QUAL.scale=Math.max(.55,+(QUAL.scale-.15).toFixed(2));QUAL.slow=0;QUAL.ema=17;renderer.setPixelRatio(QUAL.scale)}
+  else if(QUAL.fast>5000&&QUAL.scale<QUAL.max-.01){QUAL.scale=Math.min(QUAL.max,+(QUAL.scale+.1).toFixed(2));QUAL.fast=0;renderer.setPixelRatio(QUAL.scale)}
+}
+window.__quality=QUAL;
 function frame(){
-  const dt=Math.min(clock.getDelta(),.05);time+=dt;
+  const rawDt=clock.getDelta(),dt=Math.min(rawDt,.05);time+=dt;adaptQuality(rawDt*1000);
   if(thumbQ.length)snapMap(thumbQ.shift());           // miniatura mapy do losowania (renderuje się przed właściwą klatką)
   if(lobby.active||match.lobbyPhase){lobby.update(dt);match.update(dt,false);requestAnimationFrame(frame);return}
   // menu pod Esc nie zatrzymuje gry (multiplayer): spadanie, przeładowanie, bot i odliczanie lecą dalej, tylko sterowanie jest wyłączone
@@ -1577,7 +1589,7 @@ function frame(){
   if(player.view==='fps'){poseViewmodel(dt);me.visible=false}else{poseThirdPerson(dt)}
   if(DMX&&DMX.scoped)me.visible=false;
   if(DMX&&DMX.active)DMX.postPose();                    // emotka (G) w widoku z 3. osoby
-  if(DMX&&DMX.render(renderer,dt)){match.update(dt,!live());requestAnimationFrame(frame);return}   // sklep po śmierci / podium: własne sceny 3D
+  if(DMX&&DMX.render(renderer,dt)){match.update(dt,!live());requestAnimationFrame(frame);return}   // Deathmatch: miejsce na własne sceny 3D (teraz żadnej)
   if(window.__frameHook)window.__frameHook(dt);          // testy: odczyt pozy broni po każdej klatce
   updateCamera(dt);updateFx(dt);shells.update(dt,0);updateCross();match.update(dt,!live());
   climates.update(dt);const so=climates.sunOff;sun.position.set(player.pos.x+so.x,so.y,player.pos.z+so.z);sun.target.position.copy(player.pos);
@@ -1827,7 +1839,7 @@ function lobbyAnimate(b,t,dt,st){
 let mySkin='';   // przed createLobby: lobby od razu wywołuje onSkin z zapisanym skinem
 loader.set(.85);
 const lobby=createLobby({renderer,bean:lobbyBean,animate:lobbyAnimate,
-  onPlay:(m,o)=>{o=o||{};if(m==='dm'){initAudio();if(AC&&AC.state==='suspended')AC.resume();DMX.join(o.tier,o.info);return}   // Deathmatch: kolejka na serwerze (poziom = wpisowe)
+  onPlay:(m,o)=>{o=o||{};if(m==='dm'){initAudio();if(AC&&AC.state==='suspended')AC.resume();DMX.join(o.tier,o.info);return}   // Deathmatch: wejście do stałego lobby na serwerze
     if(m==='bot'){BOT.on=true;matchLock();lobby.hide();ON.active=false;ON.opp=null;ON.seat=Math.random()<.5?0:1;match.start({stake:0});match.found(i18n('g.bot'));return}   // z botem: od razu „przeciwnik znaleziony”, mapę losuje mecz
     if(m==='1v1'){BOT.on=false;matchLock();lobby.hide();ON.active=false;match.start({stake:o.stake});    // 1v1: kolejka na serwerze, mapę losuje serwer
       NET.queue({matchId:o.matchId,skin:mySkin}).catch(e=>netFail(e.message));return}
@@ -1847,7 +1859,7 @@ $('toLobby').addEventListener('click',e=>{
 $('pmStay').addEventListener('click',()=>pmShow('menu'));
 $('pmQuitYes').addEventListener('click',e=>{e.stopPropagation();$('pmQuit')._ok=true;$('toLobby').click()});
 function leaveToLobby(){
-  if(DMX&&DMX.active){$('overlay').style.display='none';DMX.leave();return}   // Deathmatch: wyjście = koniec udziału (wpisowe przepada)
+  if(DMX&&DMX.active){$('overlay').style.display='none';DMX.leave();return}   // Deathmatch: wyjście z lobby (miejsce zwalnia się dla innych)
   if(ON.active){NET.send({t:'leave'});NET.close();ON.active=false;restoreOppSkin()}
   playing=false;gun.firing=false;match.abort();player.dead=false;document.body.classList.remove('mt-dead');
   if(document.pointerLockElement)document.exitPointerLock();
@@ -1901,7 +1913,7 @@ window.__match=match;
 const NET=createNet();
 const ON={active:false,seat:0,opp:null,st:null,sendT:0,q:0,hidden:true,aim:[]};
 let remoteSkins=null;
-fetch('./skins.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(l=>{if(Array.isArray(l))remoteSkins=l}).catch(()=>{});
+loadSkinsJson().then(l=>{if(Array.isArray(l))remoteSkins=l}).catch(()=>{});   // to samo zapytanie co w lobby (jedno pobranie)
 const findSkin=id=>id?((remoteSkins||[]).find(k=>k.id===id)||SKINS.find(k=>k.id===id)||null):null;
 function applyOppSkin(){const e=duel.bot,sk=ON.opp&&findSkin(ON.opp.skin);if(!e)return;const k=sk||{id:'klasyk',c:0xf0b440};applySkin(e.mats.skin,k);if(e.mats.body)applySkin(e.mats.body,k);if(e.root.userData.eyes)e.root.userData.eyes.visible=k.eyes!==false}
 function restoreOppSkin(){const e=duel.bot;if(!e)return;const k={id:'bot',c:HUES[0]};applySkin(e.mats.skin,k);if(e.mats.body)applySkin(e.mats.body,k);if(e.root.userData.eyes)e.root.userData.eyes.visible=true}
@@ -1945,7 +1957,7 @@ function dmRespawn(p,yaw,owned){
   player.pos.set(+p[0],+p[1],+p[2]);player.vel.set(0,0,0);player.yaw=+yaw||0;player.pitch=0;
   Object.assign(player,{dead:false,slide:0,slideK:0,fatigue:0,ads:0,crouch:0,land:0});adsHeld=false;gun.firing=false;gun.trigger=false;cancelInspect(true);
   for(const w of inv){const s=WEAPON_STATS[w.id];w.mag=s.mag;w.reserve=s.reserve;w.inst.slideBack=0;w.inst.slideLocked=false;w.inst.cycle=0;w.inst.cycleT=null}
-  // w ręce najdroższa kupiona broń (po zakupie od razu ją masz), w drugim slocie pistolet
+  // w ręce najlepsza broń z drabinki (po odrodzeniu: Glock), w drugim slocie pistolet
   const c=DMX.cfg,best=(owned||[PISTOL_ID]).slice().sort((a,b)=>((c&&c.weapons[b]?c.weapons[b].price:0)-(c&&c.weapons[a]?c.weapons[a].price:0)))[0]||PISTOL_ID;
   equipNow(inv.findIndex(w=>w.id===best));prevW=inv.findIndex(w=>w.id===PISTOL_ID);
   gun.reloading=0;gun.autoReload=0;gun.switching=0;camInit=false;deathK=0;setHud();
@@ -1962,6 +1974,9 @@ DMX=createDM({THREE,scene,camera,renderer,player,me,net:DMNET,
   mapLabel:n=>i18n('mt.map')+': '+mapName(n).toUpperCase(),
   enter:enterDM,
   respawn:dmRespawn,
+  upgrade:id=>{const i=inv.findIndex(w=>w.id===id);if(i<0)return;const w=inv[i],s=WEAPON_STATS[id];   // zabójstwo: następna broń z drabinki, pełny magazynek, od razu w rękach
+    w.mag=s.mag;w.reserve=s.reserve;w.inst.slideBack=0;w.inst.slideLocked=false;w.inst.cycle=0;w.inst.cycleT=null;
+    gun.firing=false;gun.trigger=false;equipNow(i);prevW=inv.findIndex(x=>x.id===PISTOL_ID);setHud()},
   setDead:v=>{player.dead=!!v;gun.firing=false;gun.trigger=false;adsHeld=false;if(v){gun.reloading=0;cancelInspect(true)}},
   setHp:v=>setHp(v),
   curWeapon:()=>inv[curW],

@@ -9,11 +9,13 @@ export const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const PARTS = ['body', 'mag', 'slide', 'pump'];
 
 // base64 → węzły części modelu (raz na stronę; instancje to klony współdzielące siatki i materiały)
-export async function loadGlb(b64) {
-  const s = atob(b64), u = new Uint8Array(s.length);
-  for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+// src: base64 (gra w jednym pliku) albo ścieżka do pliku .glb (zwykły build: model leży obok gry i trafia do cache przeglądarki)
+export async function loadGlb(src) {
+  let buf;
+  if (src.length < 2048 && /\.glb($|\?)/.test(src)) buf = await (await fetch(src)).arrayBuffer();
+  else { const s = atob(src), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); buf = u.buffer; }
   const ld = new GLTFLoader(); ld.setMeshoptDecoder(MeshoptDecoder);
-  const gl = await ld.parseAsync(u.buffer, '');
+  const gl = await ld.parseAsync(buf, '');
   const nodes = {};
   gl.scene.traverse((o) => {
     if (PARTS.includes(o.name) && !nodes[o.name]) nodes[o.name] = o;
