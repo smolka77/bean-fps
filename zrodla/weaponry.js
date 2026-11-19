@@ -1,30 +1,42 @@
 // Bean FPS – system broni: statystyki, instancje modeli, animacje (strzał, przeładowanie, zmiana), łuski, dźwięki.
-// Modele broni są w ./weapons/<id>.js (kontrakt: ./weapons/SPEC.md).
+// Modele broni są w ./weapons/<id>.js (modele GLB z ./weapons/<id>-glb.js, składane przez ./weapons/_glb.js),
+// dźwięki – próbki z biblioteki gry w ./weapons/<id>-snd.js (odtwarzanie: ./weapons/_audio.js).
 import * as THREE from 'three';
+import { weaponAudio } from './weapons/_audio.js';
+export { weaponAudio };
 
-export const WEAPON_IDS = ['ak47', 'm4a1s', 'glock', 'usps'];
+// kolejność = indeksy w paczkach sieciowych (serwer: serwer/dm.mjs WIDS, pierwsze cztery także serwer/mecz.mjs)
+export const WEAPON_IDS = ['akm', 'm4a1', 'glock17', 'deagle', 'spas12', 'mp5k'];
+export const PISTOL_ID = 'glock17';                  // pistolet startowy (Deathmatch)
 
-// Statystyki. recoil.pitch/yaw w radianach na strzał, spread w radianach (połowa kąta stożka).
+// Statystyki. recoil.pitch/yaw w radianach na strzał, spread w radianach (połowa kąta stożka). snd = klucz próbek w _audio.js.
 export const WEAPON_STATS = {
-  ak47:  { name: 'AK-47',    slot: 1, auto: true,  rpm: 600, dmg: 36, head: 3,   mag: 30, reserve: 90,  reload: 2.45, draw: .55,
-           recoil: { pitch: .0125, yaw: .0045, kick: .045, rot: .06 }, spread: { hip: .0075, ads: .0016, move: 1.15, bloom: .14 }, snd: 'ak',
-           fov: 52, relief: .085, recoilTravel: .055 },
-  m4a1s: { name: 'M4A1-S',   slot: 2, auto: true,  rpm: 600, dmg: 33, head: 3,   mag: 25, reserve: 75,  reload: 2.3,  draw: .55,
-           recoil: { pitch: .0088, yaw: .003,  kick: .034, rot: .045 }, spread: { hip: .0065, ads: .0012, move: 1.0, bloom: .11 }, snd: 'rifleSup',
-           fov: 52, relief: .085, recoilTravel: .02 },
-  glock: { name: 'Glock-18', slot: 3, auto: false, rpm: 400, dmg: 22, head: 2.5, mag: 20, reserve: 120, reload: 1.75, draw: .4,
-           recoil: { pitch: .0065, yaw: .0028, kick: .028, rot: .09 }, spread: { hip: .006, ads: .002, move: .7, bloom: .12 }, snd: 'pistol',
-           fov: 62, relief: .3, recoilTravel: .022 },
-  usps:  { name: 'USP-S',    slot: 4, auto: false, rpm: 350, dmg: 35, head: 2.5, mag: 12, reserve: 24,  reload: 1.95, draw: .4,
-           recoil: { pitch: .0085, yaw: .003,  kick: .03,  rot: .1 },  spread: { hip: .005, ads: .0012, move: .7, bloom: .13 }, snd: 'pistolSup',
-           fov: 62, relief: .3, recoilTravel: .024 },
+  akm:     { name: 'AKM',          slot: 1, auto: true,  rpm: 600, dmg: 36, head: 3,   mag: 30, reserve: 90,  reload: 2.45, draw: .55,
+             recoil: { pitch: .0125, yaw: .0045, kick: .045, rot: .06 }, spread: { hip: .0075, ads: .0016, move: 1.15, bloom: .14 }, snd: 'akm',
+             fov: 52, relief: .085, recoilTravel: .055 },
+  m4a1:    { name: 'M4A1',         slot: 2, auto: true,  rpm: 700, dmg: 32, head: 3,   mag: 30, reserve: 90,  reload: 2.3,  draw: .55,
+             recoil: { pitch: .0092, yaw: .0032, kick: .036, rot: .045 }, spread: { hip: .0065, ads: .0011, move: 1.0, bloom: .11 }, snd: 'm4a1',
+             fov: 48, relief: .085, recoilTravel: 0 },
+  glock17: { name: 'Glock-17',     slot: 3, auto: false, rpm: 400, dmg: 22, head: 2.5, mag: 17, reserve: 102, reload: 1.75, draw: .4,
+             recoil: { pitch: .0065, yaw: .0028, kick: .028, rot: .09 }, spread: { hip: .006, ads: .002, move: .7, bloom: .12 }, snd: 'glock17',
+             fov: 62, relief: .3, recoilTravel: .022 },
+  deagle:  { name: 'Desert Eagle', slot: 4, auto: false, rpm: 267, dmg: 48, head: 2.6, mag: 7,  reserve: 35,  reload: 2.2,  draw: .5,
+             recoil: { pitch: .021, yaw: .006, kick: .05, rot: .2 },  spread: { hip: .009, ads: .0016, move: 1.0, bloom: .32 }, snd: 'deagle',
+             fov: 60, relief: .3, recoilTravel: .03 },
+  // strzelba (śruciny, pompka) i pistolet maszynowy; w Deathmatch dokładne liczby podaje serwer
+  spas12:  { name: 'SPAS-12',      slot: 5, auto: false, rpm: 72,  dmg: 15, head: 1.6, mag: 8,  reserve: 32,  reload: 2.6,  draw: .6, pellets: 9, pelletSpread: .052, pump: true,
+             recoil: { pitch: .045, yaw: .008, kick: .09, rot: .16 }, spread: { hip: .004, ads: .003, move: .4, bloom: .1 }, snd: 'spas12',
+             fov: 60, relief: .1, recoilTravel: 0 },
+  mp5k:    { name: 'MP5K',         slot: 6, auto: true,  rpm: 900, dmg: 25, head: 2.5, mag: 30, reserve: 120, reload: 2.1,  draw: .45,
+             recoil: { pitch: .0072, yaw: .004, kick: .03, rot: .05 }, spread: { hip: .0075, ads: .0022, move: .8, bloom: .09 }, snd: 'mp5k',
+             fov: 58, relief: .085, recoilTravel: 0 },
 };
 
 // ---------------- modele ----------------
 const MODELS = {};
 export async function loadWeaponModels() {
   await Promise.all(WEAPON_IDS.map(async id => {
-    try { MODELS[id] = await import(`./weapons/${id}.js`); if (typeof MODELS[id].build !== 'function') throw new Error('brak build()'); }
+    try { MODELS[id] = await import(`./weapons/${id}.js`); if (typeof MODELS[id].build !== 'function') throw new Error('brak build()'); if (MODELS[id].ready) await MODELS[id].ready; }
     catch (e) { console.warn('Broń', id, '– używam modelu zastępczego:', e && e.message); MODELS[id] = await import('./weapons/_example.js'); }
   }));
 }
@@ -58,9 +70,15 @@ export function createWeapon(id, { fx = true } = {}) {
     sightY: A.sightRear.y, boreY: m.boreY, flashScale: m.flashScale || 1,
     magRest: magPivot ? { p: magPivot.position.clone(), q: magPivot.quaternion.clone() } : null,
     slideRest: slide ? slide.position.clone() : null,
+    pump: (m.parts && m.parts.pump) || null, pumpRest: m.parts && m.parts.pump ? m.parts.pump.position.clone() : null,
+    bolt: (m.parts && m.parts.bolt) || null, boltRest: m.parts && m.parts.bolt ? { p: m.parts.bolt.position.clone(), q: m.parts.bolt.quaternion.clone() } : null, cycle: 0,
+    // pompka / zamek: skok z modelu; dłonie wracają do pozycji spoczynkowych (gripR/gripL zmieniają się w trakcie przeładowania)
+    pumpStroke: m.pumpStroke || .085, boltLift: m.boltLift || 1.1, boltTravel: m.boltTravel || .09,
+    boltKnob: A.boltKnob ? A.boltKnob.clone() : null, gripRRest: A.gripR.clone(), gripLRest: A.gripL.clone(),
+    reloadKind: m.parts && m.parts.pump ? 'shells' : 'mag', rack: 0, rackT: 0,
     slideBack: 0, slideLocked: false,
-    // kierunek wysuwania magazynka (układ inner): w dół wzdłuż osi magazynka, lekko do przodu
-    magDir: new THREE.Vector3(0, -1, m.hands === 'pistol' ? .06 : .18).normalize(),
+    // kierunek wysuwania magazynka (układ inner): z modelu albo w dół wzdłuż osi magazynka, lekko do tyłu
+    magDir: (m.magDir ? m.magDir.clone() : new THREE.Vector3(0, -1, m.hands === 'pistol' ? .06 : .18)).normalize(),
   };
   if (fx) {
     const mat = new THREE.MeshBasicMaterial({ map: flashTexture(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
@@ -80,8 +98,44 @@ export function createWeapon(id, { fx = true } = {}) {
 const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 export { ss as smoothstep };
 
+// Przebieg pompki / zamka, c ∈ [0,1] – po strzale (inst.cycle) i na końcu przeładowania pustej broni (inst.rack).
+// pompka: szybko do tyłu (łuska wylatuje w tylnym położeniu), krótka pauza, do przodu
+const pumpBack = c => ss(0, .36, c) * (1 - ss(.5, .88, c));
+// zamek: prawa dłoń na kulę rączki → w górę → do tyłu (wyrzut łuski) → do przodu → w dół → dłoń wraca na chwyt
+const boltPhase = c => ({ hand: ss(0, .14, c) * (1 - ss(.86, 1, c)), lift: ss(.11, .27, c) * (1 - ss(.72, .86, c)), back: ss(.28, .45, c) * (1 - ss(.54, .7, c)) });
+export const EJECT_AT = { pump: .3, bolt: .42 };                 // chwila wyrzutu łuski w przebiegu (tylne położenie)
+const cycleNow = inst => Math.max(inst.cycle || 0, inst.rackT && performance.now() - inst.rackT < 150 ? inst.rack : 0);
+// Ruch całej broni przy pompowaniu / pracy zamkiem (dodawany do pozy w widoku z 1. osoby i w 3. osobie)
+const _cp = { pitch: 0, roll: 0, yaw: 0, lift: 0, back: 0, hand: 0 };
+export function cyclePose(inst) {
+  _cp.pitch = _cp.roll = _cp.yaw = _cp.lift = _cp.back = _cp.hand = 0;
+  const c = cycleNow(inst); if (c <= 0 || c >= 1) return _cp;
+  if (inst.pump) { const k = pumpBack(c); _cp.pitch = -.04 * k; _cp.roll = .05 * k; _cp.back = .014 * k; _cp.lift = -.006 * k; }
+  else if (inst.bolt) { const b = boltPhase(c); _cp.hand = b.hand; _cp.roll = .16 * b.hand; _cp.pitch = -.05 * b.hand + .025 * b.back; _cp.yaw = .05 * b.hand; _cp.lift = -.014 * b.hand; _cp.back = .012 * b.back; }
+  return _cp;
+}
+
+const _kn = new THREE.Vector3();
 export function applyParts(inst, magOff, magVisible, magRot = 0) {
   if (inst.slide && inst.slideRest) inst.slide.position.set(inst.slideRest.x, inst.slideRest.y, inst.slideRest.z + inst.slideBack);
+  const c = cycleNow(inst);
+  // strzelba: czółenko do tyłu i do przodu, lewa dłoń jedzie razem z nim
+  if (inst.pump && inst.pumpRest) {
+    const s = inst.pumpStroke * pumpBack(c);
+    inst.pump.position.set(inst.pumpRest.x, inst.pumpRest.y, inst.pumpRest.z + s);
+    inst.gripL.copy(inst.gripLRest); inst.gripL.z += s;
+  }
+  // AWP: rączka w górę (rotateZ w układzie zamka obróconym o π), zamek do tyłu i z powrotem; prawa dłoń trzyma kulę rączki
+  if (inst.bolt && inst.boltRest) {
+    const b = boltPhase(c);
+    inst.bolt.position.set(inst.boltRest.p.x, inst.boltRest.p.y, inst.boltRest.p.z + inst.boltTravel * b.back);
+    inst.bolt.quaternion.copy(inst.boltRest.q); inst.bolt.rotateZ(-inst.boltLift * b.lift);
+    inst.gripR.copy(inst.gripRRest);
+    if (inst.boltKnob && b.hand > 0) {
+      _kn.copy(inst.boltKnob).applyQuaternion(inst.bolt.quaternion).add(inst.bolt.position); _kn.y -= .014; _kn.z += .012;   // dłoń obejmuje kulę od dołu
+      inst.gripR.lerp(_kn, b.hand);
+    }
+  }
   if (inst.magRest) {
     inst.mag.position.copy(inst.magRest.p);
     if (magOff) inst.mag.position.add(magOff);
@@ -95,8 +149,9 @@ export function applyParts(inst, magOff, magVisible, magRot = 0) {
 // i cel lewej dłoni: {mode:'grip'|'mag'|'pouch', blend} – blend = waga celu "mag/pouch" względem chwytu.
 const _off = new THREE.Vector3(), _pp = new THREE.Vector3(), _dd = new THREE.Vector3();
 export function reloadPose(inst, t, empty) {
-  const r = { roll: 0, pitch: 0, yaw: 0, lift: 0, side: 0, magOff: _off.set(0, 0, 0), magVisible: true, magRot: 0, hand: 'grip', handBlend: 0, click: 0, slideBack: null };
+  const r = { roll: 0, pitch: 0, yaw: 0, lift: 0, side: 0, magOff: _off.set(0, 0, 0), magVisible: true, magRot: 0, hand: 'grip', handBlend: 0, click: 0, slideBack: null, shell: 0 };
   const d = inst.magDir;
+  if (inst.reloadKind === 'shells') return shellReload(inst, t, empty, r);
   if (!inst.pistol) {
     const tilt = ss(0, .14, t) * (1 - ss(.82, .97, t));
     r.roll = .42 * tilt; r.pitch = -.12 * tilt; r.yaw = .1 * tilt; r.lift = -.02 * tilt; r.side = -.015 * tilt;
@@ -110,6 +165,7 @@ export function reloadPose(inst, t, empty) {
     }
     r.hand = 'mag'; r.handBlend = ss(.05, .14, t) * (1 - ss(.72, .84, t));
     r.click = t >= .7 ? 1 : 0;
+    if (inst.bolt && empty && t > .72 && t < .98) { inst.rack = (t - .72) / .25; inst.rackT = performance.now(); }   // AWP: pusty – przeładowanie zamkiem po nowym magazynku
   } else {
     const tilt = ss(0, .12, t) * (1 - ss(.86, .98, t));
     r.roll = -.32 * tilt; r.pitch = .22 * tilt; r.lift = .015 * tilt;
@@ -131,6 +187,30 @@ export function reloadPose(inst, t, empty) {
   return r;
 }
 
+// Strzelba: nabój po naboju. Broń przechylona oknem ładowania do lewej dłoni; dłoń bierze nabój z ładownicy,
+// podaje pod okno i wciska kciukiem do rury magazynka (SHELLS razy), na końcu – gdy była pusta – przeładowanie pompką.
+// „Magazynek” modelu to pojedynczy nabój: magOff przesuwa go, a dłoń (tryb 'mag') trzyma go od spodu.
+const SHELLS = 4, S0 = .1, S1 = .78, _pe = new THREE.Vector3();
+function shellReload(inst, t, empty, r) {
+  const d = inst.magDir, tilt = ss(0, .1, t) * (1 - ss(.86, .97, t));
+  r.roll = -.55 * tilt; r.pitch = .12 * tilt; r.yaw = .12 * tilt; r.lift = .05 * tilt; r.side = -.05 * tilt;   // górą w prawo: okno ładowania do lewej dłoni, w kadrze
+  pouchPoint(inst, _pp).sub(inst.anchors.magWell).addScaledVector(d, -.1);    // przesunięcie naboju, gdy dłoń jest przy ładownicy
+  _pe.copy(d).multiplyScalar(.045);                                         // nabój tuż pod oknem ładowania
+  r.hand = 'mag'; r.magVisible = false;
+  if (t < S0) { r.magOff.copy(_pp); r.handBlend = ss(.02, S0, t); }
+  else if (t < S1) {
+    const f = (t - S0) / (S1 - S0) * SHELLS, k = Math.min(SHELLS - 1, Math.floor(f)), u = f - k;
+    if (u < .42) r.magOff.copy(_pp).lerp(_pe, ss(0, .42, u));                                // z ładownicy pod okno
+    else if (u < .64) r.magOff.copy(_pe).multiplyScalar(1 - ss(.42, .64, u));                // wciśnięcie do rury
+    else if (k < SHELLS - 1) r.magOff.set(0, 0, 0).lerp(_pp, ss(.64, 1, u));                 // po następny nabój
+    else r.magOff.set(0, 0, 0);
+    r.magVisible = u < .62; r.handBlend = 1; r.shell = k + (u >= .6 ? 1 : 0);
+  } else { r.handBlend = 1 - ss(S1, S1 + .07, t); r.shell = SHELLS; }                         // dłoń wraca na czółenko
+  r.click = t >= .7 ? 1 : 0;
+  if (empty && t > .86 && t < .99) { inst.rack = (t - .86) / .12; inst.rackT = performance.now(); }
+  return r;
+}
+
 // Zmiana broni: t ∈ [0,1] (0 = schowana, 1 = gotowa)
 export function drawPose(t) {
   const k = 1 - ss(0, 1, t);
@@ -149,8 +229,9 @@ export function pouchPoint(inst, out = new THREE.Vector3()) {
 
 // ---------------- łuski ----------------
 export function createShells(scene) {
-  const brass = new THREE.MeshStandardMaterial({ color: 0xc9a043, metalness: 1, roughness: .32 });
-  const gRifle = new THREE.CylinderGeometry(.0055, .0058, .039, 10), gPistol = new THREE.CylinderGeometry(.0048, .005, .019, 10);
+  const brass = new THREE.MeshStandardMaterial({ color: 0xd2a84c, metalness: 1, roughness: .28 }), hull = new THREE.MeshStandardMaterial({ color: 0xa61d16, metalness: 0, roughness: .45 });
+  const gRifle = new THREE.CylinderGeometry(.0055, .0058, .039, 12), gPistol = new THREE.CylinderGeometry(.0048, .005, .019, 12);
+  const gShot = new THREE.CylinderGeometry(.0102, .0102, .062, 14), gMag = new THREE.CylinderGeometry(.0068, .0076, .066, 12);   // łuska śrutowa, .338 (AWP)
   const pool = [];
   for (let i = 0; i < 48; i++) { const m = new THREE.Mesh(gRifle, brass); m.visible = false; m.castShadow = true; scene.add(m); pool.push({ m, v: new THREE.Vector3(), w: new THREE.Vector3(), life: 0, bounced: false }); }
   let k = 0;
@@ -159,7 +240,7 @@ export function createShells(scene) {
     pool,
     spawn(inst, rnd = Math.random, layer = 0) {
       const s = pool[k = (k + 1) % pool.length]; const m = s.m;
-      m.geometry = inst.pistol ? gPistol : gRifle; m.layers.set(layer);
+      m.geometry = inst.pump ? gShot : inst.bolt ? gMag : inst.pistol ? gPistol : gRifle; m.material = inst.pump ? hull : brass; m.layers.set(layer);
       inst.inner.updateWorldMatrix(true, false);
       m.position.copy(inst.anchors.ejectPort).applyMatrix4(inst.inner.matrixWorld);
       inst.inner.getWorldQuaternion(_q);
@@ -182,15 +263,32 @@ export function createShells(scene) {
 }
 
 // ---------------- dźwięk ----------------
-// out: węzeł docelowy (np. master gain), noise(): bufor szumu
-export function weaponSound(AC, out, noiseBuf, kind, vol = 1) {
+// Próbki z biblioteki gry (weapons/_audio.js); głośności względem siebie dobrane do nagrań. Dopóki próbki się dekodują
+// (pierwsze ułamki sekundy po włączeniu dźwięku), strzał jest syntezowany jak dawniej.
+const SAMPLE_VOL = { shot: .5, far: .75, draw: .4, magOut: .5, magIn: .55, magHit: .45, bolt: .5, boltFwd: .5, pump: .6, shell: .9, dryPistol: .45, dryRifle: .45 };
+// odtwórz próbkę broni: weaponSfx(AC, master, 'akm', 'magIn'); zwraca false, gdy próbki brak (jeszcze się dekoduje)
+export function weaponSfx(AC, out, id, key, { vol = 1, rate = 1, lp = 0, at = 0 } = {}) {
+  if (!AC || !out) return false;
+  const B = weaponAudio(AC), src = B.has(id, key) ? id : 'common';
+  return B.play(src, key, { out, vol: vol * (SAMPLE_VOL[key] || .5), rate, lp, at });
+}
+weaponSfx.has = (AC, id, key) => !!AC && weaponAudio(AC).has(id, key);
+// strzał: kind = WEAPON_STATS[id].snd; dist [m] – strzał innego gracza (z daleka: nagranie „distant” i stłumione wysokie tony)
+export function weaponSound(AC, out, noiseBuf, kind, vol = 1, dist = 0) {
+  if (!AC) return;
+  const rate = .97 + Math.random() * .06;
+  if (dist > 22 && weaponSfx(AC, out, kind, 'far', { vol, rate, lp: dist > 45 ? 2600 : 0 })) return;
+  if (weaponSfx(AC, out, kind, 'shot', { vol, rate, lp: dist > 10 ? Math.max(2200, 9000 - dist * 260) : 0 })) return;
+  weaponSynth(AC, out, noiseBuf, SYNTH[kind] || 'ak', vol);
+}
+const SYNTH = { akm: 'ak', m4a1: 'ak', glock17: 'pistol', deagle: 'pistol', spas12: 'shotgun', mp5k: 'pistol' };
+function weaponSynth(AC, out, noiseBuf, kind, vol = 1) {
   if (!AC || !noiseBuf) return;
   const t = AC.currentTime;
   const P = {
     ak:        { lp0: 4600, lp1: 380, g: .62, dec: .26, th: 115, tg: .7, td: .16, click: 0 },
-    rifleSup:  { lp0: 1500, lp1: 260, g: .26, dec: .12, th: 90,  tg: .3, td: .09, click: .14 },
     pistol:    { lp0: 6200, lp1: 700, g: .48, dec: .17, th: 175, tg: .45, td: .1, click: 0 },
-    pistolSup: { lp0: 1800, lp1: 320, g: .22, dec: .1,  th: 120, tg: .22, td: .07, click: .16 },
+    shotgun:   { lp0: 3800, lp1: 220, g: .78, dec: .36, th: 80,  tg: .9,  td: .2,  click: 0 },
   }[kind] || {};
   const s = AC.createBufferSource(); s.buffer = noiseBuf;
   const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(P.lp0, t); f.frequency.exponentialRampToValueAtTime(P.lp1, t + P.dec * .85);

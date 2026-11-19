@@ -901,6 +901,20 @@ function tear(u, x0, x1) {
   return { red: `0,0 ${pts(C)} 0,200`, blue: `320,0 ${pts(C)} 320,200`, paper: `${pts(Lp)} ${pts(Rp.slice().reverse())}` };
 }
 const ART = {
+  // Deathmatch: zachód słońca Vice (fiolet → róż → pomarańcz), słońce w pasy, czerwona czaszka WANTED, napis
+  dm() {
+    const u = ++artN, skull = 'M12 1.6C6.9 1.6 3.2 5.3 3.2 10c0 2.8 1.3 4.8 3.1 6v3.1c0 .6.5 1.1 1.1 1.1h1.5v-2.1h1.6v2.1h3v-2.1h1.6v2.1h1.5c.6 0 1.1-.5 1.1-1.1V16c1.8-1.2 3.1-3.2 3.1-6 0-4.7-3.7-8.4-8.8-8.4zM8.5 14.3a2.3 2.3 0 1 1 0-4.6 2.3 2.3 0 0 1 0 4.6zm7 0a2.3 2.3 0 1 1 0-4.6 2.3 2.3 0 0 1 0 4.6zM12 15.1l-1.2 2.1h2.4z';
+    return `<svg class="art" viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice"><defs>${DEFS(u)}
+      <linearGradient id="dg${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a1255"/><stop offset=".55" stop-color="#d0377f"/><stop offset="1" stop-color="#ff9a4a"/></linearGradient>
+      <linearGradient id="ds${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe27a"/><stop offset="1" stop-color="#ff5d8f"/></linearGradient>
+      <clipPath id="dc${u}"><circle cx="160" cy="120" r="74"/></clipPath></defs>
+      <rect width="320" height="200" fill="url(#dg${u})"/>${stripes(18, .05)}${halftone(u)}
+      <g clip-path="url(#dc${u})"><rect x="80" y="40" width="160" height="160" fill="url(#ds${u})"/>${[0, 1, 2, 3, 4].map(i => `<rect x="80" y="${130 + i * 13}" width="160" height="${3 + i * 1.6}" fill="#d0377f"/>`).join('')}</g>
+      <g transform="translate(124 36) scale(3)"><path fill-rule="evenodd" d="${skull}" fill="#1a0614" opacity=".45" transform="translate(.6 .9)"/><path fill-rule="evenodd" d="${skull}" fill="#ff2b3a" stroke="#1a0614" stroke-width=".7"/></g>
+      <rect width="320" height="200" fill="url(#hl${u})"/>
+      ${(() => { const w = 'DEATHMATCH'; return bigText(u, 176, 44, w, '<tspan fill="url(#slv' + u + ')">' + w + '</tspan>', '#3a0a2a'); })()}
+      ${finish(u)}</svg>`;
+  },
   range() {
     const u = ++artN;
     return `<svg class="art" viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice"><defs>${DEFS(u)}
@@ -1037,7 +1051,7 @@ function skinIcon(sk) {
 const DEFAULT_MODES = [
   { id: 'range', name: 'Strzelnica', desc: 'Solo · zestrzel czerwone fasolki', icon: 'range', tag: 'SOLO' },
   { id: '1v1', name: '1v1', desc: 'Mapa Oaza · bot · do 5 trafień', icon: 'duel', tag: '1 NA 1' },
-  { soon: true },
+  { id: 'dm', name: 'Deathmatch', desc: 'Do 20 graczy · 3 minuty · top 3 wygrywa', icon: 'dm', tag: 'FFA' },
 ];
 
 // deterministyczny generator losowy, żeby las wyglądał zawsze tak samo

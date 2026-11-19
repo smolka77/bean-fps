@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Podgląd map Vice</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #120c1e; overflow: hidden; font: 13px/1.35 system-ui, sans-serif; color: #fff; }
+  canvas { display: block; }
+  #hud { position: fixed; left: 10px; top: 10px; background: rgba(14, 8, 26, .72); padding: 8px 10px; border-radius: 8px; white-space: pre; pointer-events: none; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+  #help { position: fixed; right: 10px; top: 10px; background: rgba(14, 8, 26, .72); padding: 8px 10px; border-radius: 8px; white-space: pre; font-size: 12px; pointer-events: none; }
+  #cross { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px #000; pointer-events: none; }
+  body.shot #hud, body.shot #help, body.shot #cross { display: none; }
+</style>
+<script>
+  // lokalnie (serwer podglądu z narzedzia/) three.js z narzedzia/node_modules – szybciej i bez internetu; poza tym z CDN jak w grze
+  { const loc = /^(localhost|127\.0\.0\.1)$/.test(location.hostname), base = loc ? '/narzedzia/node_modules/three/' : 'https://cdn.jsdelivr.net/npm/three@0.170.0/';
+    const im = document.createElement('script'); im.type = 'importmap'; im.textContent = JSON.stringify({ imports: { three: base + 'build/three.module.js', 'three/addons/': base + 'examples/jsm/' } }); document.currentScript.after(im); }
+</script>
+</head>
+<body>
+<div id="hud">wczytywanie…</div>
+<div id="help">klik = sterowanie myszą
+WASD ruch · Shift szybciej · Spacja/Q góra-dół
+G chodzenie (fizyka gry) ↔ latanie
+C kolizje · B fasolki na spawnach · P kopiuj pozycję
+1–9 kolejne spawny · M mapa: sunset/downtown</div>
+<div id="cross"></div>
+<script type="module">
+import * as THREE from 'three';
+import { buildViceMap } from './vice-render.js';
+
+const Q = new URLSearchParams(location.search);
+const MAP = (Q.get('map') || 'sunset').toLowerCase();
+if (Q.has('shot')) document.body.classList.add('shot');
+const hud = document.getElementById('hud');
+
+// ---- renderer, scena i światła jak w grze (index.html) ----
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: Q.has('shot') });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x9cc3e4); scene.fog = new THREE.Fog(0x9cc3e4, 35, 130);
+const hemi = new THREE.HemisphereLight(0xffffff, 0x5c6470, 1.45); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2dd, 2.3); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004;
+Object.assign(sun.shadow.camera, { left: -22, right: 22, top: 22, bottom: -22, near: 1, far: 80 }); scene.add(sun, sun.target);
+const camera = new THREE.PerspectiveCamera(+(Q.get('fov') || 75), innerWidth / innerHeight, 0.03, 300); scene.add(camera);
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+// ---- mapa ----
+const mod = await import(`./${MAP}-data.js`);
+const R = buildViceMap(THREE, mod.VICE, { renderer, shadowRes: +(Q.get('res') || 1024) });
+scene.add(R.group); R.apply({ scene, sun, hemi });
+const T_BUILT = performance.now();
+const D = mod.MAP;
+const boxes = D.colliders.concat(D.clips || []).map(([x0, y0, z0, x1, y1, z1]) => ({ minX: x0, maxX: x1, minZ: z0, maxZ: z1, top: y1, bottom: y0 }));
+const ladders = (D.ladders || []).map(([x0, y0, z0, x1, y1, z1, nx, nz]) => ({ x0, y0, z0, x1, y1, z1, nx, nz }));
+
+// ---- fasolki (przybliżenie gracza 1,75 m) na spawnach ----
+const beans = new THREE.Group(); beans.visible = Q.has('beans');
+const beanGeo = new THREE.CapsuleGeometry(0.32, 1.0, 4, 10); beanGeo.translate(0, 0.82, 0);
+const beanCols = [0xf0b440, 0x5d8fb5, 0xa4627d, 0x7ea35a, 0xd1b24a, 0xff7aa8];
+D.spawns.forEach((s, i) => {
+  const m = new THREE.Mesh(beanGeo, new THREE.MeshLambertMaterial({ color: beanCols[i % beanCols.length] })); m.position.set(s.x, s.y || 0, s.z); m.castShadow = true; beans.add(m);
+  const a = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.5, 6), new THREE.MeshBasicMaterial({ color: 0xffffff })); a.rotation.x = -Math.PI / 2; a.position.set(0, 1.3, -0.45); m.add(a); m.rotation.y = s.yaw;
+});
+scene.add(beans);
+// ---- nakładka kolizji ----
+const dbg = new THREE.Group(); dbg.visible = Q.has('cols');
+const addBoxes = (list, color) => { const pos = []; for (const c of list) { const [a, b, d, e, f, g] = c; const v = [[a, b, d], [e, b, d], [e, b, g], [a, b, g], [a, f, d], [e, f, d], [e, f, g], [a, f, g]]; for (const [p, q] of [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]]) pos.push(...v[p], ...v[q]); } const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); dbg.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color, depthTest: true }))); };
+addBoxes(D.colliders, 0xff3a8a); addBoxes(D.clips || [], 0xffe14a); addBoxes((D.ladders || []).map((l) => l.slice(0, 6)), 0x39ff88);
+scene.add(dbg);
+
+// ---- kamera: latanie albo chodzenie z fizyką gry ----
+const cam = { x: 0, y: 1.6, z: 0, yaw: 0, pitch: 0 };
+const pl = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), onGround: false, walk: false };
+let spawnI = 0;
+function toSpawn(i) { const s = D.spawns[(i + D.spawns.length) % D.spawns.length]; spawnI = i; Object.assign(cam, { x: s.x, y: (s.y || 0) + 1.3, z: s.z, yaw: s.yaw, pitch: 0 }); pl.pos.set(s.x, s.y || 0, s.z); pl.vel.set(0, 0, 0); }
+if (Q.get('pos')) { const [x, y, z] = Q.get('pos').split(',').map(Number); Object.assign(cam, { x, y, z }); pl.pos.set(x, Math.max(0, y - 1.3), z); }
+else toSpawn(+(Q.get('spawn') || 0));
+if (Q.get('rot')) { const [yw, pt] = Q.get('rot').split(',').map(Number); cam.yaw = (yw * Math.PI) / 180; cam.pitch = ((pt || 0) * Math.PI) / 180; }
+if (Q.has('walk')) pl.walk = true;
+const keys = {};
+addEventListener('keydown', (e) => {
+  keys[e.code] = true;
+  if (e.code === 'KeyC') dbg.visible = !dbg.visible;
+  if (e.code === 'KeyB') beans.visible = !beans.visible;
+  if (e.code === 'KeyG') { pl.walk = !pl.walk; pl.pos.set(cam.x, Math.max(0, cam.y - 1.3), cam.z); pl.vel.set(0, 0, 0); }
+  if (e.code === 'KeyP') { const t = `pos=${cam.x.toFixed(1)},${cam.y.toFixed(1)},${cam.z.toFixed(1)}&rot=${((cam.yaw * 180) / Math.PI).toFixed(0)},${((cam.pitch * 180) / Math.PI).toFixed(0)}`; navigator.clipboard?.writeText(t); console.log(t); }
+  if (e.code === 'KeyM') { Q.set('map', MAP === 'sunset' ? 'downtown' : 'sunset'); Q.delete('pos'); location.search = Q.toString(); }
+  if (/^Digit[1-9]$/.test(e.code)) toSpawn(spawnI + (e.code === 'Digit1' ? -1 : +e.code.slice(5) - 1));
+});
+addEventListener('keyup', (e) => { keys[e.code] = false; });
+renderer.domElement.addEventListener('click', () => renderer.domElement.requestPointerLock());
+addEventListener('mousemove', (e) => { if (document.pointerLockElement !== renderer.domElement) return; cam.yaw -= e.movementX * 0.0022; cam.pitch = Math.max(-1.5, Math.min(1.5, cam.pitch - e.movementY * 0.0022)); });
+
+function stepWalk(dt) {   // fizyka gracza z gry (stepPlayer): ruch, skok, schody do 0,5 m, drabiny, sufity
+  const fwd = new THREE.Vector3(-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw)), right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)), wish = new THREE.Vector3();
+  if (keys.KeyW) wish.add(fwd); if (keys.KeyS) wish.sub(fwd); if (keys.KeyD) wish.add(right); if (keys.KeyA) wish.sub(right);
+  if (wish.lengthSq()) wish.normalize(); const max = keys.ShiftLeft ? 6.8 : 3.9;
+  if (pl.onGround) { pl.vel.x = THREE.MathUtils.damp(pl.vel.x, wish.x * max, 11, dt); pl.vel.z = THREE.MathUtils.damp(pl.vel.z, wish.z * max, 11, dt); }
+  if (keys.Space && pl.onGround) { pl.vel.y = 6.6; pl.onGround = false; }
+  pl.vel.y -= 20 * dt; let onLadder = false;
+  for (const l of ladders) if (pl.pos.x > l.x0 - 0.3 && pl.pos.x < l.x1 + 0.3 && pl.pos.z > l.z0 - 0.3 && pl.pos.z < l.z1 + 0.3 && pl.pos.y >= l.y0 - 0.1 && pl.pos.y < l.y1 - 0.05) { pl.vel.y = keys.KeyW || keys.Space ? 3.4 : keys.KeyS ? -3.4 : 0; onLadder = true; break; }
+  const prevY = pl.pos.y, wasGround = pl.onGround; pl.pos.addScaledVector(pl.vel, dt); pl.onGround = false;
+  if (pl.pos.y <= 0) { pl.pos.y = 0; pl.vel.y = 0; pl.onGround = true; }
+  const Rr = 0.3;
+  for (const b of boxes) {
+    if (b.bottom > 0.05 && pl.pos.y + 1.75 <= b.bottom && prevY + 1.75 <= b.bottom) continue;
+    const cx = Math.min(Math.max(pl.pos.x, b.minX), b.maxX), cz = Math.min(Math.max(pl.pos.z, b.minZ), b.maxZ), dx = pl.pos.x - cx, dz = pl.pos.z - cz, d2 = dx * dx + dz * dz;
+    const inside = pl.pos.x > b.minX && pl.pos.x < b.maxX && pl.pos.z > b.minZ && pl.pos.z < b.maxZ;
+    if (!(inside || d2 < Rr * Rr)) continue;
+    if (b.bottom > 0.05 && prevY + 1.75 <= b.bottom + 0.02) { if (onLadder) continue; pl.pos.y = b.bottom - 1.75; if (pl.vel.y > 0) pl.vel.y = 0; continue; }
+    if (((prevY >= b.top - 0.1 && pl.pos.y <= b.top + 0.001) || (wasGround && b.top > prevY && b.top - prevY <= 0.5)) && pl.vel.y <= 0) { pl.pos.y = b.top; pl.vel.y = 0; pl.onGround = true; continue; }
+    if (pl.pos.y < b.top - 0.05) {
+      if (inside) { const l = pl.pos.x - b.minX, r = b.maxX - pl.pos.x, t = pl.pos.z - b.minZ, bt = b.maxZ - pl.pos.z, m = Math.min(l, r, t, bt); if (m === l) pl.pos.x = b.minX - Rr; else if (m === r) pl.pos.x = b.maxX + Rr; else if (m === t) pl.pos.z = b.minZ - Rr; else pl.pos.z = b.maxZ + Rr; }
+      else { const d = Math.sqrt(d2); pl.pos.x += (dx / d) * (Rr - d); pl.pos.z += dx === 0 && dz === 0 ? 0 : (dz / d) * (Rr - d); }
+    }
+  }
+  if (wasGround && !pl.onGround && pl.vel.y <= 0) { let sup = prevY <= 0.6 ? 0 : -1; for (const b of boxes) { if (b.top > prevY + 0.02 || b.top < prevY - 0.6) continue; if (pl.pos.x > b.minX - Rr * 0.7 && pl.pos.x < b.maxX + Rr * 0.7 && pl.pos.z > b.minZ - Rr * 0.7 && pl.pos.z < b.maxZ + Rr * 0.7) sup = Math.max(sup, b.top); } if (sup >= 0) { pl.pos.y = sup; pl.vel.y = 0; pl.onGround = true; } }
+  cam.x = pl.pos.x; cam.y = pl.pos.y + 1.3; cam.z = pl.pos.z;
+}
+function stepFly(dt) {
+  const sp = (keys.ShiftLeft ? 30 : 9) * dt, f = [-Math.sin(cam.yaw) * Math.cos(cam.pitch), Math.sin(cam.pitch), -Math.cos(cam.yaw) * Math.cos(cam.pitch)], r = [Math.cos(cam.yaw), 0, -Math.sin(cam.yaw)];
+  const m = (k, a, s) => { if (keys[k]) { cam.x += a[0] * s; cam.y += a[1] * s; cam.z += a[2] * s; } };
+  m('KeyW', f, sp); m('KeyS', f, -sp); m('KeyD', r, sp); m('KeyA', r, -sp); if (keys.Space) cam.y += sp; if (keys.KeyQ) cam.y -= sp;
+}
+// ---- pętla ----
+const clock = new THREE.Clock(); let frames = 0, fpsT = 0, fps = 0, first = true;
+function loop() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (pl.walk) stepWalk(dt); else stepFly(dt);
+  camera.position.set(cam.x, cam.y, cam.z); camera.rotation.set(cam.pitch, cam.yaw, 0, 'YXZ');
+  sun.position.set(cam.x + 14, 26, cam.z + 10); sun.target.position.set(cam.x, 0, cam.z); sun.target.updateMatrixWorld();
+  renderer.render(scene, camera);
+  frames++; fpsT += dt; if (fpsT > 0.5) { fps = Math.round(frames / fpsT); frames = 0; fpsT = 0; }
+  const I = renderer.info.render, S = R.stats;
+  hud.textContent = `${D.name}  ${fps} fps   draw calls: ${I.calls}   trójkąty w kadrze: ${I.triangles.toLocaleString('pl-PL')}
+mapa: ${S.tris.toLocaleString('pl-PL')} tri łącznie, ${S.meshes} siatek · kolizje ${S.colliders} · drabiny ${S.ladders} · spawny ${S.spawns} · clipy ${S.clips}
+wczytanie: geometria ${S.ms.geometry} ms · atlas ${S.ms.atlas} ms · cienie ${S.ms.shadows} ms · razem ${S.ms.total} ms
+pos=${cam.x.toFixed(1)},${cam.y.toFixed(1)},${cam.z.toFixed(1)}&rot=${((cam.yaw * 180) / Math.PI).toFixed(0)},${((cam.pitch * 180) / Math.PI).toFixed(0)}  ${pl.walk ? 'CHODZENIE' : 'LATANIE'}`;
+  if (first) {
+    first = false; window.__stats = { ...S, calls: I.calls, frameTris: I.triangles, mem: renderer.info.memory, programs: renderer.info.programs?.length, cam: { ...cam }, firstFrameMs: Math.round(performance.now() - T_BUILT), pageMs: Math.round(performance.now()) };
+    if (Q.has('report')) fetch(`/__raport?map=${MAP}`, { method: 'POST', body: JSON.stringify(window.__stats) }).catch(() => {});
+    setTimeout(() => { document.title = 'READY'; }, 300);
+  }
+  requestAnimationFrame(loop);
+}
+window.viewer = { R, scene, camera, renderer, cam, setCam(x, y, z, yaw, pitch) { Object.assign(cam, { x, y, z, yaw: (yaw * Math.PI) / 180, pitch: ((pitch || 0) * Math.PI) / 180 }); } };
+loop();
+</script>
+</body>
+</html>

@@ -23,45 +23,23 @@
 // Kotwice lewej dłoni w układzie broni: p = punkt na powierzchni, n = normalna na zewnątrz (dłoń leży o promień
 // rurki dalej), w = naturalny kierunek przedramienia (od dłoni do łokcia).
 export const ANCHORS = {
-  ak47: {
-    guard:   { p: [0, .041, -.38],    n: [0, -1, 0],   w: [-.45, -.75, .5] },
-    guardR:  { p: [0, .0232, -.275],  n: [0, -1, 0],   w: [-.45, -.75, .5] },
-    guardL:  { p: [-.021, .055, -.34], n: [-1, -.25, 0], w: [-.8, -.45, .35] },
-    magL:    { p: [-.014, -.045, -.152], n: [-1, 0, 0], w: [-.75, -.5, .45] },
-    magBase: { p: [0, -.165, -.205],  n: [0, -.8, -.6], w: [-.35, -.9, .25] },
-    magF:    { p: [0, -.115, -.222],  n: [0, -.3, -1],  w: [-.4, -.7, .6] },       // przód dolnego łuku magazynka
-    guardS:  { p: [-.012, .03, -.33], n: [-.6, -.8, 0], w: [-.6, -.7, .4] },        // spód łoża od lewej
-    chandle: { p: [.048, .092, -.075], n: [1, .2, 0],  w: [-.2, -.35, .9] },
+  akm: {},                                                                      // choreografia AKM ma własne kotwice (magazynek, łoże)
+  m4a1: {                                                                       // spód szyn łoża przed chwytem przednim
+    guard:   { p: [0, .052, -.33],   n: [0, -1, 0],   w: [-.45, -.75, .5] },
+    guardF:  { p: [0, .052, -.38],   n: [0, -1, 0],   w: [-.45, -.75, .5] },
+    guardFF: { p: [0, .052, -.42],   n: [0, -1, 0],   w: [-.45, -.75, .5] },
   },
-  m4a1s: {
-    guard:   { p: [0, .054, -.31],    n: [0, -1, 0],   w: [-.45, -.75, .5] },
-    guardF:  { p: [0, .054, -.36],    n: [0, -1, 0],   w: [-.45, -.75, .5] },
-    guardFF: { p: [0, .054, -.395],   n: [0, -1, 0],   w: [-.45, -.75, .5] },
-    guardR:  { p: [0, .054, -.2],     n: [0, -1, 0],   w: [-.45, -.75, .5] },
-    guardL:  { p: [-.023, .08, -.3],  n: [-1, 0, 0],   w: [-.8, -.45, .35] },
-    supp:    { p: [0, .0565, -.6],    n: [0, -1, 0],   w: [-.35, -.85, .4] },
-    suppTop: { p: [0, .099, -.6],     n: [0, 1, 0],    w: [-.6, .35, .7] },
-    suppL:   { p: [-.021, .0775, -.6], n: [-1, 0, 0],  w: [-.85, -.35, .4] },
-    magL:    { p: [-.014, -.055, -.115], n: [-1, 0, 0], w: [-.75, -.5, .45] },
-    magBase: { p: [0, -.158, -.122],  n: [0, -1, -.15], w: [-.35, -.9, .25] },
-    chandle: { p: [0, .102, .118],    n: [0, 1, .3],   w: [-.4, .1, .9] },
+  glock17: {},
+  deagle: {},
+  mp5k: {                                                                       // pionowy chwyt przedni i spód łoża
+    guard:   { p: [0, .03, -.215],   n: [0, -1, 0],   w: [-.45, -.75, .5] },
+    guardF:  { p: [0, .03, -.222],   n: [0, -1, 0],   w: [-.45, -.75, .5] },
+    guardFF: { p: [0, .066, -.25],   n: [0, -1, 0],   w: [-.45, -.75, .5] },
   },
-  glock: {
-    slideTop: { p: [0, .057, -.075],  n: [0, 1, 0],    w: [-.75, .25, .6] },
-    slideF:   { p: [0, .057, -.102],  n: [0, 1, 0],    w: [-.75, .25, .6] },
-    slideL:   { p: [-.013, .042, -.08], n: [-1, 0, 0], w: [-.85, -.1, .5] },
-    frameL:   { p: [-.012, .0, -.045], n: [-1, 0, 0],  w: [-.85, -.35, .4] },
-    magBase:  { p: [0, -.087, .03],   n: [0, -1, .2],  w: [-.4, -.85, .3] },
-  },
-  usps: {
-    slideTop: { p: [0, .0597, -.07],  n: [0, 1, 0],    w: [-.75, .25, .6] },
-    slideF:   { p: [0, .0597, -.1],   n: [0, 1, 0],    w: [-.75, .25, .6] },
-    slideL:   { p: [-.0138, .044, -.08], n: [-1, 0, 0], w: [-.85, -.1, .5] },
-    frameL:   { p: [-.012, .0, -.045], n: [-1, 0, 0],  w: [-.85, -.35, .4] },
-    supp:     { p: [0, .024, -.24],   n: [0, -1, 0],   w: [-.4, -.85, .35] },
-    suppL:    { p: [-.0175, .0415, -.24], n: [-1, 0, 0], w: [-.85, -.35, .4] },
-    suppTop:  { p: [0, .059, -.24],   n: [0, 1, 0],    w: [-.6, .35, .7] },
-    magBase:  { p: [0, -.087, .03],   n: [0, -1, .2],  w: [-.4, -.85, .3] },
+  spas12: {                                                                     // spód czółenka
+    guard:   { p: [0, .045, -.47],   n: [0, -1, 0],   w: [-.45, -.75, .5] },
+    guardF:  { p: [0, .045, -.51],   n: [0, -1, 0],   w: [-.45, -.75, .5] },
+    guardFF: { p: [0, .045, -.54],   n: [0, -1, 0],   w: [-.45, -.75, .5] },
   },
 };
 
@@ -71,14 +49,14 @@ export const ANCHORS = {
 // obrót idzie z nadgarstka (punkt obrotu blisko chwytu). Konwencja r: rx + = lufa w górę, ry + = lufa w lewo,
 // rz + = przechył przeciwnie do wskazówek zegara (góra broni w lewo).
 export const TIMELINES = {
-  // AK-47: lewy bok położony płasko do kamery, lewa dłoń trzyma zakrzywiony magazynek; przewrót na prawy bok
+  // AKM: lewy bok położony płasko do kamery, lewa dłoń trzyma zakrzywiony magazynek; przewrót na prawy bok
   // (okno wyrzutowe, rączka zamka), lewa dłoń wraca pod łoże; powrót z ciężkim osiadaniem.
-  ak47: {
+  akm: {
     dur: 5.3,
     spring: { w: 16, z: 0.8 },
     anchors: {
-      magHold: { p: [0.01, -0.118, -0.226], n: [0.35, -0.4, -1], w: [0.5, -0.77, 0.39] },
-      guardSup: { p: [-0.012, 0.03, -0.33], n: [-0.6, -0.8, 0], w: [-0.9, -0.4, 0.2] },
+      magHold: { p: [0.01, -0.12, -0.228], n: [0.35, -0.4, -1], w: [0.5, -0.77, 0.39] },
+      guardSup: { p: [-0.012, 0.045, -0.4], n: [-0.6, -0.8, 0], w: [-0.9, -0.4, 0.2] },
     },
     keys: [
       { t: 0, p: [0, 0, 0], r: [0, 0, 0], piv: 0.15, L: "grip" },
@@ -95,9 +73,9 @@ export const TIMELINES = {
     ],
     events: [{ t: 0.25, s: "cloth" }, { t: 0.95, s: "grab" }, { t: 2.05, s: "cloth" }, { t: 2.5, s: "grab" }, { t: 3.75, s: "cloth" }, { t: 4.35, s: "grab" }],
   },
-  // M4A1-S: przechył w lewo (prawy bok z oknem wyrzutowym do góry, tłumik w lewy górny róg), szybkie przerzucenie
-  // w poprzek ekranu (lewy profil, tłumik w lewo), uniesienie wzdłuż góry i tłumika; powrót.
-  m4a1s: {
+  // M4A1: przechył w lewo (prawy bok z oknem wyrzutowym do góry, lufa w lewy górny róg), szybkie przerzucenie
+  // w poprzek ekranu (lewy profil, lufa w lewo), uniesienie wzdłuż góry i łoża; powrót.
+  m4a1: {
     dur: 5.6,
     spring: { w: 15, z: 0.8 },
     keys: [
@@ -115,9 +93,9 @@ export const TIMELINES = {
     ],
     events: [{ t: 0.25, s: "cloth" }, { t: 0.95, s: "grab" }, { t: 1.5, s: "cloth" }, { t: 2, s: "grab" }, { t: 3.6, s: "cloth" }, { t: 5, s: "grab" }],
   },
-  // Glock-18: lewa dłoń puszcza i wychodzi z kadru; zamach do środka przez celownik (lewy bok), przewrót
+  // Glock-17: lewa dłoń puszcza i wychodzi z kadru; zamach do środka przez celownik (lewy bok), przewrót
   // przedramieniem dłonią w dół (prawy bok z oknem wyrzutowym do góry), powrót i ponowne objęcie chwytu.
-  glock: {
+  glock17: {
     dur: 4.5,
     spring: { w: 20, z: 0.8 },
     keys: [
@@ -135,9 +113,9 @@ export const TIMELINES = {
     ],
     events: [{ t: 0.2, s: "cloth" }, { t: 1.8, s: "cloth" }, { t: 3.78, s: "grab" }],
   },
-  // USP-S: lewa dłoń wychodzi z kadru; lewy profil (pistolet i długi tłumik poziomo w poprzek ekranu), przewrót
-  // dłonią w dół (prawy bok, tłumik w lewy górny róg), powrót i ponowne objęcie chwytu.
-  usps: {
+  // Desert Eagle: lewa dłoń wychodzi z kadru; lewy profil (pistolet poziomo w poprzek ekranu), przewrót
+  // dłonią w dół (prawy bok, lufa w lewy górny róg), powrót i ponowne objęcie chwytu.
+  deagle: {
     dur: 5.3,
     spring: { w: 20, z: 0.8 },
     keys: [
@@ -159,6 +137,9 @@ export const TIMELINES = {
     events: [{ t: 0.25, s: "cloth" }, { t: 1.9, s: "cloth" }, { t: 4.32, s: "grab" }],
   },
 };
+// MP5K i SPAS-12: ten sam rytm co M4A1, lewa dłoń na kotwicach guard* danej broni (chwyt przedni / czółenko)
+TIMELINES.mp5k = { ...TIMELINES.m4a1 };
+TIMELINES.spas12 = { ...TIMELINES.m4a1, spring: { w: 13, z: 0.82 } };          // cięższa: wolniejsza sprężyna
 
 // ---------------- interpolacja ----------------
 const CH_VEC = ['p', 'r', 'sh'], CH_NUM = ['piv', 'pvy', 'sl', 'mg', 'wk', 'lwk'], CH_OPT = ['rp', 'lp'];

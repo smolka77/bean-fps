@@ -11,11 +11,56 @@ Pobierz go i otwórz dwuklikiem w Chrome, Edge albo Firefoksie. Działa bez serw
 - **Tryby:**
   - **Strzelnica:** trening solo z celami-fasolkami i tablicą ustawień.
   - **1v1:** mecz z botem do 3 wygranych rund, na jednej z trzech map.
+  - **Deathmatch:** do 20 graczy, 3 minuty, widok z 3. osoby (wymaga serwera gry – szczegóły niżej).
 - **Mapy:** Oaza, Magazyn, Baza, Strzelnica.
-- **Bronie:** AK-47, M4A1-S, Glock-18, USP-S (z oglądaniem broni pod klawiszem F).
+- **Bronie:** AKM, M4A1 (z kolimatorem), Glock-17, Desert Eagle, SPAS-12, MP5K – modele 3D (GLB) i dźwięki z biblioteki gry
+  (strzał, strzał z daleka, wyjęcie, magazynek, zamek, pompka, naboje); oglądanie broni pod klawiszem F.
+  - 1v1: drużyna niebieska M4A1 + Desert Eagle, czerwona AKM + Glock-17. Deathmatch: start z Glockiem-17, reszta w sklepie.
+
+## Deathmatch
+
+Wszystko, co ważne, liczy serwer (`serwer/dm.mjs`): ruch, strzały (szybkostrzelność, amunicja, rozrzut, śruciny, spadek obrażeń),
+trafienia w głowę i tułów z kompensacją opóźnienia, pancerz, zabójstwa, kasę meczu, WANTED, zakupy, odrodzenia, zegar i wynik.
+
+- **Kolejka:** poziomy (wpisowe, np. Free / $1 / $5 / $20), osobna kolejka dla każdego. Komplet (20) startuje od razu;
+  po 60 s mecz rusza z tyloma graczami, ilu czeka (najmniej 2). Wyjście z kolejki = zwrot wpisowego.
+- **Mecz:** każdy zaczyna z pistoletem. Ranking: zabójstwa, przy remisie zadane obrażenia. Pierwsze miejsce = **WANTED**
+  (czerwona czaszka nad postacią i na minimapie, za jego zabójstwo ×3 nagrody).
+- **Śmierć:** ekran WASTED, potem sklep (broń i kamizelka / kamizelka z hełmem za kasę meczu), powrót do walki od razu.
+  Zakupy przepadają po śmierci, kasa zostaje.
+- **Koniec:** podium z trzema najlepszymi (emotki), pula wpisowego minus prowizja dzielona 50/30/20.
+- **Panel admina → Deathmatch:** wszystkie liczby trybu (gracze, czasy, nagrody, ceny i statystyki broni, pancerz, poziomy, podział puli).
+- **Boty testowe:** `node narzedzia/dm-boty.mjs 8 http://127.0.0.1:8787 free` – zakładają konta, grają mecz i wypisują wynik.
+
+Sterowanie w Deathmatch: jak wyżej, do tego Tab – tabela wyników, G – emotka (machanie / taniec / radość); w sklepie Q/E zakładki, W/S lista, A/D przedmioty,
+Enter kup, Spacja powrót do walki.
 
 Sterowanie: WASD ruch, Shift bieg, Spacja skok, C kucanie/slide, LPM strzał, PPM celowanie, R przeładowanie,
 F oglądanie broni, 1–4 / kółko zmiana broni, V widok, M dźwięk, Esc pauza.
+
+## Bronie: modele i dźwięki
+
+Modele i dźwięki broni przygotowuje [`narzedzia/assety/przygotuj-bronie.mjs`](narzedzia/assety/przygotuj-bronie.mjs) (osobne `npm install` w tym folderze):
+ustawia każdy model jak w grze (metry, lufa w −Z, początek w dłoni na chwycie), wycina ruchome części (magazynek, zamek, czółenko),
+zmniejsza tekstury (WebP) i kompresuje siatkę (meshopt), a wybrane nagrania WAV zamienia na MP3. Wynik: `zrodla/weapons/<id>-glb.js` i `<id>-snd.js`.
+Punkty chwytu, celowania i dłoni są w `zrodla/weapons/<id>.js`.
+
+```bash
+cd narzedzia/assety
+npm install
+node przygotuj-bronie.mjs
+```
+
+Modele 3D (licencja [CC-BY 4.0](http://creativecommons.org/licenses/by/4.0/), zmienione: skala, ustawienie, podział na części, kompresja):
+
+| Broń | Model | Autor |
+|---|---|---|
+| AKM | [AKM](https://sketchfab.com/3d-models/akm-93b9714e15a14dba849d2912e4b8e39d) | [mcmxcg](https://sketchfab.com/mcmxcg) |
+| M4A1 | [Assault rifle M4A1](https://sketchfab.com/3d-models/assault-rifle-m4a1-1b858701dd7142d9b82bbe3fd121a97b) | [bobeer](https://sketchfab.com/bobeer) |
+| Glock-17 | [9mm Pistol](https://sketchfab.com/3d-models/9mm-pistol-43bc09f5aace4346a8a2b6e1580fc03f) | [TORI106](https://sketchfab.com/TORI106) |
+| Desert Eagle | [Desert Eagle](https://sketchfab.com/3d-models/desert-eagle-4be942b4b2004a6c9cc47e2961b8e6fd) | [Bagason](https://sketchfab.com/Bagason) |
+| SPAS-12 | [Half-Life 2 RTX Shotgun (Spas-12)](https://sketchfab.com/3d-models/half-life-2-rtx-shotgun-spas-12-bc0dfd824ccb4d5ebf007c654b42d428) | [carrilloriscomatias](https://sketchfab.com/carrilloriscomatias) |
+| MP5K | [MP5K](https://sketchfab.com/3d-models/mp5k-b47fa4053c1e4cfabe91b0046689f8c9) | [Shorty_Digitan](https://sketchfab.com/Shorty_Digitan) |
 
 ## Struktura
 

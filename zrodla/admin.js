@@ -101,6 +101,11 @@ const CSS = `
 #fa-admin .fa-maps b{display:block;font-weight:600}
 #fa-admin .fa-maps small{color:var(--mut);font-size:12px}
 #fa-admin .fa-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
+#fa-admin .fa-dmg{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px 12px}
+#fa-admin .fa-dmf{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mut)}
+#fa-admin .fa-dmf input{width:100%}
+#fa-admin .fa-dmw input.fa-q{width:74px;padding:6px 7px;font-size:12px}
+#fa-admin .fa-dmw td,#fa-admin .fa-dmw th{padding:4px 5px;white-space:nowrap;font-size:12px}
 #fa-admin .fa-msg{font-size:13px;color:var(--mut)}
 #fa-admin .fa-msg.ok{color:var(--ok)}#fa-admin .fa-msg.err{color:var(--bad)}
 #fa-admin .fa-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:6px}
@@ -291,6 +296,61 @@ async function srvGet(p) {
   const r = await fetch(SRV + p, { headers: AH() }); const j = await r.json().catch(() => ({}));
   if (!r.ok) { const e = new Error(j.message || 'Błąd serwera'); e.code = j.error; throw e; } return j;
 }
+// ---------- Deathmatch: wszystkie parametry trybu (serwer sprawdza i przycina wartości), kolejki, trwające mecze, ostatnie wyniki ----------
+const DM_FIELDS = [
+  ['Mecz', [['maxPlayers', 'Graczy w meczu (max)', 1], ['minPlayers', 'Najmniej graczy do startu', 1], ['queueTimeout', 'Czekanie w kolejce (s)', 1], ['duration', 'Czas meczu (s)', 1], ['startDelay', 'Odliczanie przed startem (s)', 0.5], ['endDelay', 'Podium po meczu (s)', 1]]],
+  ['Kasa meczu i WANTED', [['startMoney', 'Kasa na start ($)', 10], ['killReward', 'Nagroda za zabójstwo ($)', 10], ['wantedMult', 'Mnożnik za WANTED (×)', 0.5], ['wantedMinKills', 'WANTED od zabójstw', 1]]],
+  ['Odrodzenie i sklep', [['spawnProtect', 'Ochrona po odrodzeniu (s)', 0.5], ['minDeathTime', 'Ekran WASTED (s)', 0.1], ['shopTimeout', 'Sklep – powrót sam po (s)', 1]]],
+  ['Nagrody (pula = wpisowe graczy)', [['houseFee', 'Prowizja (0–0,5)', 0.01], ['prizeSplit.0', '1. miejsce (część puli)', 0.05], ['prizeSplit.1', '2. miejsce', 0.05], ['prizeSplit.2', '3. miejsce', 0.05]]],
+  ['Pancerz', [['armor.vest.price', 'Kamizelka – cena ($)', 50], ['armor.vest.hp', 'Kamizelka – punkty', 5], ['armor.helmet.price', 'Kamizelka + hełm – cena ($)', 50], ['armor.helmet.hp', 'Kamizelka + hełm – punkty', 5], ['armor.helmet.headMult', 'Hełm – obrażenia głowy (×)', 0.05]]],
+];
+const DM_WCOLS = [['name', 'Nazwa'], ['price', 'Cena $'], ['dmg', 'Obr.'], ['head', 'Głowa ×'], ['rpm', 'RPM'], ['mag', 'Mag.'], ['reserve', 'Zapas'], ['reload', 'Przeł. s'], ['pellets', 'Śruciny'], ['pelletSpread', 'Rozrzut śr.'],
+  ['falloff.0', 'Spadek od m'], ['falloff.1', 'Min. przy m'], ['falloff.2', 'Min. ×'], ['recoil.pitch', 'Odrzut ↑'], ['recoil.yaw', 'Odrzut ↔'], ['spread.hip', 'Rozrzut z biodra'], ['spread.ads', 'Rozrzut celując'], ['auto', 'Auto']];
+const getP = (o, p) => p.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
+const setP = (o, p, v) => { const ks = p.split('.'); let a = o; for (let i = 0; i < ks.length - 1; i++) a = a[ks[i]]; a[ks[ks.length - 1]] = v; };
+function mountDeathmatch($) {
+  const box = $('fa-dm'), msg = $('fa-dm-msg'); let cfg = null, defs = null;
+  const field = (p, lbl, step) => `<label class="fa-dmf"><span>${esc(lbl)}</span><input class="fa-q" type="number" step="${step}" data-p="${p}" value="${esc(getP(cfg, p))}"></label>`;
+  function render() {
+    const guns = Object.keys(cfg.weapons);
+    box.innerHTML = DM_FIELDS.map(([h, fs]) => `<h4>${esc(h)}</h4><div class="fa-dmg">${fs.map((f) => field(...f)).join('')}</div>`).join('')
+      + `<h4>Mapy w rotacji</h4><div class="fa-row" style="gap:14px">${defs.maps.map((m) => `<label class="fa-chk"><input type="checkbox" data-map="${esc(m)}" ${cfg.maps.includes(m) ? 'checked' : ''}> ${esc(m)}</label>`).join('')}</div>`
+      + `<h4>Poziomy kolejki (wpisowe w USD, 0 = darmowy)</h4><div class="fa-dmt" id="fa-dm-tiers">${cfg.tiers.map((t, i) => `<div class="fa-row" data-tier="${i}" style="gap:8px;margin:0 0 6px">
+          <input class="fa-q" data-tk="id" value="${esc(t.id)}" placeholder="id" style="max-width:120px"><input class="fa-q" data-tk="name" value="${esc(t.name)}" placeholder="nazwa" style="max-width:160px">
+          <input class="fa-q" type="number" step="1" min="0" data-tk="entry" value="${t.entry}" style="max-width:110px"><button class="fa-btn sm" type="button" data-deltier="${i}">Usuń</button></div>`).join('')}
+        <button class="fa-btn sm" type="button" id="fa-dm-addtier">+ Poziom</button></div>`
+      + `<h4>Bronie (pistolet zawsze za darmo na start)</h4><div class="fa-tw"><table class="fa-dmw"><thead><tr><th>Broń</th>${DM_WCOLS.map(([, l]) => `<th>${esc(l)}</th>`).join('')}</tr></thead><tbody>`
+      + guns.map((g) => `<tr><td><b>${esc(g)}</b></td>${DM_WCOLS.map(([k]) => k === 'auto' ? `<td><input type="checkbox" data-w="${g}" data-k="auto" ${cfg.weapons[g].auto ? 'checked' : ''}></td>`
+        : `<td><input class="fa-q" ${k === 'name' ? '' : 'type="number" step="any"'} data-w="${g}" data-k="${k}" value="${esc(getP(cfg.weapons[g], k))}" ${k === 'price' && g === 'glock17' ? 'disabled' : ''}></td>`).join('')}</tr>`).join('')
+      + `</tbody></table></div>`;
+    box.querySelectorAll('[data-deltier]').forEach((b) => b.addEventListener('click', () => { collect(); cfg.tiers.splice(+b.dataset.deltier, 1); render(); }));
+    $('fa-dm-addtier').addEventListener('click', () => { collect(); cfg.tiers.push({ id: 'tier' + (cfg.tiers.length + 1), name: 'Nowy', entry: 10 }); render(); });
+  }
+  function collect() {
+    box.querySelectorAll('[data-p]').forEach((i) => setP(cfg, i.dataset.p, +i.value));
+    cfg.maps = [...box.querySelectorAll('[data-map]')].filter((i) => i.checked).map((i) => i.dataset.map);
+    cfg.tiers = [...box.querySelectorAll('[data-tier]')].map((r) => ({ id: r.querySelector('[data-tk="id"]').value.trim(), name: r.querySelector('[data-tk="name"]').value.trim(), entry: +r.querySelector('[data-tk="entry"]').value }));
+    box.querySelectorAll('[data-w]').forEach((i) => { const w = cfg.weapons[i.dataset.w]; setP(w, i.dataset.k, i.dataset.k === 'auto' ? i.checked : i.dataset.k === 'name' ? i.value : +i.value); });
+  }
+  async function pull() {
+    try {
+      const j = await srvGet('/api/admin/dm'); defs = j.defaults; if (!cfg) { cfg = JSON.parse(JSON.stringify(j.config)); render(); }
+      $('fa-dm-live').textContent = `kolejki: ${j.queues.map((q) => `${q.name} ${q.n}`).join(' · ')} · trwające mecze: ${j.rooms.length}${j.rooms.length ? ' (' + j.rooms.map((r) => `${r.map} ${r.players} gr., ${r.left} s`).join(', ') + ')' : ''}`;
+      $('fa-dm-recent').innerHTML = j.recent.length ? j.recent.map((r) => `<li><div><b>${esc(r.map || '—')} · ${esc(r.tier)} · ${r.players} graczy</b><small>${new Date(r.t).toLocaleString('pl-PL')} · pula $${r.pot.toFixed(2)} · wypłacone $${r.paid.toFixed(2)}</small></div>
+        <span class="mut">${r.top.map((x) => `${x.place}. ${esc(x.name)} (${x.kills} K, ${x.damage} DMG${x.prize ? ', $' + x.prize.toFixed(2) : ''})`).join(' · ')}</span></li>`).join('') : '<li class="fa-empty">Jeszcze nie było meczów.</li>';
+    } catch (e) { if (e.code === 'admin2fa') return relockAdmin(); box.innerHTML = `<p class="fa-empty">${esc(e.message)}</p>`; }
+  }
+  $('fa-dm-save').addEventListener('click', async () => {
+    if (!cfg) return; collect(); msg.textContent = 'Zapisywanie…';
+    try { const j = await srvPost('/api/admin/dm', { config: cfg }); cfg = JSON.parse(JSON.stringify(j.config)); render(); msg.textContent = 'Zapisano (serwer poprawił wartości spoza zakresu).'; }
+    catch (e) { msg.textContent = e.message; }
+  });
+  $('fa-dm-reset').addEventListener('click', async () => {
+    if (!confirm('Przywrócić domyślne ustawienia Deathmatch?')) return;
+    try { const j = await srvPost('/api/admin/dm', { reset: true }); cfg = JSON.parse(JSON.stringify(j.config)); render(); msg.textContent = 'Przywrócono domyślne.'; } catch (e) { msg.textContent = e.message; }
+  });
+  pull(); const iv = setInterval(pull, 5000); cleanup.push(() => clearInterval(iv));
+}
 function mountAnticheat($) {
   const box = $('fa-ac'), all = $('fa-ac-all'), rp = mountReplay($);
   let data = null, last = '';
@@ -432,7 +492,12 @@ function buildDashboard(db, close) {
     <section class="fa-card"><div class="fa-ch"><h3>Antycheat – mecze do sprawdzenia</h3><small id="fa-ac-sum"></small><label class="fa-chk"><input type="checkbox" id="fa-ac-all"> wszystkie mecze</label></div>
       <p class="fa-msg" style="margin:0 0 12px">Wygrana czeka tutaj, gdy serwer ocenił ryzyko oszustwa zwycięzcy wysoko, konto jest pod obserwacją, ta sama para gra ze sobą za często,
         konta są powiązane albo stawka jest wysoka. <b>Wypłać</b> = pieniądze trafiają do zwycięzcy. <b>Odrzuć i zablokuj</b> = pula przechodzi na przeciwnika, a oszust traci grę o stawki i wypłaty.</p>
-      <div id="fa-ac"><p class="fa-empty">Ładowanie…</p></div></section>` : ''}
+      <div id="fa-ac"><p class="fa-empty">Ładowanie…</p></div></section>
+    <section class="fa-card" id="fa-dm-card"><div class="fa-ch"><h3>Deathmatch – ustawienia trybu</h3><small id="fa-dm-live"></small></div>
+      <p class="fa-msg" style="margin:0 0 12px">Zmiany działają od następnego meczu (kolejki – od razu). Ranking: zabójstwa, przy remisie zadane obrażenia. WANTED = 1. miejsce, za jego zabójstwo nagroda × mnożnik.</p>
+      <div id="fa-dm"><p class="fa-empty">Ładowanie…</p></div>
+      <div class="fa-row"><button class="fa-btn pri" type="button" id="fa-dm-save">Zapisz ustawienia</button><button class="fa-btn" type="button" id="fa-dm-reset">Przywróć domyślne</button><span class="fa-msg" id="fa-dm-msg"></span></div>
+      <h4>Ostatnie mecze Deathmatch</h4><ul class="fa-list" id="fa-dm-recent"><li class="fa-empty">—</li></ul></section>` : ''}
     <section class="fa-grid2">
       <div class="fa-card"><div class="fa-ch"><h3>Mecze dziennie</h3><small id="fa-ch-m-sum">ostatnie 14 dni</small></div><div class="fa-chart" id="fa-ch-m"></div></div>
       <div class="fa-card"><div class="fa-ch"><h3>Prowizja dziennie</h3><small id="fa-ch-f-sum">USD (płatne w SOL) · ostatnie 14 dni</small></div><div class="fa-chart" id="fa-ch-f"></div></div>
@@ -518,6 +583,7 @@ function buildDashboard(db, close) {
     });
     $('fa-lock').addEventListener('click', async () => { try { await srvPost('/api/admin/logout'); } catch {} admTok.set(''); close(); });
     mountAnticheat($);
+    mountDeathmatch($);
   } else if (db) {
     const timer = setTimeout(() => { if (!gotA) { note.hidden = false; note.textContent = 'Baza danych jeszcze nie odpowiada – dane mogą być niepełne.'; } }, 10000);
     cleanup.push(() => clearTimeout(timer));

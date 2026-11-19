@@ -18,6 +18,7 @@ import { derivePath } from 'ed25519-hd-key';
 import * as bip39 from 'bip39';
 import { WebSocketServer } from 'ws';
 import * as MECZ from './mecz.mjs';
+import * as DM from './dm.mjs';                                   // tryb Deathmatch: do 20 graczy, 3 minuty, kasa meczu, WANTED, sklep po śmierci
 import * as OCH from './ochrona.mjs';
 import * as ANTY from './antycheat.mjs';                          // ocena ryzyka cheatów po meczu (aimbot, triggerbot, silent aim)
 
@@ -35,6 +36,7 @@ const STAKE_MIN_USD = 1, STAKE_MAX_USD = 1000;
 // nowe konta grają o mniejsze stawki: [rozegrane mecze poniżej, najwyższa stawka w $] (cheater na świeżym koncie nie wygra od razu dużo)
 const STAKE_TIERS = [[5, 5], [20, 25], [50, 100]];
 const STAKE_MSG = { 5: 'Nowe konto: stawka najwyżej $5 (więcej po 5 meczach)', 25: 'Stawka najwyżej $25 – więcej po 20 meczach', 100: 'Stawka najwyżej $100 – więcej po 50 meczach' };
+const MM_BLOCK_LINKED = env.MM_BLOCK_LINKED === '1';                 // 1 = kolejka 1v1 nie paruje kont z tym samym IP/urządzeniem/adresem wypłat (domyślnie wyłączone; wygrana takich kont i tak czeka na admina)
 const REVIEW_STAKE_USD = +(env.REVIEW_STAKE_USD || 250);               // od takiej stawki każda wygrana czeka na sprawdzenie przez admina
 const REPLAY_DAYS = +(env.REPLAY_DAYS || 60);                          // powtórki meczów trzymamy tyle dni (wstrzymane i odrzucone – zawsze)
 const TX_FEE = 5000;
@@ -90,6 +92,12 @@ for (const c of ['email TEXT', 'avatar TEXT', 'google_sub TEXT', 'totp TEXT', 't
 for (const c of ['banned INTEGER NOT NULL DEFAULT 0', 'ban_reason TEXT', 'suspicion REAL NOT NULL DEFAULT 0']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + c); } catch {} }
 for (const c of ['opp_id INTEGER', 'room TEXT', 'risk REAL', 'flags TEXT', 'replay TEXT', 'review TEXT', 'score TEXT', 'hold TEXT']) { try { db.exec('ALTER TABLE matches ADD COLUMN ' + c); } catch {} }
 // urządzenia, adresy IP i adresy wypłat każdego konta (wykrywanie multikont i omijania blokady)
+// Deathmatch: wpis gracza do meczu (wpisowe pobrane przy dołączeniu do kolejki, zwrot przy anulowaniu, nagroda za miejsca 1–3)
+db.exec(`CREATE TABLE IF NOT EXISTS dm_entries(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), t INTEGER NOT NULL, tier TEXT NOT NULL,
+  entry_usd REAL NOT NULL, lamports INTEGER NOT NULL, price REAL NOT NULL, state TEXT NOT NULL DEFAULT 'queued', room TEXT, map TEXT, players INTEGER,
+  rank INTEGER, place INTEGER, kills INTEGER, deaths INTEGER, damage INTEGER, payout_lamports INTEGER NOT NULL DEFAULT 0, fee_lamports INTEGER NOT NULL DEFAULT 0, ended INTEGER);
+CREATE INDEX IF NOT EXISTS dm_entries_room ON dm_entries(room);
+CREATE INDEX IF NOT EXISTS dm_entries_user ON dm_entries(user_id, t DESC);`);
 db.exec(`CREATE TABLE IF NOT EXISTS seen(user_id INTEGER NOT NULL, kind TEXT NOT NULL, value TEXT NOT NULL, first INTEGER NOT NULL, last INTEGER NOT NULL, n INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(user_id, kind, value));
 CREATE INDEX IF NOT EXISTS seen_val ON seen(kind, value);
 CREATE INDEX IF NOT EXISTS matches_room ON matches(room);`);
@@ -590,6 +598,28 @@ const routes = {
       audit: q('SELECT a.t, a.ip, a.action, a.detail, COALESCE(a.who, u.username) username FROM audit a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT 50').all(),
       limits: { dailyUsd: WD_DAILY_USD, reviewUsd: WD_REVIEW_USD } };
   },
+  // ---- Deathmatch ----
+  // lobby: poziomy (wpisowe), zasady i ilu graczy czeka w każdej kolejce
+  'GET /api/dm/info': async () => ({ ...DM.publicConfig(dmCfg), price: PRICE, queues: Object.fromEntries(dmCfg.tiers.map((t) => [t.id, (dmQueues.get(t.id) || []).length])), live: dmRooms.size }),
+  // panel admina: wszystkie ustawienia trybu, kolejki, trwające mecze i ostatnie wyniki
+  'GET /api/admin/dm': async ({ req }) => {
+    adminGate(req);
+    const recent = q(`SELECT room, MAX(COALESCE(ended,t)) te, MAX(map) map, MAX(tier) tier, MAX(players) players, SUM(lamports) pot, SUM(payout_lamports) paid, MAX(price) price FROM dm_entries
+      WHERE room IS NOT NULL AND state IN ('won','lost','left') GROUP BY room ORDER BY te DESC LIMIT 40`).all().map((r) => {
+      const top = q('SELECT e.place, e.kills, e.damage, e.payout_lamports, e.price, u.username FROM dm_entries e JOIN users u ON u.id=e.user_id WHERE e.room=? AND e.place BETWEEN 1 AND 3 ORDER BY e.place').all(r.room);
+      return { room: r.room, t: r.te, map: r.map, tier: r.tier, players: r.players, pot: Math.round(r.pot / 1e9 * r.price * 100) / 100, paid: Math.round(r.paid / 1e9 * r.price * 100) / 100,
+        top: top.map((x) => ({ place: x.place, name: x.username, kills: x.kills, damage: x.damage, prize: Math.round(x.payout_lamports / 1e9 * x.price * 100) / 100 })) };
+    });
+    return { config: dmCfg, defaults: DM.sanitizeConfig({}), queues: dmCfg.tiers.map((t) => ({ tier: t.id, name: t.name, n: (dmQueues.get(t.id) || []).length })),
+      rooms: [...dmRooms].map((r) => ({ id: r.id, tier: r.tier.id, map: r.game.mapName, phase: r.game.phase, players: r.entries.length, left: Math.max(0, Math.round(r.game.endAt - nowS())) })), recent };
+  },
+  'POST /api/admin/dm': async ({ body, req, ip }) => {
+    const adm = adminGate(req);
+    const next = DM.sanitizeConfig(body && body.reset ? {} : (body.config || {}));
+    cfgPut('dm', JSON.stringify(next)); dmCfg = next;
+    audit(adm.username, ip, 'dm_config', body && body.reset ? 'reset' : Object.keys(body.config || {}).join(','));
+    return { config: dmCfg };
+  },
 };
 
 // gra pod tym samym adresem co API: index.html z wpisanym adresem serwera portfeli + skins.json
@@ -637,6 +667,8 @@ function serveCover(res) {
 // zerwanie połączenia w trakcie meczu = wygrana przeciwnika.
 const DUEL_MAPS = ['Oaza', 'Magazyn', 'Baza'];
 await MECZ.loadMaps(GAME_DIR, DUEL_MAPS);                       // kolizje map z plików gry (zrodla/*-data.js): serwer sam liczy ruch i strzały
+for (const n of DM.DEFAULTS.maps) if (!DUEL_MAPS.includes(n)) { try { await MECZ.loadMaps(GAME_DIR, [n]); } catch (e) { console.warn(`[dm] mapa ${n} niedostępna:`, e.message); } }   // mapy tylko do Deathmatch
+const dmMapsReady = (list) => { const ok = list.filter((n) => MECZ.mapByName(n)); return ok.length ? ok : DUEL_MAPS; };
 const rooms = new Set();
 // czy opłacony mecz właśnie czeka w kolejce albo trwa (wtedy rozlicza go wyłącznie serwer meczu)
 const duelActive = matchId => mmQueue.some(x => x.matchId === matchId) || [...rooms].some(r => !r.over && r.p.some(p => p.matchId === matchId));
@@ -746,7 +778,7 @@ function onDuelMessage(ws, user, raw) {
     if (!match) return wsSend(ws, { t: 'error', code: 'match', message: 'Brak opłaconej stawki – zagraj jeszcze raz z lobby.' });
     for (const x of mmQueue.filter(x => x.user.id === user.id)) { leaveQueue(x.ws, true); wsSend(x.ws, { t: 'error', code: 'dup', message: 'Szukasz meczu w innej karcie.' }); }
     const entry = { ws, user, matchId: match.id, stake: match.stake_usd, nick: user.username, skin: String(m.skin || '').slice(0, 64) };
-    const i = mmQueue.findIndex(x => x.stake === entry.stake && x.user.id !== user.id && x.ws.readyState === 1 && !linkOf(x.user.id, user.id));
+    const i = mmQueue.findIndex(x => x.stake === entry.stake && x.user.id !== user.id && x.ws.readyState === 1 && !(MM_BLOCK_LINKED && linkOf(x.user.id, user.id)));
     if (i < 0) { mmQueue.push(entry); ws.mm = entry; wsSend(ws, { t: 'queued', waiting: mmQueue.filter(x => x.stake === entry.stake).length }); return; }
     startRoom(mmQueue.splice(i, 1)[0], entry); return;
   }
@@ -772,11 +804,175 @@ function afterGame(room) {
   if (g.over && !room.ending) { room.ending = true; setTimeout(() => endRoom(room, g.winner, 'score'), 1200); }
 }
 setInterval(() => { const t = nowS(); for (const room of rooms) { if (room.over) continue; MECZ.tick(room.game, t, room.out); afterGame(room); } }, 100);
+
+// ---------------- DEATHMATCH: kolejki według poziomu (wpisowego), pokoje do 20 graczy, rozliczenie podium ----------------
+// Gracz łączy się z /ws i wysyła {t:'dmq', tier, skin}. Serwer pobiera wpisowe z salda (poziom darmowy: 0), wstawia gracza do kolejki
+// poziomu i co sekundę wysyła stan kolejki. Mecz startuje od razu przy komplecie (maxPlayers) albo po queueTimeout s z tyloma graczami,
+// ilu czeka (co najmniej minPlayers). Wyjście z kolejki (albo zamknięta karta) = zwrot wpisowego. W meczu wszystko liczy dm.mjs;
+// po meczu serwer rozdziela pulę (wpisowe wszystkich minus prowizja) na miejsca 1–3 według rankingu: zabójstwa, potem obrażenia.
+let dmCfg = (() => { try { const r = q("SELECT value FROM config WHERE key='dm'").get(); return DM.sanitizeConfig(r ? JSON.parse(r.value) : {}); } catch { return DM.sanitizeConfig({}); } })();
+const dmQueues = new Map();                                     // tier -> [{ws, user, nick, skin, tier, entryId, lamports, price, t}]
+const dmRooms = new Set();
+const dmUsers = new Map();                                      // user.id -> wpis (w kolejce albo w meczu): jeden mecz/kolejka na gracza
+let dmSeq = 0;
+const inDuel = (uid) => mmQueue.some((x) => x.user.id === uid) || [...rooms].some((r) => !r.over && r.p.some((p) => p.user.id === uid));
+function dmRefund(e, why) {
+  try {
+    tx(() => {
+      const row = q("SELECT * FROM dm_entries WHERE id=? AND state='queued'").get(e.entryId); if (!row) return;
+      q("UPDATE dm_entries SET state='refunded', ended=? WHERE id=?").run(Date.now(), row.id);
+      if (row.lamports > 0) {
+        q('UPDATE users SET lamports=lamports+? WHERE id=?').run(row.lamports, row.user_id);
+        const st = q("SELECT id FROM txs WHERE user_id=? AND type='stake' AND lamports=? AND t>=? ORDER BY t DESC, id DESC LIMIT 1").get(row.user_id, -row.lamports, row.t - 5000);
+        if (st) q('DELETE FROM txs WHERE id=?').run(st.id);
+      }
+    });
+  } catch (er) { console.error('[dm] zwrot wpisowego', er); }
+  if (why) console.log(`[dm] ${e.nick}: wyjście z kolejki ${e.tier.id} (${why})`);
+}
+function dmLeaveQueue(e, refund, why) {
+  const qu = dmQueues.get(e.tier.id) || []; const i = qu.indexOf(e); if (i < 0) return false;
+  qu.splice(i, 1); if (dmUsers.get(e.user.id) === e) dmUsers.delete(e.user.id); if (e.ws.dm === e) e.ws.dm = null;
+  if (refund) dmRefund(e, why);
+  dmQueueStatus(e.tier.id);
+  return true;
+}
+function dmQueueStatus(tierId) {
+  const qu = dmQueues.get(tierId) || [], now = Date.now(), wait = qu.length ? (now - qu[0].t) / 1000 : 0;
+  for (const e of qu) wsSend(e.ws, { t: 'dmq', n: qu.length, max: dmCfg.maxPlayers, min: dmCfg.minPlayers, wait: +wait.toFixed(1), timeout: dmCfg.queueTimeout, tier: tierId });
+}
+function dmJoin(ws, user, m) {
+  if (ws.dm || ws.mm) return wsSend(ws, { t: 'error', code: 'dup', message: 'Już szukasz meczu albo grasz.' });
+  const u = fresh(user.id) || {};
+  if (u.banned) return wsSend(ws, { t: 'error', code: 'banned', message: BANNED_MSG });
+  if (inDuel(user.id)) return wsSend(ws, { t: 'error', code: 'dup', message: 'Grasz już mecz 1v1.' });
+  const tier = dmCfg.tiers.find((t) => t.id === String(m.tier || '')); if (!tier) return wsSend(ws, { t: 'error', code: 'tier', message: 'Nie ma takiego poziomu.' });
+  const old = dmUsers.get(user.id);
+  if (old) {
+    if (old.room) return wsSend(ws, { t: 'error', code: 'dup', message: 'Grasz już mecz Deathmatch w innej karcie.' });
+    dmLeaveQueue(old, true, 'nowa karta'); wsSend(old.ws, { t: 'error', code: 'dup', message: 'Szukasz meczu w innej karcie.' });
+  }
+  let lam = 0, price = PRICE;
+  if (tier.entry > 0) {
+    if (!PRICE) return wsSend(ws, { t: 'error', code: 'price', message: 'Brak kursu SOL – spróbuj za chwilę.' });
+    lam = Math.round(tier.entry / PRICE * LAMPORTS_PER_SOL);
+  }
+  let entryId;
+  try {
+    entryId = tx(() => {
+      const cur = fresh(user.id); if (cur.lamports < lam) throw new E('funds', 'Za mało środków na wpisowe');
+      if (lam > 0) { q('UPDATE users SET lamports=lamports-? WHERE id=?').run(lam, user.id); addTx(user.id, 'stake', -lam, -tier.entry, { note: 'Deathmatch ' + tier.name }); }
+      return Number(q('INSERT INTO dm_entries(user_id,t,tier,entry_usd,lamports,price) VALUES(?,?,?,?,?,?)').run(user.id, Date.now(), tier.id, tier.entry, lam, price || 0).lastInsertRowid);
+    });
+  } catch (er) { return wsSend(ws, { t: 'error', code: er.code || 'funds', message: er.message || 'Za mało środków' }); }
+  const e = { ws, user, nick: user.username, skin: String(m.skin || '').slice(0, 64), tier, entryId, lamports: lam, price, t: Date.now(), room: null, pid: 0 };
+  if (!dmQueues.has(tier.id)) dmQueues.set(tier.id, []);
+  dmQueues.get(tier.id).push(e); dmUsers.set(user.id, e); ws.dm = e;
+  wsSend(ws, { t: 'dmqueued', tier: tier.id, account: publicUser(fresh(user.id)) });
+  dmQueueStatus(tier.id);
+  dmMatchmake();
+}
+// dobieranie: komplet od razu; po czasie oczekiwania najstarszego gracza – tylu, ilu jest (co najmniej minPlayers); puste pokoje nie powstają
+function dmMatchmake() {
+  const now = Date.now();
+  for (const [tierId, qu] of dmQueues) {
+    for (let i = qu.length - 1; i >= 0; i--) if (qu[i].ws.readyState !== 1) dmLeaveQueue(qu[i], true, 'rozłączony');
+    while (qu.length >= dmCfg.maxPlayers) dmStart(qu.splice(0, dmCfg.maxPlayers));
+    if (qu.length >= dmCfg.minPlayers && now - qu[0].t >= dmCfg.queueTimeout * 1000) dmStart(qu.splice(0, qu.length));
+  }
+}
+function dmStart(entries) {
+  const tier = entries[0].tier, cfg = dmCfg, maps = dmMapsReady(cfg.maps), map = maps[Math.floor(Math.random() * maps.length)];
+  const key = Date.now().toString(36) + '-d' + (++dmSeq);
+  let game;
+  try { game = DM.createRoom(cfg, map, entries.map((e) => ({ uid: e.user.id, nick: e.nick, skin: e.skin })), nowS()); }
+  catch (er) { console.error('[dm] start pokoju', er); for (const e of entries) { dmRefund(e); dmUsers.delete(e.user.id); e.ws.dm = null; wsSend(e.ws, { t: 'error', code: 'start', message: 'Nie udało się utworzyć meczu – wpisowe wróciło.' }); } return; }
+  const room = { id: dmSeq, key, tier, entries, game, settled: false };
+  entries.forEach((e, i) => { e.pid = i + 1; e.room = room; });
+  room.byPid = new Map(entries.map((e) => [e.pid, e]));
+  room.out = (pid, msg) => {
+    if (pid < 0) { const s = JSON.stringify(msg); for (const e of room.entries) if (!e.gone && e.ws.readyState === 1) e.ws.send(s); return; }
+    const e = room.byPid.get(pid); if (e && !e.gone) wsSend(e.ws, msg);
+  };
+  dmRooms.add(room);
+  try { for (const e of entries) q("UPDATE dm_entries SET state='playing', room=?, map=?, players=? WHERE id=?").run(key, map, entries.length, e.entryId); } catch (er) { console.error('[dm] zapis pokoju', er); }
+  const t = nowS();
+  for (const e of entries) wsSend(e.ws, DM.startMessage(game, e.pid, t));
+  dmQueueStatus(tier.id);
+  console.log(`[dm] pokój ${key}: ${entries.length} graczy, poziom ${tier.id} ($${tier.entry}), mapa ${map}`);
+}
+// rozliczenie: pula = wpisowe wszystkich (także tych, którzy wyszli) minus prowizja; podział na miejsca 1–3 (mniej graczy = podział tylko na tych, którzy są)
+function dmSettle(room) {
+  if (room.settled) return; room.settled = true;
+  const g = room.game, cfg = g.cfg, res = g.results || [];
+  const pot = room.entries.reduce((a, e) => a + e.lamports, 0), fee = Math.round(pot * cfg.houseFee), dist = pot - fee;
+  const podium = g.podium || [], split = cfg.prizeSplit.slice(0, podium.length), sum = split.reduce((a, b) => a + b, 0) || 1;
+  const pay = new Map(); podium.forEach((pid, i) => pay.set(pid, Math.floor(dist * split[i] / sum)));
+  const prizesUsd = {};
+  try {
+    tx(() => {
+      for (const e of room.entries) {
+        const r = res.find((x) => x.pid === e.pid) || {}, lam = pay.get(e.pid) || 0, usd = e.price ? Math.round(lam / 1e9 * e.price * 100) / 100 : 0;
+        const state = e.gone || r.left ? 'left' : lam > 0 || (r.place >= 1 && r.place <= 3) ? 'won' : 'lost';
+        q('UPDATE dm_entries SET state=?, rank=?, place=?, kills=?, deaths=?, damage=?, payout_lamports=?, fee_lamports=?, ended=? WHERE id=?')
+          .run(state, r.rank || null, r.place || 0, r.kills || 0, r.deaths || 0, r.damage || 0, lam, e.pid === podium[0] ? fee : 0, Date.now(), e.entryId);
+        if (lam > 0) { q('UPDATE users SET lamports=lamports+? WHERE id=?').run(lam, e.user.id); addTx(e.user.id, 'win', lam, usd, { note: `Deathmatch · ${r.place}. miejsce` }); }
+        else if (e.lamports > 0) addTx(e.user.id, 'loss', 0, 0, { note: `Deathmatch · ${r.rank || '-'}. miejsce` });
+        prizesUsd[e.pid] = usd;
+        // statystyki konta z wyniku serwera (nie z przeglądarki)
+        const u = fresh(e.user.id); if (u) { const st = JSON.parse(u.stats || '{}');
+          for (const [k, v] of [['shots', r.shots], ['hits', r.hits], ['heads', r.heads], ['kills', r.kills], ['deaths', r.deaths]]) if (v > 0) st[k] = (st[k] || 0) + v;
+          q('UPDATE users SET stats=?, last_active=? WHERE id=?').run(JSON.stringify(st), Date.now(), u.id); }
+      }
+    });
+  } catch (er) { console.error('[dm] rozliczenie', er); }
+  const top = podium.map((pid, i) => { const e = room.byPid.get(pid); return `${i + 1}. ${e ? e.nick : '?'}`; }).join(', ');
+  console.log(`[dm] pokój ${room.key}: koniec – ${top}; pula ${pot / LAMPORTS_PER_SOL} SOL, prowizja ${fee / LAMPORTS_PER_SOL} SOL`);
+  if (g.log.length) console.log(`[dm] pokój ${room.key}: odrzucone ruchy (${g.log.length}):`, g.log.slice(-10).join(' | '));
+  const end = DM.endMessage(g, prizesUsd);
+  for (const e of room.entries) if (!e.gone) wsSend(e.ws, { ...end, you: e.pid, account: publicUser(fresh(e.user.id)) });
+}
+function dmClose(room) {
+  dmRooms.delete(room);
+  for (const e of room.entries) { if (dmUsers.get(e.user.id) === e) dmUsers.delete(e.user.id); if (e.ws.dm === e) e.ws.dm = null; }
+}
+function dmPlayerGone(e, why) {
+  const room = e.room; if (!room || e.gone) return;
+  e.gone = true; DM.leave(room.game, e.pid, nowS(), room.out);
+  if (dmUsers.get(e.user.id) === e) dmUsers.delete(e.user.id); if (e.ws.dm === e) e.ws.dm = null;
+  console.log(`[dm] pokój ${room.key}: ${e.nick} wyszedł (${why})`);
+}
+function onDmMessage(ws, user, m) {
+  if (m.t === 'dmq') return dmJoin(ws, user, m);
+  const e = ws.dm; if (!e) return;
+  if (m.t === 'dmc') { if (!e.room) { dmLeaveQueue(e, true, 'anulowane'); wsSend(ws, { t: 'dmcancelled' }); } return; }
+  if (!e.room || e.gone) return;
+  if (m.t === 'leave') { dmPlayerGone(e, 'wyjście'); return; }
+  DM.handleMessage(e.room.game, e.pid, m, nowS(), e.room.out);
+}
+setInterval(() => {
+  const t = nowS();
+  for (const room of dmRooms) {
+    DM.tick(room.game, t, room.out);
+    for (const e of room.entries) { const p = room.game.p.get(e.pid); if (p && p.kickedOut && !e.gone) { e.gone = true; if (e.ws.dm === e) e.ws.dm = null; dmUsers.delete(e.user.id); } }
+    if (room.game.phase === 'end' && !room.settled) dmSettle(room);
+    if (room.game.over) dmClose(room);
+  }
+}, 50);
+setInterval(() => { dmMatchmake(); for (const id of dmQueues.keys()) dmQueueStatus(id); }, 1000);
+
 wss.on('connection', (ws, req, user) => {
   ws.alive = true; ws.on('pong', () => { ws.alive = true; });
   try { noteSeen(user.id, 'ip', OCH.clientIp(req)); noteSeen(user.id, 'dev', cleanDev(new URL(req.url, 'http://x').searchParams.get('d'))); } catch {}
-  ws.on('message', d => onDuelMessage(ws, user, String(d)));
+  ws.on('message', d => {
+    const raw = String(d); let m; try { m = JSON.parse(raw); } catch { return; }
+    if (!m || typeof m.t !== 'string') return;
+    if (ws.dm || m.t === 'dmq' || m.t === 'dmc') return onDmMessage(ws, user, m);
+    if (m.t === 'queue' && dmUsers.has(user.id)) return wsSend(ws, { t: 'error', code: 'dup', message: 'Jesteś w kolejce Deathmatch albo w meczu.' });
+    onDuelMessage(ws, user, raw);
+  });
   ws.on('close', () => {
+    const e = ws.dm; if (e) { if (!e.room) dmLeaveQueue(e, true, 'zamknięta karta'); else dmPlayerGone(e, 'rozłączony'); }
     const me = ws.mm; if (!me) return;
     if (!me.room) leaveQueue(ws, true);                           // zamknięta karta w trakcie szukania: zwrot stawki
     else if (!me.room.over) endRoom(me.room, 1 - me.seat, 'left');   // wyjście z meczu: wygrywa przeciwnik
