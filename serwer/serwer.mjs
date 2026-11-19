@@ -139,11 +139,19 @@ purgeSessions(); setInterval(purgeSessions, 3600e3).unref();
 // bash beanladen-admin.sh dodaj NAZWA (albo node admin.mjs dodaj NAZWA). Dawne ADMIN_USERS / ADMIN_IDS nie są już używane.
 const cfgPut = (k, v) => q('INSERT INTO config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(k, v);
 // napis „150 players online” na górze lobby – liczbę i tekst ustawia panel admina (klucz 'online' w config); {n} = liczba
+// Wzrost wykładniczy: co minutę liczba rośnie o `growth` % (czyli z każdą minutą przybywa coraz więcej), aż do `cap`.
+// Liczone od `start` (chwila zapisu w panelu), więc restart serwera nie cofa licznika.
 const onlineSanitize = (s = {}) => {
   const text = String(s.text ?? '{n} players online').replace(/[<>]/g, '').trim().slice(0, 60) || '{n} players online';
-  return { enabled: s.enabled === undefined ? true : !!s.enabled, count: Math.max(0, Math.min(1e6, Math.round(+(s.count ?? 150) || 0))), text: text.includes('{n}') ? text : '{n} ' + text };
+  const count = Math.max(0, Math.min(1e6, Math.round(+(s.count ?? 150) || 0)));
+  return { enabled: s.enabled === undefined ? true : !!s.enabled, count, text: text.includes('{n}') ? text : '{n} ' + text,
+    growth: Math.max(0, Math.min(10, Math.round((+(s.growth ?? 0.5) || 0) * 100) / 100)),
+    cap: Math.max(count, Math.min(1e6, Math.round(+(s.cap ?? 5000) || 0))),
+    start: Number.isFinite(+s.start) && +s.start > 0 ? +s.start : Date.now() };
 };
-let onlineCfg = (() => { try { const r = q("SELECT value FROM config WHERE key='online'").get(); return onlineSanitize(r ? JSON.parse(r.value) : {}); } catch { return onlineSanitize({}); } })();
+let onlineCfg = (() => { try { const r = q("SELECT value FROM config WHERE key='online'").get(); const c = onlineSanitize(r ? JSON.parse(r.value) : {}); if (!r || !JSON.parse(r.value).start) cfgPut('online', JSON.stringify(c)); return c; } catch { return onlineSanitize({}); } })();
+// liczba teraz: start × (1 + growth%)^minuty, najwyżej cap
+const onlineNow = (now = Date.now()) => { const c = onlineCfg, min = Math.max(0, (now - c.start) / 60000); return Math.min(c.cap, Math.round(c.count * Math.pow(1 + c.growth / 100, min))); };
 { const a = q('SELECT username, totp FROM admins ORDER BY id').all();
   console.log(a.length ? `[admin] konta panelu: ${a.map(x => x.username + (x.totp ? ' (2FA)' : ' (2FA przy pierwszym logowaniu)')).join(', ')}` : '[admin] brak konta panelu admina – dodaj je: bash beanladen-admin.sh dodaj NAZWA');
   if (env.ADMIN_USERS || env.ADMIN_IDS) console.log('[admin] ADMIN_USERS / ADMIN_IDS w .env nie są już używane (panel ma własne konta)'); }
@@ -730,14 +738,17 @@ const routes = {
     return { config: dmCfg };
   },
   // ---- napis „N players online” na górze lobby (bez logowania) ----
-  'GET /api/online': async () => ({ enabled: onlineCfg.enabled, count: onlineCfg.count, text: onlineCfg.text }),
-  'GET /api/admin/online': async ({ req }) => { adminGate(req); return { config: onlineCfg, defaults: onlineSanitize({}) }; },
+  // count = liczba teraz; next = liczba za minutę (lobby płynnie dolicza między odświeżeniami)
+  'GET /api/online': async () => { const t = Date.now(); return { enabled: onlineCfg.enabled, count: onlineNow(t), next: onlineNow(t + 60000), text: onlineCfg.text }; },
+  'GET /api/admin/online': async ({ req }) => { adminGate(req); return { config: onlineCfg, defaults: onlineSanitize({}), now: onlineNow() }; },
   'POST /api/admin/online': async ({ body, req, ip }) => {
     const adm = adminGate(req);
-    const next = onlineSanitize(body && body.reset ? {} : (body.config || {}));
+    const b = body && body.reset ? {} : { ...(body.config || {}) };
+    if (!(body && body.keep)) delete b.start;                     // zapis = wzrost liczony od nowa od podanej liczby startowej
+    const next = onlineSanitize(b);
     cfgPut('online', JSON.stringify(next)); onlineCfg = next;
-    audit(adm.username, ip, 'online_config', `${next.enabled ? 'wł.' : 'wył.'} ${next.count}`);
-    return { config: onlineCfg };
+    audit(adm.username, ip, 'online_config', `${next.enabled ? 'wł.' : 'wył.'} ${next.count} +${next.growth}%/min do ${next.cap}`);
+    return { config: onlineCfg, now: onlineNow() };
   },
   // ---- Udostępnienie na X (wejście do Deathmatch) ----
   // lobby: kod gracza, gotowy tekst posta, link do okna X i czy post jest już zweryfikowany
