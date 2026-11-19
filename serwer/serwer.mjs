@@ -709,7 +709,7 @@ const routes = {
   },
   // ---- Deathmatch ----
   // lobby gry: zasady i ilu graczy jest teraz w stałym lobby Deathmatch (komplet = full)
-  'GET /api/dm/info': async () => { const n = dmCount(); return { ...DM.publicConfig(dmCfg), players: n, full: dmHumans() >= dmCfg.maxPlayers, queues: { [dmCfg.tiers[0].id]: n }, live: dmRooms.size, xshare: xsCfg.enabled }; },
+  'GET /api/dm/info': async () => { const n = dmCount() || Math.min(dmCfg.bots, dmCfg.maxPlayers); return { ...DM.publicConfig(dmCfg), players: n, full: dmHumans() >= dmCfg.maxPlayers, queues: { [dmCfg.tiers[0].id]: n }, live: dmRooms.size, xshare: xsCfg.enabled }; },
   // panel admina: wszystkie ustawienia trybu, kolejki, trwające mecze i ostatnie wyniki
   'GET /api/admin/dm': async ({ req }) => {
     adminGate(req);
@@ -1143,7 +1143,7 @@ function dmPlayerGone(e, why, stats) {
 // boty: dodanie jednego do lobby / usunięcie (domyślnie martwego albo ostatnio dodanego)
 function dmBotAdd(room, t) {
   const taken = new Set([...room.game.p.values()].map((p) => String(p.nick).toLowerCase()));
-  const pid = DM.addPlayer(room.game, { uid: 0, nick: BOTY.botNick(taken), skin: BOTY.botSkin(), bot: true }, t, room.out);
+  const pid = DM.addPlayer(room.game, { uid: 0, nick: BOTY.botNick(taken), skin: BOTY.botSkin([...room.game.p.values()].map((p) => p.skin)), bot: true }, t, room.out);
   room.bots.set(pid, BOTY.createBot(pid, dmCfg.botSkill));
 }
 function dmBotRemove(room, pid) {
