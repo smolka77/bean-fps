@@ -703,13 +703,38 @@ function refundMatch(matchId, userId) {
   try {
     tx(() => {
       const m = q("SELECT * FROM matches WHERE id=? AND user_id=? AND state='open'").get(matchId, userId); if (!m) return;
-      q('DELETE FROM matches WHERE id=?').run(m.id);
-      const st = q("SELECT id FROM txs WHERE user_id=? AND type='stake' AND lamports=? AND t>=? ORDER BY t DESC, id DESC LIMIT 1").get(userId, -m.stake_lamports, m.t - 5000);
-      if (st) q('DELETE FROM txs WHERE id=?').run(st.id);
-      q('UPDATE users SET lamports=lamports+? WHERE id=?').run(m.stake_lamports, userId);
-      console.log(`[1v1] zwrot stawki ${m.stake_usd} USD dla użytkownika ${userId} (anulowane szukanie)`);
+      refundOpen(m, 'anulowane szukanie');
     });
   } catch (e) { console.error('[1v1] zwrot stawki', e); }
+}
+// zwrot opłaconej, nierozegranej stawki 1v1 – wołać WEWNĄTRZ transakcji (tx). Mecz i pobranie stawki znikają z historii, saldo wraca.
+function refundOpen(m, why) {
+  q('DELETE FROM matches WHERE id=?').run(m.id);
+  const st = q("SELECT id FROM txs WHERE user_id=? AND type='stake' AND lamports=? AND t BETWEEN ? AND ? ORDER BY t DESC, id DESC LIMIT 1").get(m.user_id, -m.stake_lamports, m.t - 5000, m.t + 5000);
+  if (st) q('DELETE FROM txs WHERE id=?').run(st.id);
+  q('UPDATE users SET lamports=lamports+? WHERE id=?').run(m.stake_lamports, m.user_id);
+  console.log(`[1v1] zwrot stawki ${m.stake_usd} USD dla użytkownika ${m.user_id} (${why})`);
+}
+// Po restarcie albo awarii serwera w pamięci nie ma kolejek ani pokoi, więc każda otwarta stawka 1v1 i każde wpisowe Deathmatch
+// w kolejce / w trakcie meczu jest osierocone: wraca do gracza (mecz nie został rozstrzygnięty). Wołane raz, przed startem serwera.
+function refundOrphans() {
+  try {
+    const n = tx(() => {
+      const ms = q("SELECT * FROM matches WHERE state='open'").all();
+      for (const m of ms) refundOpen(m, 'restart serwera');
+      const es = q("SELECT * FROM dm_entries WHERE state IN ('queued','playing')").all();
+      for (const e of es) {
+        q("UPDATE dm_entries SET state='refunded', ended=? WHERE id=?").run(Date.now(), e.id);
+        if (e.lamports > 0) {
+          q('UPDATE users SET lamports=lamports+? WHERE id=?').run(e.lamports, e.user_id);
+          const st = q("SELECT id FROM txs WHERE user_id=? AND type='stake' AND lamports=? AND t BETWEEN ? AND ? ORDER BY t DESC, id DESC LIMIT 1").get(e.user_id, -e.lamports, e.t - 5000, e.t + 5000);
+          if (st) q('DELETE FROM txs WHERE id=?').run(st.id);
+        }
+      }
+      return [ms.length, es.length];
+    });
+    if (n[0] || n[1]) console.log(`[restart] zwrócono ${n[0]} stawek 1v1 i ${n[1]} wpisowych Deathmatch z przerwanych meczów`);
+  } catch (e) { console.error('[restart] zwrot osieroconych stawek', e); }
 }
 // rozliczenie jednego gracza po meczu (decyduje serwer). x: przeciwnik, pokój, ryzyko, sygnały, powtórka, wynik, powód wstrzymania wypłaty
 function settleDuel(matchId, userId, won, forfeit, map, x = {}) {
@@ -796,11 +821,17 @@ function onDuelMessage(ws, user, raw, arsChecked = false) {
   if (m.t === 'queue') {
     if (me) return;                                              // już w kolejce albo w meczu
     if ((fresh(user.id) || {}).banned) return wsSend(ws, { t: 'error', code: 'banned', message: BANNED_MSG });
-    const match = q("SELECT * FROM matches WHERE id=? AND user_id=? AND state='open'").get(+m.matchId, user.id);
-    if (!match) return wsSend(ws, { t: 'error', code: 'match', message: 'Brak opłaconej stawki – zagraj jeszcze raz z lobby.' });
+    const mid = typeof m.matchId === 'number' || typeof m.matchId === 'string' ? Number(m.matchId) : NaN;
+    const noMatch = () => wsSend(ws, { t: 'error', code: 'match', message: 'Brak opłaconej stawki – zagraj jeszcze raz z lobby.' });
+    const match = Number.isSafeInteger(mid) ? q("SELECT * FROM matches WHERE id=? AND user_id=? AND state='open'").get(mid, user.id) : null;
+    if (!match) return noMatch();
     if (!arsChecked && arsenalWait(ws, user, () => { if (!ws.mm) onDuelMessage(ws, user, raw, true); })) return;   // Arsenał: najpierw aktualne saldo tokenu
-    for (const x of mmQueue.filter(x => x.user.id === user.id)) { leaveQueue(x.ws, true); wsSend(x.ws, { t: 'error', code: 'dup', message: 'Szukasz meczu w innej karcie.' }); }
-    const entry = { ws, user, matchId: match.id, stake: match.stake_usd, lam: match.stake_lamports || 0, nick: user.username, skin: String(m.skin || '').slice(0, 64) };
+    // jedna opłacona stawka = jeden mecz: ten sam mecz nie może trwać w innym pokoju ani czekać w drugiej kolejce
+    // (wcześniej druga karta dostawała zwrot stawki pierwszej, a sama grała dalej – bez stawki – albo w kilku pokojach naraz)
+    if ([...rooms].some(r => !r.over && r.p.some(p => p.matchId === match.id))) return wsSend(ws, { t: 'error', code: 'dup', message: 'Ten mecz już trwa w innej karcie.' });
+    for (const x of mmQueue.filter(x => x.user.id === user.id)) { leaveQueue(x.ws, x.matchId !== match.id); wsSend(x.ws, { t: 'error', code: 'dup', message: 'Szukasz meczu w innej karcie.' }); }
+    if (!q("SELECT 1 FROM matches WHERE id=? AND state='open'").get(match.id)) return noMatch();   // stawka mogła właśnie wrócić
+    const entry ={ ws, user, matchId: match.id, stake: match.stake_usd, lam: match.stake_lamports || 0, nick: user.username, skin: String(m.skin || '').slice(0, 64) };
     const i = mmQueue.findIndex(x => x.stake === entry.stake && x.user.id !== user.id && x.ws.readyState === 1 && !(MM_BLOCK_LINKED && linkOf(x.user.id, user.id)));
     if (i < 0) { mmQueue.push(entry); ws.mm = entry; wsSend(ws, { t: 'queued', waiting: mmQueue.filter(x => x.stake === entry.stake).length }); return; }
     startRoom(mmQueue.splice(i, 1)[0], entry); return;
@@ -842,7 +873,7 @@ const arsenalInfo = () => ARS.active(arsCfg) ? { unit: ARS.unitLabel(arsCfg), ne
 function arsenalWait(ws, user, again) {
   if (!ARS.active(arsCfg) || arsenal.isFresh(user.id, ARS.QUEUE_AGE)) return false;
   const u = fresh(user.id); if (!u) return false;
-  arsenal.refresh(u).then(() => { if (ws.readyState === 1) again(); });
+  arsenal.refresh(u).then(() => { if (ws.readyState === 1) again(); }).catch((e) => console.error('[arsenał] po sprawdzeniu salda:', e && e.message));
   return true;
 }
 // bronie gracza w meczu (null = Arsenał wyłączony); `ids` = bronie, które zna dany tryb; lam = stawka / wpisowe zamrożone na ten mecz (liczy się do salda SOL)
@@ -1010,11 +1041,13 @@ wss.on('connection', (ws, req, user) => {
   ws.alive = true; ws.on('pong', () => { ws.alive = true; });
   try { noteSeen(user.id, 'ip', OCH.clientIp(req)); noteSeen(user.id, 'dev', cleanDev(new URL(req.url, 'http://x').searchParams.get('d'))); } catch {}
   ws.on('message', d => {
-    const raw = String(d); let m; try { m = JSON.parse(raw); } catch { return; }
-    if (!m || typeof m.t !== 'string') return;
-    if (ws.dm || m.t === 'dmq' || m.t === 'dmc') return onDmMessage(ws, user, m);
-    if (m.t === 'queue' && dmUsers.has(user.id)) return wsSend(ws, { t: 'error', code: 'dup', message: 'Jesteś w kolejce Deathmatch albo w meczu.' });
-    onDuelMessage(ws, user, raw);
+    try {                                                         // uszkodzona wiadomość jednego gracza nie może wyłączyć serwera
+      const raw = String(d); let m; try { m = JSON.parse(raw); } catch { return; }
+      if (!m || typeof m.t !== 'string') return;
+      if (ws.dm || m.t === 'dmq' || m.t === 'dmc') return onDmMessage(ws, user, m);
+      if (m.t === 'queue' && dmUsers.has(user.id)) return wsSend(ws, { t: 'error', code: 'dup', message: 'Jesteś w kolejce Deathmatch albo w meczu.' });
+      onDuelMessage(ws, user, raw);
+    } catch (e) { console.error(`[ws] wiadomość od ${user.id} odrzucona:`, e && e.message); }
   });
   ws.on('close', () => {
     const e = ws.dm; if (e) { if (!e.room) dmLeaveQueue(e, true, 'zamknięta karta'); else dmPlayerGone(e, 'rozłączony'); }
@@ -1026,18 +1059,28 @@ wss.on('connection', (ws, req, user) => {
 });
 setInterval(() => { for (const ws of wss.clients) { if (!ws.alive) { ws.terminate(); continue; } ws.alive = false; try { ws.ping(); } catch {} } }, 20000);
 function onUpgrade(req, socket, head) {
-  const url = new URL(req.url, 'http://x');
-  if (url.pathname !== '/ws' || (COVER_PW && !coverOk(req))) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); return socket.destroy(); }
-  const uid = OCH.useTicket(url.searchParams.get('k'));           // jednorazowy bilet z POST /api/ws-ticket (nie token sesji)
-  const user = uid ? fresh(uid) : null;
-  if (!user) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); return socket.destroy(); }
-  wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req, user));
+  try {
+    let url; try { url = new URL(req.url, 'http://x'); } catch { socket.write('HTTP/1.1 400 Bad Request\r\n\r\n'); return socket.destroy(); }
+    if (url.pathname !== '/ws' || (COVER_PW && !coverOk(req))) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); return socket.destroy(); }
+    const uid = OCH.useTicket(url.searchParams.get('k'));           // jednorazowy bilet z POST /api/ws-ticket (nie token sesji)
+    const user = uid ? fresh(uid) : null;
+    if (!user) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); return socket.destroy(); }
+    wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req, user));
+  } catch (e) { console.error('[ws] połączenie odrzucone:', e && e.message); try { socket.destroy(); } catch {} }
 }
-const server = http.createServer(async (req, res) => {
+// ostatnia linia obrony: pojedynczy błąd (złe zapytanie, uszkodzona wiadomość) nie wyłącza serwera z trwającymi meczami i stawkami
+process.on('unhandledRejection', (e) => console.error('[serwer] nieobsłużona obietnica:', e));
+process.on('uncaughtException', (e) => console.error('[serwer] nieobsłużony wyjątek:', e));
+const server = http.createServer((req, res) => handleHttp(req, res).catch((e) => {
+  console.error('[http]', req.method, String(req.url).slice(0, 200), e && e.message);
+  try { if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify({ error: 'server', message: 'Błąd serwera' })); } catch {}
+}));
+async function handleHttp(req, res) {
   const origin = req.headers.origin;
   if (req.method === 'OPTIONS') { res.writeHead(204, cors(origin)); return res.end(); }
+  let url; try { url = new URL(req.url, 'http://x'); } catch { res.writeHead(400); return res.end(); }   // np. „GET //x:99999/” – wcześniej wyłączało serwer
   if (COVER_PW) {                                               // bramka z hasłem (lock screen)
-    const p0 = new URL(req.url, 'http://x').pathname;
+    const p0 = url.pathname;
     if (req.method === 'POST' && p0 === '/__cover') return coverLogin(req, res);
     if (!coverOk(req) && !(req.method === 'GET' && PUBLIC_PAGES.has(p0))) {
       if (req.method === 'GET' && !p0.startsWith('/api/')) return serveCover(res);
@@ -1045,30 +1088,8 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify({ error: 'locked', message: 'Strona jest zablokowana hasłem' }));
     }
   }
-  const url = new URL(req.url, 'http://x'), key = req.method + ' ' + url.pathname, h = routes[key];
+  const key = req.method + ' ' + url.pathname, h = routes[key];
   if (!h && req.method === 'GET' && !url.pathname.startsWith('/api/')) return serveGame(url.pathname, res);
   if (!h) return send(res, 404, { error: 'not_found', message: 'Nie ma takiej ścieżki' }, origin);
   try {
-    const body = req.method === 'POST' ? await readBody(req) : {};
-    const ip = OCH.clientIp(req), dev = cleanDev(req.headers['x-dev']);
-    const user = userFromReq(req); if (user) { user._auth = req.headers.authorization; noteSeen(user.id, 'ip', ip); noteSeen(user.id, 'dev', dev); }
-    send(res, 200, await h({ req, body, ip, dev, user }), origin);
-  } catch (e) {
-    if (!(e instanceof E)) console.error(key, e);
-    send(res, e.status || 500, { error: e.code || 'server', message: e instanceof E ? e.message : 'Błąd serwera' }, origin);
-  }
-});
-server.on('upgrade', onUpgrade);                              // WebSocket /ws: kolejka i mecze 1v1
-server.listen(PORT, HOST, () => {
-  console.log(`Portfele BEANLADEN: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}  sieć: ${CLUSTER}  skarbiec: ${TREASURY.publicKey.toBase58()}`);
-});
-refreshPrice(); setInterval(refreshPrice, 60000);
-function cleanReplays() {                                        // stare powtórki znikają; wstrzymane i odrzucone mecze zostają
-  try {
-    const keep = new Set(q("SELECT replay FROM matches WHERE replay IS NOT NULL AND (state='held' OR review IN ('held','rejected'))").all().map(r => r.replay));
-    const lim = Date.now() - REPLAY_DAYS * 864e5;
-    for (const f of fs.readdirSync(REPLAY_DIR)) { const fp = path.join(REPLAY_DIR, f); if (!keep.has(f) && fs.statSync(fp).mtimeMs < lim) fs.unlinkSync(fp); }
-  } catch (e) { console.warn('[powtórki]', e.message); }
-}
-setInterval(cleanReplays, 6 * 3600e3); setTimeout(cleanReplays, 60e3);
-setInterval(scanAll, SCAN_MS); setTimeout(scanAll, 3000);
+    const body = req.method === 'POST' ? await readBo

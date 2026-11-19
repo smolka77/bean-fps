@@ -2,7 +2,113 @@
 // Na start każdy ma pistolet (Glock-17); każda inna broń ma próg – ile tokenów musi leżeć na adresie depozytu gracza w grze.
 // Odblokowane bronie działają w 1v1 i w Deathmatch (tam: można je kupić w sklepie meczu); Z botem i Strzelnica – wszystkie bronie.
 // Użycie (lobby-ui.js): createArsenal({ root, getLang, toast, sfx, wallet: () => W, acct: () => konto, art: () => {id: dataURL}, openAuth })
-import { WEAPON_STATS } from './weaponry.js';
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { WEAPON_STATS, createWeapon } from './weaponry.js';
+
+// ---- podgląd 3D broni: obracanie (przeciągnij), przybliżanie (kółko), reset (2× klik), płynne przejście przy zmianie broni ----
+const PISTOLS = new Set(['glock17', 'deagle']);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const easeOutBack = (t) => { const c1 = 1.35, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+const easeInCubic = (t) => t * t * t;
+const wrapPi = (a) => { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; };
+function createViewer(host, onInput = () => {}) {
+  let r;
+  try { r = new THREE.WebGLRenderer({ antialias: true, alpha: true }); } catch { return null; }
+  if (!r.getContext()) return null;
+  r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); r.setClearColor(0x000000, 0);
+  r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.1;
+  const cv = r.domElement; cv.className = 'ars-3d'; host.appendChild(cv);
+  const sc = new THREE.Scene();
+  try { const pm = new THREE.PMREMGenerator(r); sc.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; pm.dispose(); sc.environmentIntensity = 0.85; } catch {}
+  sc.add(new THREE.HemisphereLight(0xfff4fb, 0x2a1430, 1.2));
+  const key = new THREE.DirectionalLight(0xffffff, 2.4); key.position.set(4, 5, 2); sc.add(key);
+  const rim = new THREE.DirectionalLight(0xff6ab4, 1.6); rim.position.set(-3, 2, -4); sc.add(rim);
+  const cam = new THREE.PerspectiveCamera(26, 2.4, 0.05, 50);   // kamera z boku (+X): lufa w prawo
+  const reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  // model: środek pudełka w (0,0,0), najdłuższy wymiar = 1 (pistolety 0,6); pivot = przechył, spin = obrót wokół pionu
+  const models = new Map();
+  function model(id) {
+    let m = models.get(id); if (m) return m;
+    const g = createWeapon(id, { fx: false }).group; g.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(g), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+    g.position.sub(c);
+    // skala jak w rzeczywistości (0,95 m = 1 jednostka kadru), ale krótka broń nie mniej niż 0,5–0,62 długości, a żadna nie za wysoka ani za długa
+    const len = Math.max(size.z, size.x, 1e-3), h = Math.max(size.y, 1e-3);
+    let k = 1 / 0.95; if (len * k < (PISTOLS.has(id) ? 0.5 : 0.62)) k = (PISTOLS.has(id) ? 0.5 : 0.62) / len; if (h * k > 0.42) k = 0.42 / h; if (len * k > 1) k = 1 / len;
+    const inner = new THREE.Group(); inner.add(g); inner.scale.setScalar(k);
+    const spin = new THREE.Group(); spin.add(inner);
+    const pivot = new THREE.Group(); pivot.add(spin);
+    m = { pivot, spin }; models.set(id, m); return m;
+  }
+  const DEF = { yaw: -0.3, pitch: 0.12 };
+  const V = { yaw: DEF.yaw, pitch: DEF.pitch, vy: 0, vp: 0, zoom: 1, zoomT: 1, idle: 9, t: 0, drag: null, lastMove: 0 };
+  let cur = null, curId = '', inT = 1, dir = 1; const outs = [];
+  function show(id, d = 1) {
+    if (id === curId) return;
+    if (cur) outs.push({ m: cur, t: 0, dir: d });
+    cur = model(id); curId = id; inT = reduce ? 1 : 0; dir = d;
+    for (let i = outs.length - 1; i >= 0; i--) if (outs[i].m === cur) outs.splice(i, 1);   // wraca broń, która jeszcze odjeżdżała
+    sc.add(cur.pivot);
+  }
+  let fitD = 1;
+  function resize() {
+    const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return;
+    r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix();
+    const tan = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+    fitD = Math.max(0.54 / (tan * cam.aspect), 0.34 / tan);          // cała broń mieści się w kadrze (z małym zapasem na obrót)
+  }
+  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null; if (ro) ro.observe(host); else addEventListener('resize', resize);
+  function step(dt) {
+    V.t += dt; V.idle += dt;
+    if (!V.drag) {
+      V.yaw += V.vy * dt; V.pitch = clamp(V.pitch + V.vp * dt, -0.75, 0.75);
+      const k = Math.exp(-3.2 * dt); V.vy *= k; V.vp *= k;
+      // po chwili bez ruchu broń wraca do ustawienia sklepowego i lekko się kołysze
+      if (V.idle > 2.6 && Math.abs(V.vy) < 0.3) {
+        const ty = DEF.yaw + (reduce ? 0 : 0.26 * Math.sin(V.t * 0.55)), a = 1 - Math.exp(-1.6 * dt);
+        V.yaw = ty + wrapPi(V.yaw - ty); V.yaw += (ty - V.yaw) * a; V.pitch += (DEF.pitch - V.pitch) * a;
+      }
+    }
+    V.zoom += (V.zoomT - V.zoom) * (1 - Math.exp(-10 * dt));
+    cam.position.set(fitD / V.zoom, 0, 0); cam.lookAt(0, 0, 0);
+    if (cur) {
+      inT = Math.min(1, inT + dt / 0.55);
+      const e = easeOutCubic(inT), s = 0.55 + 0.45 * easeOutBack(inT);
+      cur.pivot.position.set(0, 0, -1.25 * dir * (1 - e)); cur.pivot.scale.setScalar(s);
+      cur.pivot.rotation.z = -V.pitch; cur.spin.rotation.y = V.yaw + 1.15 * dir * (1 - e);
+    }
+    for (let i = outs.length - 1; i >= 0; i--) {
+      const o = outs[i]; o.t = Math.min(1, o.t + dt / (reduce ? 0.01 : 0.32)); const e = easeInCubic(o.t);
+      o.m.pivot.position.set(0, 0, 1.25 * o.dir * e); o.m.pivot.scale.setScalar(Math.max(0.01, 1 - 0.55 * e));
+      o.m.pivot.rotation.z = -V.pitch; o.m.spin.rotation.y = V.yaw - 0.9 * o.dir * e;
+      if (o.t >= 1) { sc.remove(o.m.pivot); outs.splice(i, 1); }
+    }
+  }
+  let raf = 0, last = 0;
+  const frame = (now) => { raf = requestAnimationFrame(frame); const dt = Math.min(0.1, last ? (now - last) / 1000 : 0); last = now; step(dt); r.render(sc, cam); };
+  // przeciąganie (mysz / palec), bezwładność po puszczeniu
+  cv.addEventListener('pointerdown', (e) => { if (e.button > 0) return; V.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now() }; V.vy = V.vp = 0; V.idle = 0;
+    try { cv.setPointerCapture(e.pointerId); } catch {} cv.classList.add('drag'); onInput(); });
+  cv.addEventListener('pointermove', (e) => {
+    const d = V.drag; if (!d || d.id !== e.pointerId) return;
+    const now = performance.now(), dt = Math.max(8, now - d.t) / 1000, dx = e.clientX - d.x, dy = e.clientY - d.y;
+    V.yaw += dx * 0.011; V.pitch = clamp(V.pitch + dy * 0.007, -0.75, 0.75);
+    V.vy = clamp(V.vy * 0.4 + (dx * 0.011 / dt) * 0.6, -14, 14); V.vp = clamp(V.vp * 0.4 + (dy * 0.007 / dt) * 0.6, -6, 6);
+    d.x = e.clientX; d.y = e.clientY; d.t = now; V.lastMove = now; V.idle = 0;
+  });
+  const end = (e) => { const d = V.drag; if (!d || d.id !== e.pointerId) return; V.drag = null; cv.classList.remove('drag'); if (performance.now() - V.lastMove > 90) V.vy = V.vp = 0; };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end); cv.addEventListener('lostpointercapture', end);
+  cv.addEventListener('wheel', (e) => { e.preventDefault(); V.zoomT = clamp(V.zoomT * Math.exp(-e.deltaY * 0.0012), 0.7, 1.9); V.idle = 0; onInput(); }, { passive: false });
+  cv.addEventListener('dblclick', () => { V.zoomT = 1; V.vy = V.vp = 0; V.idle = 99; });
+  return {
+    show, resize,
+    start() { if (!raf) { resize(); last = 0; raf = requestAnimationFrame(frame); } },
+    stop() { if (raf) cancelAnimationFrame(raf); raf = 0; },
+    setLocked(v) { cv.classList.toggle('lk', !!v); },
+  };
+}
 
 const TXT = {
   pl: { title: 'Arsenał', sub: 'Na start masz pistolet. Trzymaj token na swoim adresie w grze, a odblokujesz resztę broni.',
@@ -15,7 +121,7 @@ const TXT = {
     addr: 'Twój adres w grze (Solana)', copy: 'Kopiuj', copied: 'Skopiowano adres', login: 'Zaloguj się, żeby zobaczyć saldo i swój adres do wpłaty.', loginBtn: 'Zaloguj się',
     off: 'Arsenał nie jest jeszcze włączony – na razie każdy ma wszystkie bronie.', offline: 'Arsenał działa z serwerem gry – tu masz wszystkie bronie.', close: 'Zamknij', err: 'Nie udało się sprawdzić salda – spróbuj za chwilę',
     st_dmg: 'Obrażenia', st_rof: 'Szybkostrzelność', st_acc: 'Celność', st_mag: 'Magazynek', c_pistol: 'Pistolet', c_hand: 'Pistolet ciężki', c_smg: 'Pistolet maszynowy', c_shot: 'Strzelba', c_rifle: 'Karabin szturmowy',
-    keys: 'W / S wybór · Esc zamknij', net: 'sieć' },
+    keys: 'W / S wybór · Esc zamknij', net: 'sieć', drag: 'Przeciągnij, żeby obrócić · kółko: przybliż · 2× klik: od nowa' },
   en: { title: 'Arsenal', sub: 'You start with a pistol. Hold the token on your in-game address to unlock the other guns.',
     subSol: 'You start with a pistol. Keep SOL in your in-game balance to unlock the other guns – nothing is charged, only the balance counts.',
     howSol: 'Deposit SOL to your in-game balance and simply keep it there. The guns cost nothing – the SOL stays in your account. If the balance drops below a threshold, that gun locks again.', deposit: 'Deposit SOL',
@@ -26,7 +132,7 @@ const TXT = {
     addr: 'Your in-game address (Solana)', copy: 'Copy', copied: 'Address copied', login: 'Log in to see your balance and deposit address.', loginBtn: 'Log in',
     off: 'The Arsenal is not switched on yet – for now everyone has every gun.', offline: 'The Arsenal works with the game server – here you have every gun.', close: 'Close', err: 'Could not check the balance – try again shortly',
     st_dmg: 'Damage', st_rof: 'Fire rate', st_acc: 'Accuracy', st_mag: 'Magazine', c_pistol: 'Pistol', c_hand: 'Heavy pistol', c_smg: 'Submachine gun', c_shot: 'Shotgun', c_rifle: 'Assault rifle',
-    keys: 'W / S select · Esc close', net: 'network' },
+    keys: 'W / S select · Esc close', net: 'network', drag: 'Drag to rotate · wheel: zoom · double-click: reset' },
   ru: { title: 'Арсенал', sub: 'На старте у тебя пистолет. Держи токен на своём игровом адресе – и откроешь остальное оружие.',
     subSol: 'На старте у тебя пистолет. Держи SOL на игровом балансе – и откроешь остальное оружие. Ничего не списывается, важен только баланс.',
     howSol: 'Пополни игровой баланс в SOL и просто держи его. Оружие ничего не стоит – SOL остаётся на счёте. Если баланс упадёт ниже порога, оружие снова закроется.', deposit: 'Пополнить SOL',
@@ -37,7 +143,7 @@ const TXT = {
     addr: 'Твой игровой адрес (Solana)', copy: 'Копировать', copied: 'Адрес скопирован', login: 'Войди, чтобы увидеть баланс и адрес для пополнения.', loginBtn: 'Войти',
     off: 'Арсенал ещё не включён – пока у всех всё оружие.', offline: 'Арсенал работает с игровым сервером – здесь у тебя всё оружие.', close: 'Закрыть', err: 'Не удалось проверить баланс – попробуй чуть позже',
     st_dmg: 'Урон', st_rof: 'Скорострельность', st_acc: 'Точность', st_mag: 'Магазин', c_pistol: 'Пистолет', c_hand: 'Тяжёлый пистолет', c_smg: 'Пистолет-пулемёт', c_shot: 'Дробовик', c_rifle: 'Штурмовая винтовка',
-    keys: 'W / S выбор · Esc закрыть', net: 'сеть' },
+    keys: 'W / S выбор · Esc закрыть', net: 'сеть', drag: 'Тяни, чтобы вращать · колесо: зум · двойной клик: сброс' },
   es: { title: 'Arsenal', sub: 'Empiezas con una pistola. Guarda el token en tu dirección del juego y desbloquea el resto de armas.',
     subSol: 'Empiezas con una pistola. Mantén SOL en tu saldo del juego y desbloquea el resto de armas: no se cobra nada, solo cuenta el saldo.',
     howSol: 'Deposita SOL en tu saldo del juego y simplemente mantenlo. Las armas no cuestan nada: el SOL se queda en tu cuenta. Si el saldo baja del umbral, el arma se vuelve a bloquear.', deposit: 'Depositar SOL',
@@ -48,7 +154,7 @@ const TXT = {
     addr: 'Tu dirección del juego (Solana)', copy: 'Copiar', copied: 'Dirección copiada', login: 'Inicia sesión para ver tu saldo y tu dirección de depósito.', loginBtn: 'Iniciar sesión',
     off: 'El Arsenal aún no está activado: por ahora todos tienen todas las armas.', offline: 'El Arsenal funciona con el servidor del juego: aquí tienes todas las armas.', close: 'Cerrar', err: 'No se pudo comprobar el saldo, inténtalo en un momento',
     st_dmg: 'Daño', st_rof: 'Cadencia', st_acc: 'Precisión', st_mag: 'Cargador', c_pistol: 'Pistola', c_hand: 'Pistola pesada', c_smg: 'Subfusil', c_shot: 'Escopeta', c_rifle: 'Fusil de asalto',
-    keys: 'W / S elegir · Esc cerrar', net: 'red' },
+    keys: 'W / S elegir · Esc cerrar', net: 'red', drag: 'Arrastra para girar · rueda: zoom · doble clic: restablecer' },
 };
 const CAT = { glock17: 'c_pistol', deagle: 'c_hand', mp5k: 'c_smg', spas12: 'c_shot', akm: 'c_rifle', m4a1: 'c_rifle' };
 const ORDER = ['glock17', 'deagle', 'mp5k', 'spas12', 'akm', 'm4a1'];   // jak na serwerze: pistolet + bronie z progiem
@@ -59,6 +165,7 @@ const IC = {
   ref: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>',
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="1"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  rot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c0-2.2 4-4 9-4s9 1.8 9 4-4 4-9 4"/><path d="M8.5 13.5L12 16l-3.5 2.5"/></svg>',
   token: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#ff2e93"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="#fff" stroke-width="2"/><path d="M12 8.5v7M9.5 12h5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
   sol: '<svg viewBox="0 0 398 312"><defs><linearGradient id="arsol" x1="361" y1="-37" x2="141" y2="383" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#00ffa3"/><stop offset="1" stop-color="#dc1fff"/></linearGradient></defs><g fill="url(#arsol)"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1z"/></g></svg>',
 };
@@ -103,7 +210,27 @@ const CSS = `
 #lb-ui .ars-list button{position:relative;display:flex;align-items:center;gap:12px;min-height:54px;padding:0 16px;border:0;border-bottom:1px solid rgba(255,255,255,.1);
   background:transparent;color:#f4eff6;cursor:pointer;text-align:left;font:500 19px/1.1 Barlow,sans-serif}
 #lb-ui .ars-list button:hover{background:rgba(255,255,255,.06)}
-#lb-ui .ars-list button.on{background:linear-gradient(90deg,#f6f3f8 0%,#f6f3f8 55%,rgba(246,243,248,.55) 100%);color:#0b0610}
+#lb-ui .ars-list button{transition:color .22s ease}
+#lb-ui .ars-list button::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,#f6f3f8 0%,#f6f3f8 55%,rgba(246,243,248,.55) 100%);
+  opacity:0;transform:scaleX(.94);transform-origin:left center;transition:opacity .22s ease,transform .28s cubic-bezier(.2,.8,.2,1);pointer-events:none}
+#lb-ui .ars-list button>*{position:relative}
+#lb-ui .ars-list button.on{color:#0b0610}#lb-ui .ars-list button.on::before{opacity:1;transform:none}
+#lb-ui .ars-list .st,#lb-ui .ars-list .dot{transition:color .22s ease,background .22s ease}
+#lb-ui .ars-view{position:relative;width:100%;height:clamp(240px,42vh,460px)}
+#lb-ui .ars-3d{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:pan-y;filter:drop-shadow(0 22px 24px rgba(0,0,0,.5));transition:filter .35s ease}
+#lb-ui .ars-3d.drag{cursor:grabbing}#lb-ui .ars-3d.lk{filter:drop-shadow(0 22px 24px rgba(0,0,0,.5)) saturate(.7) brightness(.85)}
+#lb-ui .ars-hint{position:absolute;left:50%;bottom:2%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:6px 12px;white-space:nowrap;pointer-events:none;
+  font:600 12px/1 Barlow,sans-serif;letter-spacing:.04em;color:#cfc6d8;background:rgba(9,4,13,.6);transition:opacity .5s ease}
+#lb-ui .ars-hint svg{width:16px;height:16px;color:var(--teal)}#lb-ui .ars-hint.off{opacity:0}#lb-ui .ars-hint[hidden]{display:none}
+@keyframes arsIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes arsBadge{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+@keyframes arsBar{from{width:0}}
+#lb-ui .ars-side.swap>*{animation:arsIn .34s cubic-bezier(.2,.8,.2,1) both}
+#lb-ui .ars-side.swap>*:nth-child(2){animation-delay:.05s}#lb-ui .ars-side.swap>*:nth-child(3){animation-delay:.1s}
+#lb-ui .ars-stage .big.swap{animation:arsBadge .34s .12s cubic-bezier(.2,.8,.2,1) both}
+#lb-ui .ars-req .bar b{animation:arsBar .6s .1s cubic-bezier(.2,.8,.2,1) both}
+#lb-ui .ars-stat i b{transition:width .5s cubic-bezier(.2,.8,.2,1)}
+@media (prefers-reduced-motion:reduce){#lb-ui .ars-side.swap>*,#lb-ui .ars-stage .big.swap,#lb-ui .ars-req .bar b{animation:none}#lb-ui .ars-stat i b{transition:none}}
 #lb-ui .ars-list .dot{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.25);flex:none}
 #lb-ui .ars-list .ok .dot{background:var(--cash)}#lb-ui .ars-list .lk .dot{background:var(--acc)}
 #lb-ui .ars-list .st{margin-left:auto;display:flex;align-items:center;gap:6px;font:700 14px/1 'Barlow Condensed',sans-serif;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
@@ -123,6 +250,7 @@ const CSS = `
 #lb-ui .ars-card{background:rgba(9,4,13,.82);border:1px solid rgba(255,255,255,.12);padding:16px}
 #lb-ui .ars-card h3{margin:0;font:700 22px/1 'Barlow Condensed',sans-serif;letter-spacing:.04em;text-transform:uppercase}
 #lb-ui .ars-card h4{margin:4px 0 0;font:600 13px/1.2 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#a39aae}
+#lb-ui .ars-req{min-height:172px;box-sizing:border-box}   /* stała wysokość: przy zmianie broni układ nie podskakuje */
 #lb-ui .ars-req .need{display:flex;align-items:baseline;gap:8px;margin-top:12px;font:400 34px/1 Anton,Impact,sans-serif;color:#fff}
 #lb-ui .ars-req .need small{font:700 12px/1 'Barlow Condensed',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#a39aae}
 #lb-ui .ars-req .need i{font-style:normal;font-size:18px;color:#ff7ab8}
@@ -145,7 +273,7 @@ const CSS = `
   #lb-ui .lb-arsbtn b{font-size:18px}#lb-ui .lb-arsbtn em,#lb-ui .lb-arsbtn i{display:none}
   #lb-ui .ars-in{padding:18px 16px;gap:14px}#lb-ui .ars-hd{flex-wrap:wrap;gap:12px}#lb-ui .ars-hd>div:first-child{flex:1 1 100%;order:1}#lb-ui .ars-bal{order:2;text-align:left;margin-left:0}
   #lb-ui .ars-bal .v,#lb-ui .ars-bal .row{justify-content:flex-start}#lb-ui .ars-x{position:absolute;top:14px;right:14px}
-  #lb-ui .ars-body{grid-template-columns:1fr}#lb-ui .ars-side{grid-template-columns:1fr}#lb-ui .ars-stage{min-height:180px;order:-1}
+  #lb-ui .ars-body{grid-template-columns:1fr}#lb-ui .ars-side{grid-template-columns:1fr}#lb-ui .ars-stage{min-height:180px;order:-1}#lb-ui .ars-view{height:clamp(190px,32vh,270px)}
   #lb-ui .ars-ft{grid-template-columns:1fr}#lb-ui .ars-keys{display:none}}
 `;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -165,7 +293,7 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
       <button type="button" class="ars-btn ars-x" aria-label="">${IC.x}</button></div>
     <div class="ars-note" hidden></div>
     <div class="ars-body"><div class="ars-list" role="listbox"></div>
-      <div class="ars-stage"><span class="big"></span><img class="ars-art" alt=""><span class="ars-noart" hidden></span></div>
+      <div class="ars-stage"><span class="big"></span><div class="ars-view" hidden></div><img class="ars-art" alt=""><span class="ars-noart" hidden></span><span class="ars-hint" hidden></span></div>
       <div class="ars-side"><div class="ars-card ars-req"></div><div class="ars-card ars-stats"></div><p class="ars-modes"></p></div></div>
     <div class="ars-ft"></div><span class="ars-keys"></span></div>`;
   root.appendChild(tile); root.appendChild(ov);
@@ -173,6 +301,9 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
 
   // stan: s = odpowiedź serwera (GET /api/arsenal); null = jeszcze nie ma / brak serwera
   let s = null, sel = 0, busy = false, forUser = undefined, lastFetch = 0, artMap = null, err = '';
+  let viewer, shownId = '', shownSel = -1, listSig = '', hintDone = false;   // podgląd 3D (undefined = jeszcze nie tworzony, null = brak WebGL – zdjęcia)
+  const hideHint = () => { if (hintDone) return; hintDone = true; Q('.ars-hint').classList.add('off'); };
+  const restart = (el) => { el.classList.remove('swap'); void el.offsetWidth; el.classList.add('swap'); };   // ponowne odpalenie animacji wejścia
   const W = () => wallet();
   const online = () => !!(W() && W().api);
   const guns = () => (s && s.base ? [s.base, ...(s.guns || [])] : ORDER).filter((id) => WEAPON_STATS[id]);
@@ -231,14 +362,26 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     renderBal();
     const note = Q('.ars-note'), msg = !online() ? T('offline') : err ? err : s && !s.enabled ? T('off') : '';
     note.hidden = !msg; note.textContent = msg; note.classList.toggle('err', !!err);
-    Q('.ars-list').innerHTML = list.map((g, i) => { const k = stateOf(g), lbl = k === 'ok' ? `${IC.check}${esc(T('open'))}` : k === 'lk' ? `${IC.lock}${esc(num(s.need[g]))} ${esc(sym)}` : k === 'bs' ? esc(T('base')) : esc(T('all'));
-      return `<button type="button" role="option" data-i="${i}" class="${k}${i === sel ? ' on' : ''}" aria-selected="${i === sel}"><span class="dot"></span>${esc(WEAPON_STATS[g].name)}<span class="st">${lbl}</span></button>`; }).join('');
-    // zdjęcie broni (kolorowe, robione raz przy pierwszym otwarciu)
-    if (!artMap && art) { try { artMap = art() || {}; } catch { artMap = {}; } }
-    const img = Q('.ars-art'), src = artMap && artMap[id];
-    img.hidden = !src; if (src) { img.src = src; img.alt = WEAPON_STATS[id].name; } img.classList.toggle('lk', st === 'lk'); img.classList.toggle('sm', id === 'glock17' || id === 'deagle');
-    const na = Q('.ars-noart'); na.hidden = !!src; na.textContent = WEAPON_STATS[id].name;
-    const big = Q('.big'); big.className = 'big ' + st;
+    // lista: przebudowa tylko po zmianie danych; zmiana wyboru = przesunięcie podświetlenia (płynne przejście w CSS)
+    const rows = list.map((g) => { const k = stateOf(g), lbl = k === 'ok' ? `${IC.check}${esc(T('open'))}` : k === 'lk' ? `${IC.lock}${esc(num(s.need[g]))} ${esc(sym)}` : k === 'bs' ? esc(T('base')) : esc(T('all')); return [g, k, lbl]; });
+    const sig = getLang() + JSON.stringify(rows);
+    if (sig !== listSig) { listSig = sig; Q('.ars-list').innerHTML = rows.map(([g, k, lbl], i) => `<button type="button" role="option" data-i="${i}" class="${k}"><span class="dot"></span><span>${esc(WEAPON_STATS[g].name)}</span><span class="st">${lbl}</span></button>`).join(''); }
+    Q('.ars-list').querySelectorAll('button').forEach((b, i) => { b.classList.toggle('on', i === sel); b.setAttribute('aria-selected', String(i === sel)); });
+    // broń: podgląd 3D (obracanie) albo – bez WebGL – kolorowe zdjęcie
+    if (viewer === undefined) { viewer = createViewer(Q('.ars-view'), hideHint); if (viewer) { Q('.ars-view').hidden = false; viewer.start(); } }
+    const img = Q('.ars-art'), na = Q('.ars-noart'), hint = Q('.ars-hint');
+    if (viewer) {
+      img.hidden = true; na.hidden = true; hint.hidden = false; hint.innerHTML = `${IC.rot}<span>${esc(T('drag'))}</span>`;
+      viewer.show(id, shownSel < 0 || sel >= shownSel ? 1 : -1); viewer.setLocked(st === 'lk');
+    } else {
+      if (!artMap && art) { try { artMap = art() || {}; } catch { artMap = {}; } }
+      const src = artMap && artMap[id];
+      img.hidden = !src; if (src) { img.src = src; img.alt = WEAPON_STATS[id].name; } img.classList.toggle('lk', st === 'lk'); img.classList.toggle('sm', PISTOLS.has(id));
+      na.hidden = !!src; na.textContent = WEAPON_STATS[id].name;
+    }
+    const changed = id !== shownId; shownId = id; shownSel = sel;
+    const big = Q('.big'); big.className = 'big ' + st + (changed ? ' swap' : ''); if (changed) restart(big);
+    if (changed) restart(Q('.ars-side'));
     big.innerHTML = st === 'ok' ? `${IC.check}${esc(T('open'))}` : st === 'lk' ? `${IC.lock}${esc(num(s.need[id]))} ${esc(sym)}` : st === 'bs' ? esc(T('base')) : esc(T('all'));
     // wymaganie: próg, pasek postępu, ile brakuje
     let req = `<h3>${esc(WEAPON_STATS[id].name)}</h3><h4>${esc(T(CAT[id] || 'c_rifle'))}</h4>`;
@@ -249,7 +392,10 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
         + (st === 'ok' ? `<p class="ok">${esc(T('have'))}</p>` : acct() ? `<p>${esc(T('missing', { n: num(Math.max(0, need - b)) + ' ' + sym }))}</p>` : `<p>${esc(T('login'))}</p>`);
     } else if (st === 'bs') req += `<p class="ok" style="margin-top:12px">${esc(T('haveBase'))}</p>`;
     Q('.ars-req').innerHTML = req;
-    Q('.ars-stats').innerHTML = statRows(id).map(([n, v, l]) => `<div class="ars-stat"><div><span>${esc(n)}</span><span>${esc(l)}</span></div><i><b style="width:${Math.max(3, v * 10)}%"></b></i></div>`).join('');
+    // statystyki: te same wiersze, zmieniają się liczby i długość pasków (pasek „dojeżdża” do nowej wartości)
+    const stBox = Q('.ars-stats'), sr = statRows(id);
+    if (stBox.children.length !== sr.length) stBox.innerHTML = sr.map(() => `<div class="ars-stat"><div><span></span><span></span></div><i><b style="width:3%"></b></i></div>`).join('');
+    sr.forEach(([n, v, l], i) => { const row = stBox.children[i], sp = row.querySelectorAll('span'); sp[0].textContent = n; sp[1].textContent = l; row.querySelector('b').style.width = Math.max(3, v * 10) + '%'; });
     Q('.ars-modes').textContent = T('modes');
     // stopka: jak odblokować + adres depozytu (albo logowanie)
     const ft = Q('.ars-ft');
@@ -266,8 +412,9 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     if (who !== forUser || Date.now() - lastFetch > 60e3) { forUser = who; load(false); }
     const list = guns(); if (sel === 0 && s && active()) { const j = list.findIndex((g) => stateOf(g) === 'lk'); if (j > 0) sel = j; }   // od razu pierwsza zablokowana
     render();
+    if (viewer) viewer.start();                                  // podgląd 3D rysuje się tylko przy otwartym Arsenale
   }
-  const close = () => { if (!ov.hidden) { ov.hidden = true; sfx.close && sfx.close(); } };
+  const close = () => { if (!ov.hidden) { ov.hidden = true; sfx.close && sfx.close(); if (viewer) viewer.stop(); } };
   tile.addEventListener('click', open);
   ov.addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
