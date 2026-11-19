@@ -114,7 +114,7 @@
   #ld .ld-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:#ff2e93}
   #ld.boot .ld-fill{animation:ld-creep 7s cubic-bezier(.2,.7,.3,1) forwards}
   @keyframes ld-creep{from{width:2%}to{width:86%}}
-  #ld-bg,#ld .ld-title,#ld .ld-sub,#ld .ld-row,#ld .ld-tipbox{display:none}   /* elementy używane przez loader.js – w tym wyglądzie ukryte */
+  #ld-bg,#ld .ld-title,#ld .ld-sub,#ld .ld-row{display:none}   /* elementy używane przez loader.js – w tym wyglądzie ukryte */
   @media (prefers-reduced-motion:reduce){#ld .ld-fill{animation:none!important}}
   #vlabel{left:50%;transform:translateX(-50%);top:16px;color:var(--dim);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
   .mute{font:600 12px/1 Barlow,system-ui,sans-serif;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:0;padding:8px 12px;cursor:pointer}
@@ -262,16 +262,9 @@
   #ld .ld-row::before{content:"";width:22px;height:22px;border-radius:50%;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;animation:ld-spin .8s linear infinite}
   #ld .ld-pct{display:none}
   @keyframes ld-spin{to{transform:rotate(360deg)}}
-  #ld .ld-tipbox{display:flex;flex-direction:column;gap:6px;position:absolute;z-index:1;left:max(30px,env(safe-area-inset-left,0px));bottom:max(26px,env(safe-area-inset-bottom,0px));
-    max-width:min(520px,calc(100vw - 260px));padding:12px 16px 13px;background:rgba(6,2,10,.72);border-left:3px solid #ff2e93}
-  #ld .ld-tag{font:800 11px/1 'Barlow Condensed',Oswald,sans-serif;letter-spacing:.24em;color:var(--vc-teal)}
-  #ld .ld-tip{font:600 15px/1.35 Barlow,system-ui,sans-serif;color:#fff}
-  #ld .ld-tip.in{animation:ld-tip .4s ease}
-  @keyframes ld-tip{from{opacity:0;transform:translateY(4px)}}
   #ld .ld-title{display:block;position:absolute;z-index:1;left:max(30px,env(safe-area-inset-left,0px));bottom:calc(max(26px,env(safe-area-inset-bottom,0px)) + 84px);margin:0;
     font:400 clamp(34px,4vw,52px)/1 Anton,Impact,sans-serif;letter-spacing:.03em;text-transform:uppercase;transform:skewX(-8deg);color:#fff;text-shadow:3px 3px 0 #1a0614}
   #ld .ld-title:empty{display:none}
-  @media (max-width:640px){#ld .ld-tipbox{display:none}}
   @media (prefers-reduced-motion:reduce){#ld .ld-row::before{animation:none}}
   /* HUD: proste prostokąty bez skosów, liczby białe z czarnym obrysem jak w GTA */
   #hp .ic,#hp .col,#ammo,#slots .sl{clip-path:none}
@@ -313,10 +306,8 @@
 </style>
 <div id="ld" class="boot"><div id="ld-bg"></div>
   <div class="ld-in"><div class="ld-logo"><b>GT</b>ASSAULT</div><div class="ld-bar"><div class="ld-fill" id="ld-fill"></div></div></div>
-  <h2 class="ld-title" id="ld-title"></h2><div class="ld-sub" id="ld-sub"></div><div class="ld-row"><span class="ld-label" id="ld-label"></span><span class="ld-pct" id="ld-pct"></span></div>
-  <div class="ld-tipbox"><span class="ld-tag" id="ld-tiptag"></span><span class="ld-tip" id="ld-tip"></span></div>
-</div>
-<script>(function(){try{var L='en',s=JSON.parse(localStorage.getItem('fasolka-settings')||'null');if(s&&s.langPicked&&s.lang)L=s.lang;var T={pl:['WSKAZÓWKA','WCZYTYWANIE','Strzał w głowę zadaje dużo więcej obrażeń.'],en:['TIP','LOADING','Headshots deal much more damage.'],ru:['СОВЕТ','ЗАГРУЗКА','Выстрел в голову наносит гораздо больше урона.'],es:['CONSEJO','CARGANDO','Los disparos a la cabeza hacen mucho más daño.']}[L];if(!T)return;document.getElementById('ld-tiptag').textContent=T[0];document.getElementById('ld-label').textContent=T[1];document.getElementById('ld-tip').textContent=T[2]}catch(e){}})()</script>
+  <h2 class="ld-title" id="ld-title"></h2><div class="ld-sub" id="ld-sub"></div><div class="ld-row"><span class="ld-label" id="ld-label"></span><span class="ld-pct" id="ld-pct"></span></div></div>
+<script>(function(){try{var L='en',s=JSON.parse(localStorage.getItem('fasolka-settings')||'null');if(s&&s.langPicked&&s.lang)L=s.lang;var T={pl:'WCZYTYWANIE',en:'LOADING',ru:'ЗАГРУЗКА',es:'CARGANDO'}[L];if(!T)return;document.getElementById('ld-label').textContent=T}catch(e){}})()</script>
 <div id="cross" class="hud"><i class="h l"></i><i class="h r"></i><i class="v t"></i><i class="v b"></i></div>
 <div id="marker" class="hud"><svg viewBox="0 0 26 26" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M3 3l6 6M23 3l-6 6M3 23l6-6M23 23l-6-6"/></svg></div>
 <div id="vlabel" class="hud"></div>
