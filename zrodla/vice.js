@@ -1,15 +1,18 @@
-// Lobby "Vice Bay": nocny zachód słońca nad zatoką (low-poly, retro-synthwave).
-// Kamera stoi na +Z i patrzy na -Z. Fasolka stoi na mokrym tarasie nad wodą; po drugiej stronie zatoki świeci miasto,
-// z lewej most, na wodzie jacht, nad wodą helikopter. Kadr zamykają ciemne sylwetki palm, a z lewej świeci neon.
+// Lobby "Vice Bay": promenada nad zatoką o zmierzchu (low-poly, retro-synthwave).
+// Kamera stoi na +Z i patrzy na -Z. Fasolka stoi na chodniku z płyt; promenada biegnie pod kątem w głąb kadru (w lewo),
+// wzdłuż barierki. Za barierką zatoka, po drugiej stronie świeci miasto, na wodzie jacht, nad wodą helikopter.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const rng = seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const C = hex => new THREE.Color(hex);
 const WY = -2.5;                                   // poziom wody
-const EDGE = -2.6;                                 // krawędź tarasu (z)
+const PHI = 0.314;                                 // skręt promenady względem kamery (18°)
+// układ promenady: z' wzdłuż chodnika (ujemne = w głąb kadru), x' w poprzek (dodatnie = strona wody)
+const RAIL_X = 2.3, LAND_X = -5;
+const toWorld = (lx, lz) => new THREE.Vector3(lx * Math.cos(PHI) + lz * Math.sin(PHI), 0, -lx * Math.sin(PHI) + lz * Math.cos(PHI));
 
-// wspólny GLSL: szum, gradient nieba z łuną słońca, smugi świateł miasta odbite w mokrych powierzchniach
+// wspólny GLSL: szum, gradient nieba z łuną słońca, smugi świateł miasta odbite w wodzie
 const COMMON = `
 uniform vec3 c0,c1,c2,c3,c4,c5,uGlow,uSunDir; uniform float uTime;
 float h11(float n){return fract(sin(n*127.1)*43758.5453);}
@@ -45,7 +48,7 @@ function soup() {
     build() { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); return g; },
   };
 }
-// palma-sylwetka: wygięty pień i korona z ząbkowanych, opadających liści; crownOnly = sama korona (do ramki kadru i krzewów)
+// palma-sylwetka: wygięty pień i korona z ząbkowanych, opadających liści; crownOnly = sama korona (ramka kadru)
 function palmGeo(seed, h, lean, crownOnly = false, frondL = 3.1) {
   const r = rng(seed), s = soup(), SIDES = 6, SEG = 9, scale = h / 8;
   const TA = C(0x2c1249), TB = C(0x150727);
@@ -77,10 +80,13 @@ function palmGeo(seed, h, lean, crownOnly = false, frondL = 3.1) {
   }
   return s.build();
 }
+const profile2d = pts => { const s = new THREE.Shape(); pts.forEach(([x, y], i) => i ? s.lineTo(x, y) : s.moveTo(x, y)); return s; };
+// bryła z profilu bocznego (x = długość, y = wysokość), wyciągnięta na szerokość w (symetrycznie w osi z)
+const slab = (pts, w) => { const g = new THREE.ExtrudeGeometry(profile2d(pts), { depth: w, bevelEnabled: false }); g.translate(0, 0, -w / 2); return g; };
 
 export function buildVice(scene) {
   const rnd = rng(11), R = (a, b) => a + (b - a) * rnd();
-  scene.fog = new THREE.FogExp2(0x7a2a9a, 0.0016);
+  scene.fog = new THREE.FogExp2(0x8a3a9a, 0.0035);
 
   const SUN_DIR = new THREE.Vector3(-.2, .02, -.98).normalize();
   const U = { uTime: { value: 0 }, uSunDir: { value: SUN_DIR }, uGlow: { value: C(0xffa030) } };
@@ -107,11 +113,15 @@ export function buildVice(scene) {
       }`,
   })));
 
-  // ---------- światła (fasolka, auto, jacht) ----------
-  scene.add(new THREE.HemisphereLight(0xff7ac8, 0x3a1466, 1.15));
-  const key = new THREE.DirectionalLight(0xff7a5a, 2.2); key.position.copy(SUN_DIR).multiplyScalar(30).setY(9); scene.add(key);      // ciepły kontur od łuny
-  const fill = new THREE.DirectionalLight(0xff6ab8, 1.25); fill.position.set(-3, 4, 10); scene.add(fill);                              // róż od przodu
-  const rim = new THREE.DirectionalLight(0x4de0ff, 1.5); rim.position.set(8, 3, -3); scene.add(rim);                                   // turkus z prawej
+  // ---------- światła ----------
+  scene.add(new THREE.HemisphereLight(0xff8ad0, 0x4a2070, 1.2));
+  const key = new THREE.DirectionalLight(0xff8a5a, 2.4);                                   // niskie słońce zza zatoki: długie cienie w stronę kamery
+  key.target.position.set(0, 0, -2); key.position.set(SUN_DIR.x * 30, 9, SUN_DIR.z * 30); key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0005; key.shadow.normalBias = 0.02;
+  Object.assign(key.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 80 });
+  scene.add(key, key.target);
+  const fill = new THREE.DirectionalLight(0xff6ab8, 1.1); fill.position.set(-3, 4, 10); scene.add(fill);     // róż od przodu
+  const rim = new THREE.DirectionalLight(0x4de0ff, 1.3); rim.position.set(8, 3, -3); scene.add(rim);          // turkus z prawej
 
   const glowTex = (() => {
     const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
@@ -120,7 +130,9 @@ export function buildVice(scene) {
     x.fillStyle = g; x.fillRect(0, 0, 128, 128);
     return new THREE.CanvasTexture(c);
   })();
-  const glowSprite = (color, x, y, z, size, op = 1) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color, opacity: op, fog: false, depthWrite: false, transparent: true, blending: THREE.AdditiveBlending, toneMapped: false })); s.position.set(x, y, z); s.scale.setScalar(size); scene.add(s); return s; };
+  const glowMat = (color, op) => new THREE.SpriteMaterial({ map: glowTex, color, opacity: op, fog: false, depthWrite: false, transparent: true, blending: THREE.AdditiveBlending, toneMapped: false });
+  const glowSprite = (color, x, y, z, size, op = 1, parent = scene) => { const s = new THREE.Sprite(glowMat(color, op)); s.position.set(x, y, z); s.scale.setScalar(size); parent.add(s); return s; };
+  const darkMat = new THREE.MeshBasicMaterial({ color: 0x150827, fog: false });
 
   // ---------- woda zatoki ----------
   const water = new THREE.Mesh(new THREE.PlaneGeometry(2800, 2800), new THREE.ShaderMaterial({
@@ -133,7 +145,7 @@ export function buildVice(scene) {
         vec3 r=reflect(-v,n); r.y=abs(r.y);
         float fres=.12+.7*pow(1.-max(v.y,0.),9.);
         vec3 col=mix(uDeep,skyBase(r),fres)+cityStreak(r,dist)*.8;
-        col+=vec3(1.,.5,.75)*smoothstep(.72,.95,vn(vW.xz*vec2(1.2,5.)+vec2(uTime*.4,-uTime)))*.1*smoothstep(160.,20.,dist);   // drobne błyski na falach
+        col+=vec3(1.,.5,.75)*smoothstep(.72,.95,vn(vW.xz*vec2(1.2,5.)+vec2(uTime*.4,-uTime)))*.1*smoothstep(160.,20.,dist);
         col=mix(col,skyBase(vec3(-v.x,0.,-v.z)),smoothstep(260.,800.,dist));
         gl_FragColor=vec4(col,1.);
         #include <colorspace_fragment>
@@ -141,34 +153,59 @@ export function buildVice(scene) {
   }));
   water.rotation.x = -Math.PI / 2; water.position.set(0, WY, -500); scene.add(water);
 
-  // ---------- taras: mokry asfalt z odbiciami, murek, barierka ----------
-  const CAR = { x: -3.5, z: -.3, ry: Math.PI / 2 + .35 };
-  const carRear = new THREE.Vector2(CAR.x - 2.5 * Math.cos(CAR.ry), CAR.z + 2.5 * Math.sin(CAR.ry));
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 18), new THREE.ShaderMaterial({
-    fog: false, uniforms: { ...U, uAsphalt: { value: C(0x1d0c33) }, uCurb: { value: C(0x6a4a9a) }, uRear: { value: carRear } }, vertexShader: VS,
-    fragmentShader: `${COMMON} uniform vec3 uAsphalt,uCurb; uniform vec2 uRear; varying vec3 vW;
-      void main(){
-        vec3 tc=cameraPosition-vW; float dist=length(tc); vec3 v=tc/dist;
-        float pud=smoothstep(.38,.66,fbm(vW.xz*.33+4.));                          // kałuże: gładsze i mocniej odbijają
-        vec3 n=normalize(vec3((vn(vW.xz*3.)-.5)*.07*(1.-pud*.8),1.,(vn(vW.xz*3.+9.)-.5)*.12*(1.-pud*.8)));
-        vec3 r=reflect(-v,n); r.y=abs(r.y);
-        float fres=(.12+.5*pud)*(.25+.75*pow(1.-max(v.y,0.),3.));
-        vec3 col=mix(uAsphalt*(.8+.4*vn(vW.xz*14.)),skyBase(r),fres)+cityStreak(r,dist)*fres;
-        vec2 b=vW.xz-vec2(-4.5,-2.); col+=vec3(1.,.15,.6)*exp(-dot(b,b)/14.)*.16;  // róż neonu
-        col=mix(col,uCurb,smoothstep(-2.2,-2.32,vW.z)*.75);                       // krawężnik
-        gl_FragColor=vec4(col,1.);
-        #include <colorspace_fragment>
-      }`,
-  }));
-  ground.rotation.x = -Math.PI / 2; ground.position.set(0, 0, EDGE + 9); scene.add(ground);
-  const darkMat = new THREE.MeshBasicMaterial({ color: 0x150827, fog: false });
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(120, 3.4, .4), darkMat); wall.position.set(0, -1.7, EDGE - .2); scene.add(wall);
+  // ---------- promenada: chodnik z płyt, krawężnik, barierka, latarnie, ławki, żywopłot, szpaler palm ----------
+  const prom = new THREE.Group(); prom.rotation.y = PHI; scene.add(prom);
   {
-    const metal = new THREE.MeshStandardMaterial({ color: 0xa894d8, roughness: .35, metalness: .3 });
-    const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(.07, .95, .07), metal, 41), o = new THREE.Object3D();
-    for (let i = 0; i < 41; i++) { o.position.set(-40 + i * 2, .475, EDGE + .25); o.updateMatrix(); posts.setMatrixAt(i, o.matrix); }
-    scene.add(posts);
-    for (const y of [.95, .55]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(82, .05, .06), metal); rail.position.set(0, y, EDGE + .25); scene.add(rail); }
+    // płyty chodnikowe: 4×4 w jednym powtórzeniu (płyta 60 cm), fugi, różnice odcieni, drobne plamy
+    const tileTex = (() => {
+      const c = document.createElement('canvas'); c.width = c.height = 512; const x = c.getContext('2d'), r = rng(4);
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { const v = 150 + Math.floor(r() * 26); x.fillStyle = `rgb(${v},${v - 8},${v + 6})`; x.fillRect(i * 128, j * 128, 128, 128); }
+      for (let i = 0; i < 2600; i++) { x.fillStyle = r() < .5 ? `rgba(60,45,70,${.04 + r() * .08})` : `rgba(255,245,255,${.03 + r() * .06})`; x.beginPath(); x.arc(r() * 512, r() * 512, .6 + r() * 2.4, 0, 7); x.fill(); }
+      x.strokeStyle = 'rgba(52,38,62,.85)'; x.lineWidth = 3; for (let i = 0; i <= 4; i++) { x.beginPath(); x.moveTo(i * 128, 0); x.lineTo(i * 128, 512); x.moveTo(0, i * 128); x.lineTo(512, i * 128); x.stroke(); }
+      const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 16; return t;
+    })();
+    const W = RAIL_X - LAND_X, LEN = 270, Z0 = -105;
+    tileTex.repeat.set(W / 2.4, LEN / 2.4);
+    const pave = new THREE.Mesh(new THREE.PlaneGeometry(W, LEN), new THREE.MeshStandardMaterial({ map: tileTex, roughness: .62 }));
+    pave.rotation.x = -Math.PI / 2; pave.position.set((RAIL_X + LAND_X) / 2, 0, Z0); pave.receiveShadow = true; prom.add(pave);
+    // krawężnik z jasnego kamienia przy barierce i murek oporowy od strony wody
+    const stone = new THREE.MeshStandardMaterial({ color: 0xc9bcd8, roughness: .7 });
+    const curb = new THREE.Mesh(new THREE.BoxGeometry(.5, .16, LEN), stone); curb.position.set(RAIL_X + .05, .08, Z0); curb.receiveShadow = true; prom.add(curb);
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(.5, 3.2, LEN), darkMat); wall.position.set(RAIL_X + .06, -1.6, Z0); prom.add(wall);
+    // barierka: słupki co 2 m, poręcz i dwa cieńsze pręty
+    const metal = new THREE.MeshStandardMaterial({ color: 0x9d8fc0, roughness: .38, metalness: .25 });
+    const NP = 120, posts = new THREE.InstancedMesh(new THREE.BoxGeometry(.07, 1.0, .07), metal, NP), o = new THREE.Object3D();
+    for (let i = 0; i < NP; i++) { o.position.set(RAIL_X, .66, 24 - i * 2); o.updateMatrix(); posts.setMatrixAt(i, o.matrix); }
+    posts.castShadow = true; posts.frustumCulled = false; prom.add(posts);
+    for (const [y, th] of [[1.16, .07], [.82, .035], [.5, .035]]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(th, th, 240), metal); rail.position.set(RAIL_X, y, -95); rail.castShadow = true; prom.add(rail); }
+    // ląd za chodnikiem (ulica i trawnik w półmroku) oraz żywopłot
+    const land = new THREE.Mesh(new THREE.PlaneGeometry(140, LEN), new THREE.MeshStandardMaterial({ color: 0x2a1840, roughness: 1 }));
+    land.rotation.x = -Math.PI / 2; land.position.set(LAND_X - 70, -.02, Z0); prom.add(land);
+    const hedge = new THREE.Mesh(new THREE.BoxGeometry(1.1, .8, LEN), new THREE.MeshStandardMaterial({ color: 0x1c2a3e, roughness: 1, flatShading: true })); hedge.position.set(LAND_X - .55, .4, Z0); prom.add(hedge);
+    // latarnie po stronie lądu: słup, wysięgnik nad chodnik, klosz; plama ciepłego światła na płytach
+    const lampGeo = mergeGeometries([
+      (() => { const g = new THREE.CylinderGeometry(.06, .09, 4.7, 8); g.translate(0, 2.35, 0); return g; })(),
+      (() => { const g = new THREE.BoxGeometry(1.1, .07, .07); g.translate(.5, 4.7, 0); return g; })(),
+      (() => { const g = new THREE.BoxGeometry(.42, .1, .22); g.translate(1.0, 4.62, 0); return g; })(),
+    ]);
+    const lampZ = []; for (let z = -7; z > -220; z -= 13) lampZ.push(z);
+    const lamps = new THREE.InstancedMesh(lampGeo, new THREE.MeshStandardMaterial({ color: 0x2a1a44, roughness: .5 }), lampZ.length);
+    const poolMat = new THREE.MeshBasicMaterial({ map: glowTex, color: 0xffb468, transparent: true, opacity: .34, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, toneMapped: false });
+    lampZ.forEach((z, i) => {
+      o.position.set(LAND_X + .35, 0, z); o.updateMatrix(); lamps.setMatrixAt(i, o.matrix);
+      glowSprite(0xffc890, LAND_X + 1.35, 4.52, z, 1.9, .95, prom); glowSprite(0xffb060, LAND_X + 1.35, 4.52, z, 6, .22, prom);
+      const pool = new THREE.Mesh(new THREE.PlaneGeometry(9, 9), poolMat); pool.rotation.x = -Math.PI / 2; pool.position.set(LAND_X + 1.9, .02, z); prom.add(pool);
+    });
+    lamps.frustumCulled = false; prom.add(lamps);
+    // ławki przy barierce (oparciem do wody)
+    const wood = new THREE.MeshStandardMaterial({ color: 0x6a4458, roughness: .8, flatShading: true });
+    const benchGeo = mergeGeometries([
+      (() => { const g = new THREE.BoxGeometry(.5, .07, 1.9); g.translate(0, .46, 0); return g; })(),
+      (() => { const g = new THREE.BoxGeometry(.07, .5, 1.9); g.rotateZ(-.2); g.translate(.3, .78, 0); return g; })(),
+      (() => { const g = new THREE.BoxGeometry(.45, .44, .08); g.translate(0, .22, .8); return g; })(),
+      (() => { const g = new THREE.BoxGeometry(.45, .44, .08); g.translate(0, .22, -.8); return g; })(),
+    ]);
+    for (const z of [-11, -37, -63, -89]) { const b = new THREE.Mesh(benchGeo, wood); b.position.set(RAIL_X - .75, 0, z); b.castShadow = b.receiveShadow = true; prom.add(b); }
   }
 
   // ---------- miasto po drugiej stronie zatoki ----------
@@ -191,22 +228,23 @@ export function buildVice(scene) {
     g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g;
   }
   function strip(w, h, d, x, y, z, col) { const g = new THREE.BoxGeometry(w, h, d); g.translate(x, y + h / 2, z); g.deleteAttribute('uv'); const n = g.attributes.position.count, c = new Float32Array(n * 3); for (let i = 0; i < n; i++) c.set([col.r, col.g, col.b], i * 3); g.setAttribute('color', new THREE.BufferAttribute(c, 3)); strips.push(g); }
-  function tower(x, z, w, h, d) {
+  function tower(x, z, w, h, d, base = WY) {
     const tint = TINTS[Math.floor(R(0, TINTS.length))], neon = NEON[Math.floor(R(0, NEON.length))];
-    bld.push(cityBox(w, h, d, x, WY, z, tint));
-    let topY = WY + h;
+    bld.push(cityBox(w, h, d, x, base, z, tint));
+    let topY = base + h;
     if (h > 26 && rnd() < .65) { const h2 = h * R(.14, .26); bld.push(cityBox(w * .62, h2, d * .62, x, topY, z, tint)); topY += h2; }
-    if (rnd() < .4) { strip(.9, h, .5, x - w / 2 + .4, WY, z + d / 2 + .3, neon); strip(.9, h, .5, x + w / 2 - .4, WY, z + d / 2 + .3, neon); }
-    if (rnd() < .5) strip(w + .6, 1.1, d + .6, x, WY + h - 1.1, z, neon);
+    if (rnd() < .4) { strip(.9, h, .5, x - w / 2 + .4, base, z + d / 2 + .3, neon); strip(.9, h, .5, x + w / 2 - .4, base, z + d / 2 + .3, neon); }
+    if (rnd() < .5) strip(w + .6, 1.1, d + .6, x, base + h - 1.1, z, neon);
     if (h > 36) { strip(.3, 6, .3, x, topY, z, C(0x2a1650)); antennas.push(x, topY + 6.5, z); }
   }
-  const profile = x => 10 + 30 * Math.exp(-(((x - 110) / 170) ** 2)) + 10 * Math.exp(-(((x + 230) / 90) ** 2));
-  for (let x = -460; x < 520; x += R(15, 27)) tower(x, -338 - 30 * Math.cos(x / 260) + R(-8, 14), R(13, 24), profile(x) * R(.55, 1.25), R(14, 22));
-  for (let x = -440; x < 500; x += R(20, 34)) tower(x, -400 + R(-10, 20), R(16, 28), profile(x) * R(.9, 1.4) + 5, R(16, 24));
+  const skyline = x => 10 + 30 * Math.exp(-(((x - 110) / 170) ** 2)) + 10 * Math.exp(-(((x + 230) / 90) ** 2));
+  for (let x = -460; x < 520; x += R(15, 27)) tower(x, -338 - 30 * Math.cos(x / 260) + R(-8, 14), R(13, 24), skyline(x) * R(.55, 1.25), R(14, 22));
+  for (let x = -440; x < 500; x += R(20, 34)) tower(x, -400 + R(-10, 20), R(16, 28), skyline(x) * R(.9, 1.4) + 5, R(16, 24));
+  // hotele wzdłuż promenady (po stronie lądu), coraz dalej w głąb kadru
+  for (let z = -34; z > -230; z -= R(17, 24)) { const p = toWorld(LAND_X - R(15, 19), z); tower(p.x, p.z, R(11, 15), R(9, 19), R(12, 16), 0); }
   scene.add(new THREE.Mesh(mergeGeometries(bld), new THREE.MeshBasicMaterial({ map: winTex, vertexColors: true, fog: false })));
   scene.add(new THREE.Mesh(mergeGeometries(strips), new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, toneMapped: false })));
   { const shore = new THREE.Mesh(new THREE.BoxGeometry(1200, 2.4, 30), darkMat); shore.position.set(20, WY + .6, -322); scene.add(shore); }
-  // światła nabrzeża i czerwone lampki na antenach
   const pointsOf = (arr, colors, size) => {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); if (colors) g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     const m = new THREE.PointsMaterial({ size, map: glowTex, vertexColors: !!colors, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, toneMapped: false });
@@ -216,13 +254,12 @@ export function buildVice(scene) {
     for (let i = 0; i < 260; i++) { const x = R(-470, 520), c = pal[Math.floor(R(0, pal.length))]; pos.push(x, WY + R(1.5, 7), -306 + R(-3, 3)); col.push(c.r, c.g, c.b); }
     pointsOf(pos, col, 11); }
   const antennaPts = pointsOf(antennas, null, 13); antennaPts.material.color.set(0xff2a3a);
-  // różowa mgiełka świateł u podstawy miasta
   { const c = document.createElement('canvas'); c.width = 4; c.height = 64; const x = c.getContext('2d'), g = x.createLinearGradient(0, 64, 0, 0);
     g.addColorStop(0, 'rgba(255,110,170,.75)'); g.addColorStop(.35, 'rgba(255,70,160,.3)'); g.addColorStop(1, 'rgba(255,70,160,0)'); x.fillStyle = g; x.fillRect(0, 0, 4, 64);
     const haze = new THREE.Mesh(new THREE.PlaneGeometry(1500, 34), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, toneMapped: false }));
     haze.position.set(20, WY + 17, -300); scene.add(haze); }
 
-  // ---------- most z lampami (z lewej) ----------
+  // ---------- most z lampami (z lewej, w tle) ----------
   {
     const A = new THREE.Vector3(-470, 0, -262), B = new THREE.Vector3(-70, 0, -318), N = 30, parts = [], lamps = [], dir = B.clone().sub(A), len = dir.length() / N, yaw = Math.atan2(-dir.z, dir.x);
     const yAt = t => WY + 7 + 7.5 * Math.sin(Math.PI * t);
@@ -236,20 +273,18 @@ export function buildVice(scene) {
     pointsOf(lamps, null, 9).material.color.set(0xffc27a);
   }
 
-  // ---------- ciemne cyple z krzakami i palmy ----------
+  // ---------- wysepki z krzakami na zatoce (z prawej) i ląd na końcu promenady ----------
   {
     const parts = [], ico = new THREE.IcosahedronGeometry(1, 1);
     const mound = (x, z, sx, sy, sz) => { const g = ico.clone(); g.scale(sx, sy, sz); g.rotateY(R(0, 3)); g.translate(x, WY, z); parts.push(g); };
-    mound(-10.5, -15, 7, 1.5, 6); mound(-15, -24, 9, 1.5, 7);
-    mound(11, -16, 7, 1.5, 6); mound(16, -25, 9, 1.5, 7);
-    mound(-58, -48, 30, 1.5, 7); mound(58, -50, 32, 1.5, 8); mound(-100, -80, 40, 1.4, 8); mound(105, -90, 44, 1.4, 9);
-    for (let i = 0; i < 34; i++) { const side = i % 2 ? 1 : -1, z = R(-30, -12), x = side * R(6, 4 - z * .55), s = R(.6, 1.2); mound(x, z, s * 1.4, s * .7 + 1.3, s * 1.2); }   // krzaki
+    mound(15, -30, 8, 1.5, 6); mound(22, -40, 10, 1.5, 7); mound(70, -62, 30, 1.5, 8); mound(120, -100, 44, 1.4, 9);
+    for (let i = 0; i < 16; i++) { const z = R(-44, -26), x = R(9, 30), s = R(.6, 1.2); mound(x, z, s * 1.4, s * .7 + 1.3, s * 1.2); }
+    const end = toWorld(-10, -262); mound(end.x, end.z, 90, 4.2, 44);
     scene.add(new THREE.Mesh(mergeGeometries(parts), new THREE.MeshBasicMaterial({ color: 0x120622, fog: false })));
   }
-  const wind = U.uTime;
   const palmMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, fog: false });
   palmMat.onBeforeCompile = sh => {
-    sh.uniforms.uTime = wind;
+    sh.uniforms.uTime = U.uTime;
     sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       #ifdef USE_INSTANCING
         vec3 wp=(instanceMatrix*vec4(0.,0.,0.,1.)).xyz;
@@ -261,24 +296,23 @@ export function buildVice(scene) {
       transformed.z+=cos(uTime*.9+wp.z*.17)*k*.6;`);
   };
   const variants = [palmGeo(3, 6.5, .5), palmGeo(7, 8, .38), palmGeo(13, 5.5, .7)];
-  const PI = Math.PI;
-  const palms = [   // [x, z, wariant, skala, obrót]: lewe pochylają się w prawo, prawe w lewo (do środka kadru)
-    [-9, -13, 1, 1, .1], [-12, -18, 0, 1.15, -.2], [-8, -22, 2, 1.1, .3], [-15.5, -26, 1, 1.15, .1], [-5.6, -17, 2, .8, -.2],
-    [8, -12, 1, .95, PI + .15], [10.5, -16.5, 0, 1.15, PI - .2], [14, -21, 2, 1.15, PI + .3], [17, -28, 1, 1.2, PI], [6.5, -19, 2, .8, PI - .3],
-    [-42, -44, 1, 1.1, .2], [-55, -47, 0, 1.2, -.3], [-70, -49, 2, 1.2, .5], [44, -45, 0, 1.2, PI], [60, -50, 1, 1.15, PI + .4], [78, -52, 2, 1.2, PI - .3], [36, -47, 2, 1, PI + .2],
-    [-90, -80, 1, 1.3, 0], [-112, -82, 0, 1.3, .4], [95, -90, 1, 1.3, PI], [120, -92, 0, 1.3, PI - .4],
-  ];
+  const PI = Math.PI, palms = [];                                   // [x, y, z, wariant, skala, obrót] w układzie świata
+  // szpaler wzdłuż promenady: pochylone nad chodnik
+  for (let z = -1.5, i = 0; z > -225; z -= R(8, 11), i++) { if (z < -22 && z > -42) continue; /* przerwa w szpalerze: palmy nie zasłaniają neonu */ const p = toWorld(LAND_X - 1.7 + R(-.4, .4), z); palms.push([p.x, 0, p.z, i % 3, R(.95, 1.2), PHI + R(-.25, .25)]); }
+  // wysepki na zatoce i ląd w tle
+  [[13, -29, 1, 1.05, PI + .15], [17.5, -33, 0, 1.2, PI - .2], [22, -38, 2, 1.2, PI + .3], [26, -43, 1, 1.25, PI], [11, -36, 2, .9, PI - .3],
+    [58, -60, 0, 1.3, PI], [72, -63, 1, 1.25, PI + .4], [86, -64, 2, 1.3, PI - .3], [108, -100, 1, 1.4, PI], [130, -102, 0, 1.4, PI - .4]]
+    .forEach(([x, z, v, s, ry]) => palms.push([x, WY + 1.0, z, v, s, ry]));
   variants.forEach((geo, v) => {
-    const list = palms.filter(p => p[2] === v), m = new THREE.InstancedMesh(geo, palmMat, list.length), o = new THREE.Object3D();
-    list.forEach((p, i) => { o.position.set(p[0], WY + 1.1, p[1]); o.rotation.set(0, p[4], 0); o.scale.setScalar(p[3]); o.updateMatrix(); m.setMatrixAt(i, o.matrix); });
+    const list = palms.filter(p => p[3] === v), m = new THREE.InstancedMesh(geo, palmMat, list.length), o = new THREE.Object3D();
+    list.forEach((p, i) => { o.position.set(p[0], p[1], p[2]); o.rotation.set(0, p[5], 0); o.scale.setScalar(p[4]); o.updateMatrix(); m.setMatrixAt(i, o.matrix); });
     m.frustumCulled = false; scene.add(m);
   });
-  // liście w górnych rogach kadru i niskie rośliny za barierką
+  // liście palm w górnych rogach kadru
   const crownGeo = palmGeo(41, 8, 0, true, 3.4);
-  [[-5.2, 5.0, 1.5, 1, .4], [5.5, 5.3, 1.0, 1, 2.2], [-7.6, -.7, -3.7, .5, 1], [-5.7, -.9, -4, .42, 2], [6.4, -.8, -3.8, .46, 3], [8.7, -.7, -3.6, .5, .5], [-10, -.6, -3.9, .55, 4], [11, -.6, -4, .55, 5]]
-    .forEach(([x, y, z, s, ry]) => { const m = new THREE.Mesh(crownGeo, palmMat); m.position.set(x, y, z); m.scale.setScalar(s); m.rotation.y = ry; m.frustumCulled = false; scene.add(m); });
+  [[-5.2, 5.0, 1.5, 1, .4], [5.5, 5.3, 1.0, 1, 2.2]].forEach(([x, y, z, s, ry]) => { const m = new THREE.Mesh(crownGeo, palmMat); m.position.set(x, y, z); m.scale.setScalar(s); m.rotation.y = ry; m.frustumCulled = false; scene.add(m); });
 
-  // ---------- neon powitalny ----------
+  // ---------- billboard z neonem przy promenadzie ----------
   let sign;
   {
     if (!document.getElementById('vice-font')) { const l = document.createElement('link'); l.id = 'vice-font'; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Yellowtail&display=swap'; document.head.appendChild(l); }
@@ -295,26 +329,49 @@ export function buildVice(scene) {
       tex.needsUpdate = true;
     };
     draw(); try { document.fonts.load('150px Yellowtail').then(draw).catch(() => {}); } catch {}
-    const g = new THREE.Group();
+    const g = new THREE.Group();                                   // brama nad promenadą: neon na dwóch słupach
     sign = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 1.8), new THREE.MeshBasicMaterial({ map: tex, fog: false, toneMapped: false })); sign.position.z = .08; g.add(sign);
-    const back = new THREE.Mesh(new THREE.BoxGeometry(3.8, 2, .14), darkMat); g.add(back);
-    for (const dx of [-1.3, 1.3]) { const post = new THREE.Mesh(new THREE.BoxGeometry(.14, 5, .14), darkMat); post.position.set(dx, -3.4, 0); g.add(post); }
-    g.scale.setScalar(1.25); g.position.set(-6.4, 2.5, -11.5); g.rotation.y = .3; scene.add(g);
-    glowSprite(0xff2d95, -6.4, 2.5, -11.2, 10, .4);
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(3.8, 2, .14), darkMat));
+    for (const dx of [-1.72, 1.72]) { const post = new THREE.Mesh(new THREE.BoxGeometry(.1, 3.2, .1), darkMat); post.position.set(dx, -2.0, 0); g.add(post); }
+    g.scale.setScalar(1.9); g.position.set(-.9, 6.6, -42); prom.add(g);
+    glowSprite(0xff2d95, -.9, 6.6, -41.5, 16, .36, prom);
   }
 
-  // ---------- jacht ----------
+  // ---------- jacht motorowy: kadłub z wręgów (dziób, burty z granatowym pasem), trzy pokłady ze skośnymi szybami ----------
   const yacht = new THREE.Group();
   {
-    const white = new THREE.MeshBasicMaterial({ color: 0xfff4ff, fog: false, toneMapped: false }), warm = new THREE.MeshBasicMaterial({ color: 0x1c1040, fog: false });
-    const hull = new THREE.BoxGeometry(30, 2.6, 6, 8, 1, 1), p = hull.attributes.position;
-    for (let i = 0; i < p.count; i++) { const x = p.getX(i); let z = p.getZ(i); if (x > 3) z *= 1 - Math.pow(Math.min(1, (x - 3) / 12), 1.6); if (p.getY(i) < 0) z *= .7; p.setZ(i, z); if (x > 3 && p.getY(i) > 0) p.setY(i, p.getY(i) + (x - 3) * .05); }
-    hull.computeVertexNormals(); const hm = new THREE.Mesh(hull, white); hm.position.y = 1; yacht.add(hm);
-    for (const [w, h, d, x, y] of [[16, 1.5, 5, -3, 3.05], [11, 1.4, 4.4, -4, 4.5], [6, 1.1, 3.6, -5, 5.75]]) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), white); m.position.set(x, y, 0); yacht.add(m); }
-    for (const [w, d, x, y] of [[15, 5.06, -3, 3.1], [10, 4.46, -4, 4.55], [5, 3.66, -5, 5.8]]) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, .5, d), warm); m.position.set(x, y, 0); yacht.add(m); }
-    const mast = new THREE.Mesh(new THREE.BoxGeometry(.2, 3, .2), white); mast.position.set(-5, 7.6, 0); yacht.add(mast);
-    yacht.position.set(27, WY, -98); yacht.rotation.y = .28; scene.add(yacht);
-    glowSprite(0xffc27a, 24, WY + 3.6, -96, 16, .5); glowSprite(0xffc27a, 30, WY + 1.2, -95, 20, .3);
+    const s = soup(), WHITE = C(0xffffff), NAVY = C(0x1a1446), DECK = C(0xd9cfe6), ST = 16, X0 = -15, LENY = 31, pts = [];
+    const halfW = t => 3.1 * Math.pow(Math.max(0, 1 - Math.pow(Math.max(0, (t - .42) / .58), 2.3)), .75);
+    for (let i = 0; i <= ST; i++) { const t = i / ST, w = halfW(t); pts.push({ x: X0 + LENY * t, k: [.5 * w, -.25], b: [.84 * w, .6], t: [w, 2.15 + 1.25 * t * t] }); }
+    for (let i = 0; i < ST; i++) {
+      const a = pts[i], b = pts[i + 1];
+      for (const sg of [1, -1]) {
+        const P = (q, v) => [q.x, v[1], v[0] * sg];
+        s.quad(P(a, a.k), P(b, b.k), P(b, b.b), P(a, a.b), NAVY); s.quad(P(a, a.b), P(b, b.b), P(b, b.t), P(a, a.t), WHITE);
+      }
+      s.quad([a.x, a.t[1], a.t[0]], [b.x, b.t[1], b.t[0]], [b.x, b.t[1], -b.t[0]], [a.x, a.t[1], -a.t[0]], DECK);
+    }
+    { const a = pts[0]; s.quad([a.x, a.k[1], a.k[0]], [a.x, a.k[1], -a.k[0]], [a.x, a.t[1], -a.t[0]], [a.x, a.t[1], a.t[0]], WHITE); }   // pawęż
+    const hullG = s.build(); hullG.computeVertexNormals();
+    yacht.add(new THREE.Mesh(hullG, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .45, side: THREE.DoubleSide, flatShading: true, emissive: 0x4a3566, fog: false })));
+    const white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .45, flatShading: true, emissive: 0x4a3566, fog: false });
+    const glass = new THREE.MeshStandardMaterial({ color: 0x0e0a26, roughness: .15, flatShading: true, fog: false });
+    const litGlass = new THREE.MeshBasicMaterial({ color: 0xffd9a0, fog: false, toneMapped: false });
+    const add = (g, m) => { const me = new THREE.Mesh(g, m); yacht.add(me); return me; };
+    add(slab([[-11.5, 2.2], [-11.5, 4.15], [4.6, 4.15], [8.6, 2.75]], 4.9), white);                      // pokład główny
+    add(slab([[-10.6, 2.95], [-10.6, 3.75], [4.9, 3.75], [6.9, 3.05]], 4.96), glass);
+    add(slab([[-8.6, 4.15], [-8.6, 5.75], [1.8, 5.75], [4.6, 4.15]], 4.1), white);                       // pokład górny
+    add(slab([[-7.9, 4.6], [-7.9, 5.35], [2.0, 5.35], [3.3, 4.6]], 4.16), litGlass);
+    add(slab([[-7.2, 6.75], [-7.2, 6.98], [1.2, 6.98], [2.2, 6.75]], 3.9), white);                       // daszek nad mostkiem
+    for (const x of [-6.6, -2.4, .6]) for (const z of [-1.75, 1.75]) { const p = add(new THREE.BoxGeometry(.14, 1.0, .14), white); p.position.set(x, 6.25, z); }
+    add(slab([[-6.4, 6.98], [-5.6, 8.3], [-4.9, 8.3], [-4.4, 6.98]], .5), white);                        // maszt z radarem
+    const dome = add(new THREE.IcosahedronGeometry(.42, 1), white); dome.position.set(-3.2, 7.3, 0);
+    for (const x of [-9, -5.5, -2, 1.5, 5, 8.5, 11.5]) for (const z of [-1, 1]) { const ph = add(new THREE.BoxGeometry(.5, .2, .06), litGlass); ph.position.set(x, 1.45, z * (halfW((x - X0) / LENY) * .93 + .02)); }   // bulaje
+    yacht.position.set(20, WY, -112); yacht.rotation.y = .45; scene.add(yacht);
+    glowSprite(0xffc27a, -3, 5, 0, 9, .32, yacht); glowSprite(0x6ad8ff, -15, .2, 0, 7, .5, yacht);
+    // odbicie jachtu w wodzie: jasna smuga pod kadłubem
+    const refl = new THREE.Mesh(new THREE.PlaneGeometry(26, 9), new THREE.MeshBasicMaterial({ map: glowTex, color: 0xffd6f0, transparent: true, opacity: .34, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, toneMapped: false }));
+    refl.rotation.x = -Math.PI / 2; refl.position.set(-.5, .06, 3.2); yacht.add(refl);
   }
 
   // ---------- helikopter ----------
@@ -331,11 +388,11 @@ export function buildVice(scene) {
 
   return (t, dt) => {
     U.uTime.value = t;
-    yacht.position.y = WY + Math.sin(t * .7) * .12; yacht.rotation.z = Math.sin(t * .5) * .012;
-    const hx = -70 + ((t * 3.2) % 190);                                             // powolny przelot z lewej na prawo
+    yacht.position.y = WY + Math.sin(t * .7) * .1; yacht.rotation.z = Math.sin(t * .5) * .01;
+    const hx = -70 + ((t * 3.2) % 190);
     heli.position.set(hx, 23 + Math.sin(t * .6) * .8, -150); heli.rotation.z = -.06; rotor.rotation.y = t * 30;
     heliLamp.position.set(hx, 21, -149); heliLamp.material.opacity = Math.sin(t * 6) > .5 ? 1 : .08;
     antennaPts.material.opacity = .55 + .45 * Math.sin(t * 2.2);
-    sign.material.color.setScalar(.93 + .07 * Math.sin(t * 23) * Math.sin(t * 2.7));    // lekkie migotanie neonu
+    sign.material.color.setScalar(.93 + .07 * Math.sin(t * 23) * Math.sin(t * 2.7));
   };
 }
