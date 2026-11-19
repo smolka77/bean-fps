@@ -1555,7 +1555,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
     if (bay) bay.render(camera); else renderer.render(scene, camera);
 
     // tabliczka z nickiem nad głową
-    head.set(0, 1.78, 0); holder.localToWorld(head); head.project(camera);
+    head.set(0, 1.56, 0); holder.localToWorld(head); head.project(camera);
     plate.style.transform = `translate(${(head.x * .5 + .5) * innerWidth}px,${(-head.y * .5 + .5) * innerHeight}px) translate(-50%,-100%)`;
   }
 
