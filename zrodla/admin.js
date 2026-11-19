@@ -300,7 +300,7 @@ async function srvGet(p) {
 const DM_FIELDS = [
   ['Mecz', [['maxPlayers', 'Graczy w meczu (max)', 1], ['minPlayers', 'Najmniej graczy do startu', 1], ['queueTimeout', 'Czekanie w kolejce (s)', 1], ['duration', 'Czas meczu (s)', 1], ['startDelay', 'Odliczanie przed startem (s)', 0.5], ['endDelay', 'Podium po meczu (s)', 1]]],
   ['Kasa meczu i WANTED', [['startMoney', 'Kasa na start ($)', 10], ['killReward', 'Nagroda za zabójstwo ($)', 10], ['wantedMult', 'Mnożnik za WANTED (×)', 0.5], ['wantedMinKills', 'WANTED od zabójstw', 1]]],
-  ['Boty (zapełniają lobby, gdy jest w nim co najmniej 1 gracz; ustępują miejsca graczom)', [['bots', 'Zapełniaj lobby botami do (osób, 0 = bez botów)', 1], ['botSkill', 'Poziom botów (0 = słabe, 1 = mocne)', 0.05]]],
+  ['Boty (zapełniają lobby, gdy jest w nim co najmniej 1 gracz; ustępują miejsca graczom)', [['bots', 'Liczba botów w lobby (0 = bez botów)', 1], ['botSkill', 'Poziom botów (0 = słabe, 1 = mocne)', 0.05]]],
   ['Odrodzenie', [['spawnProtect', 'Ochrona po odrodzeniu (s)', 0.5], ['minDeathTime', 'Ekran WASTED (s)', 0.1], ['idleDead', 'Ekran śmierci – powrót do lobby po (s)', 5]]],
   ['Nagrody (pula = wpisowe graczy)', [['houseFee', 'Prowizja (0–0,5)', 0.01], ['prizeSplit.0', '1. miejsce (część puli)', 0.05], ['prizeSplit.1', '2. miejsce', 0.05], ['prizeSplit.2', '3. miejsce', 0.05]]],
   ['Pancerz', [['armor.vest.price', 'Kamizelka – cena ($)', 50], ['armor.vest.hp', 'Kamizelka – punkty', 5], ['armor.helmet.price', 'Kamizelka + hełm – cena ($)', 50], ['armor.helmet.hp', 'Kamizelka + hełm – punkty', 5], ['armor.helmet.headMult', 'Hełm – obrażenia głowy (×)', 0.05]]],

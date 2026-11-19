@@ -28,7 +28,7 @@ export const DEFAULTS = {
     { id: 'free', name: 'Free', entry: 0 },           // tryb jest darmowy: jedno lobby, bez wpisowego
   ],
   maps: ['Oaza', 'Magazyn', 'Baza'],
-  bots: 8, botSkill: 0.5,                               // boty: lobby z co najmniej jednym graczem zapełniane botami do tylu osób (0 = bez botów); poziom 0–1
+  bots: 3, botSkill: 0.5,                               // boty: ilu botów jest w lobby, gdy gra w nim co najmniej jeden gracz (0 = bez botów); poziom 0–1
   armor: {
     vest: { name: 'Body Armor', price: 650, hp: 100 },
     helmet: { name: 'Body Armor + Helmet', price: 1000, hp: 100, headMult: 0.55 },   // hełm: obrażenia głowy ×0,55 i najpierw z pancerza
