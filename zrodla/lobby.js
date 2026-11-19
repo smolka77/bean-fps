@@ -916,7 +916,7 @@ const ART = {
     return `<svg class="art" viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice"><defs>${DEFS(u)}
       <radialGradient id="bg${u}" cx=".5" cy=".45" r=".75"><stop offset="0" stop-color="#3a5394"/><stop offset=".6" stop-color="#18234a"/><stop offset="1" stop-color="#080d22"/></radialGradient></defs>
       <rect width="320" height="200" fill="url(#bg${u})"/>${stripes(18, .05)}${halftone(u)}
-      ${(() => { const w = String(tr('soon.art')).toUpperCase().replace(/[<&>"]/g, ''), fs = Math.min(50, Math.round(700 / Math.max(w.length, 1) * (/[А-яЁё]/.test(w) ? .76 : 1))); return bigText(u, 100, fs, w, '<tspan fill="#d6e1f7">' + w + '</tspan>', '#070b1c'); })()}
+      ${(() => { const w = String(tr('soon.art')).toUpperCase().replace(/[<&>"]/g, ''), fs = Math.min(50, Math.round(560 / Math.max(w.length, 1) * (/[А-яЁё]/.test(w) ? .76 : 1))); return bigText(u, 100, fs, w, '<tspan fill="#d6e1f7">' + w + '</tspan>', '#070b1c'); })()}
       ${finish(u)}</svg>`;
   },
 };
@@ -1015,7 +1015,9 @@ function skinIcon(sk) {
 const DEFAULT_MODES = [
   { id: 'range', name: 'Strzelnica', desc: 'Solo · zestrzel czerwone fasolki', icon: 'range', tag: 'SOLO' },
   { id: '1v1', name: '1v1', desc: 'Mapa Bagno · bot · do 5 trafień', icon: 'duel', tag: '1 NA 1' },
-  { id: 'bot', name: 'Z botem', desc: 'Trening 1 na 1 · bez stawki i serwera · do 3 wygranych rund', icon: 'bot', tag: 'BOT' },
+  // tryb „Z botem” schowany na razie za kafelkiem „Więcej wkrótce” (kod trybu zostaje w grze); żeby go przywrócić, zamień { soon: true } na:
+  // { id: 'bot', name: 'Z botem', desc: 'Trening 1 na 1 · bez stawki i serwera · do 3 wygranych rund', icon: 'bot', tag: 'BOT' },
+  { soon: true },
 ];
 
 // deterministyczny generator losowy, żeby las wyglądał zawsze tak samo
