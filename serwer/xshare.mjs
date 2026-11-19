@@ -15,7 +15,7 @@ export function xLength(t) {
   for (const ch of String(t).replace(/https?:\/\/\S+/g, 'x'.repeat(23))) { const c = ch.codePointAt(0); n += c <= 0x10ff || (c >= 0x2000 && c <= 0x200d) || (c >= 0x2010 && c <= 0x201f) || (c >= 0x2032 && c <= 0x2037) ? 1 : 2; }
   return n;
 }
-const D = { enabled: false, text: DEFAULT_TEXT, ca: '', url: '', requireCa: true, recheckHours: 24 };
+const D = { enabled: false, text: DEFAULT_TEXT, ca: '', url: '', requireCa: true, recheckHours: 24, profile: 'https://x.com/playGTAssault' };   // profile: strona gry na X (kafelek X w lobby)
 const isB58 = (s) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
 
 export function sanitize(s = {}) {
@@ -29,6 +29,7 @@ export function sanitize(s = {}) {
     url: /^https?:\/\/(?=[^/\s]*[a-z])[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?(\/[^\s]{0,180})?$/i.test(url) && !/^https?:\/\/\d+(\.\d+){3}/.test(url) ? url : '',   // tylko domena (DNS), nie adres IP
     requireCa: !!(s.requireCa ?? D.requireCa),
     recheckHours: Math.max(0, Math.min(24 * 30, Math.round(+(s.recheckHours ?? D.recheckHours) || 0))),
+    profile: /^https:\/\/(www\.)?(x|twitter)\.com\/[A-Za-z0-9_]{1,15}\/?$/.test(String(s.profile ?? '').trim()) ? String(s.profile).trim() : (s.profile === '' ? '' : D.profile),
   };
 }
 

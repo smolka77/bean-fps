@@ -673,7 +673,7 @@ const routes = {
   },
   // ---- Udostępnienie na X (wejście do Deathmatch) ----
   // lobby: kod gracza, gotowy tekst posta, link do okna X i czy post jest już zweryfikowany
-  'GET /api/xshare': async ({ user, req }) => { if (!user) return { enabled: xsCfg.enabled, verified: false, guest: true }; return xshare.status(user.id, originOf(req)); },
+  'GET /api/xshare': async ({ user, req }) => { if (!user) return { enabled: xsCfg.enabled, verified: false, guest: true, profile: xsCfg.profile }; return { ...xshare.status(user.id, originOf(req)), profile: xsCfg.profile }; },
   // wklejony link do posta: serwer czyta post (oEmbed X) i sprawdza kod gracza i CA
   'POST /api/xshare/verify': async ({ user, body, req, ip }) => {
     need(user); if (limited('xs:' + user.id, 6) || limited('xsip:' + ip, 20)) throw new E('rate', 'Za dużo prób – odczekaj minutę', 429);

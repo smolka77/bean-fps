@@ -382,6 +382,7 @@ function mountXShare($) {
       <div class="fa-dmg">
         <label class="fa-dmf" style="grid-column:span 2"><span>Adres CA (puste = mint z Ekwipunku${info.ca && !cfg.ca ? ': ' + esc(info.ca) : ''})</span><input class="fa-q" id="fa-xs-ca" value="${esc(cfg.ca)}" placeholder="np. 7xKX…pump" spellcheck="false"></label>
         <label class="fa-dmf" style="grid-column:span 2"><span>Link do gry w poście (domena, nie IP) – ${info.site ? 'puste = ' + esc(info.site) : '<b style="color:#ff6b8b">wpisz domenę strony</b>'}</span><input class="fa-q" id="fa-xs-url" value="${esc(cfg.url)}" placeholder="https://…" spellcheck="false"></label>
+        <label class="fa-dmf" style="grid-column:span 2"><span>Strona gry na X – kafelek X w lobby (puste = ukryty)</span><input class="fa-q" id="fa-xs-profile" value="${esc(cfg.profile || '')}" placeholder="https://x.com/nazwa" spellcheck="false"></label>
         <label class="fa-dmf"><span>Sprawdzaj post ponownie co (godz., 0 = nigdy)</span><input class="fa-q" type="number" min="0" max="720" step="1" id="fa-xs-re" value="${cfg.recheckHours}"></label>
       </div>
       <label class="fa-dmf" style="display:block;margin-top:10px"><span>Tekst posta</span><textarea class="fa-q" id="fa-xs-text" rows="6" maxlength="600" style="width:100%;box-sizing:border-box;resize:vertical;font:inherit">${esc(cfg.text)}</textarea></label>
@@ -390,7 +391,7 @@ function mountXShare($) {
     $('fa-xs-sum').textContent = (cfg.enabled ? 'włączone' : 'wyłączone – Deathmatch bez posta') + ` · zweryfikowanych graczy: ${s.v || 0}` + (cfg.enabled && cfg.requireCa && !(cfg.ca || info.ca) ? ' · brak CA – sprawdzany tylko kod' : '') + (!cfg.url && !info.site ? ' · brak domeny – post bez linku do gry' : '');
   }
   function collect() {
-    cfg.enabled = $('fa-xs-on').checked; cfg.requireCa = $('fa-xs-reqca').checked; cfg.ca = $('fa-xs-ca').value.trim(); cfg.url = $('fa-xs-url').value.trim();
+    cfg.enabled = $('fa-xs-on').checked; cfg.requireCa = $('fa-xs-reqca').checked; cfg.ca = $('fa-xs-ca').value.trim(); cfg.url = $('fa-xs-url').value.trim(); cfg.profile = $('fa-xs-profile').value.trim();
     cfg.recheckHours = +$('fa-xs-re').value; cfg.text = $('fa-xs-text').value;
   }
   const load = async () => { info = await srvGet('/api/admin/xshare'); cfg = JSON.parse(JSON.stringify(info.config)); render(); };
