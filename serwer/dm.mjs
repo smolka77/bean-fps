@@ -1,18 +1,20 @@
-// Autorytatywny serwer trybu DEATHMATCH (do 20 graczy, 3 minuty, ranking: zabójstwa, potem zadane obrażenia).
+// Autorytatywny serwer trybu DEATHMATCH: stałe, zawsze otwarte lobby do 20 graczy, za darmo, bez końca meczu
+// (wchodzisz i wychodzisz kiedy chcesz; ranking: zabójstwa, potem zadane obrażenia).
+// Broń: każde zabójstwo daje kolejną broń z drabinki DM_GUNS (Glock → Deagle → SPAS → MP5K → AKM → M4A1), śmierć cofa na Glocka.
 // Jak w 1v1 (mecz.mjs) to SERWER decyduje o wszystkim, co ważne:
 //  - ruch: prędkość, skok, ściany, wyjście poza mapę (zły ruch = korekta „fix”),
 //  - strzały: szybkostrzelność, amunicja, przeładowanie, rozrzut, śruciny strzelby, spadek obrażeń z odległością,
 //    trafienie w głowę albo tułów z kompensacją opóźnienia strzelającego,
 //  - pancerz (kamizelka: +100 punktów na tułów; kamizelka z hełmem: też głowa, z mniejszymi obrażeniami głowy),
 //  - zabójstwa, kasa meczu (nagroda za zabójstwo, ×3 za gracza WANTED), status WANTED (pierwsze miejsce w rankingu),
-//  - sklep po śmierci (zakupy sprawdza serwer), odrodzenie w bezpiecznym miejscu z ochroną, zegar meczu i wynik końcowy,
+//  - odrodzenie na życzenie gracza (Spacja na ekranie śmierci) w bezpiecznym miejscu z ochroną,
 //  - widoczność: gracz dostaje pozycje tylko tych przeciwników, których może zobaczyć (wallhack nic nie pokaże).
 // Moduł nie zna WebSocketu ani bazy: serwer.mjs woła createRoom / handleMessage / tick / leave i wysyła to, co dostanie w out(pid, msg).
 import * as MECZ from './mecz.mjs';
 
 // kolejność jak WEAPON_IDS w grze (zrodla/weaponry.js) – w paczkach ruchu broń to indeks w tej liście
 export const WIDS = ['akm', 'm4a1', 'glock17', 'deagle', 'spas12', 'mp5k', 'akmgold'];   // akmgold: złoty AKM – jeszcze nie w trybie (brak w DM_GUNS)
-export const DM_GUNS = ['glock17', 'deagle', 'spas12', 'mp5k', 'akm', 'm4a1'];   // bronie trybu, w kolejności slotów (1 = pistolet startowy)
+export const DM_GUNS = ['glock17', 'deagle', 'spas12', 'mp5k', 'akm', 'm4a1'];   // drabinka broni: start z pierwszą, każde zabójstwo = następna
 export const PISTOL = 'glock17';
 
 // ---------------- ustawienia (panel admina może zmienić każdą wartość) ----------------
@@ -20,13 +22,10 @@ export const DEFAULTS = {
   maxPlayers: 20, minPlayers: 2, queueTimeout: 60,     // kolejka: najwyżej tylu graczy; po queueTimeout s start z tyloma, ilu jest (co najmniej minPlayers)
   duration: 180, startDelay: 7, endDelay: 16,          // mecz 3 min; odliczanie przed startem; podium po meczu
   startMoney: 0, killReward: 300, wantedMult: 3, wantedMinKills: 1,
-  spawnProtect: 2.5, minDeathTime: 2.4, shopTimeout: 30,   // ochrona po odrodzeniu (s), najkrótsza śmierć (ekran WASTED), po tylu s w sklepie gracz wraca sam
+  spawnProtect: 2.5, minDeathTime: 2.4, idleDead: 120,  // ochrona po odrodzeniu (s), najkrótsza śmierć (ekran WASTED), po tylu s na ekranie śmierci gracz wraca do lobby (zwalnia miejsce)
   houseFee: 0.10, prizeSplit: [0.5, 0.3, 0.2],          // prowizja od puli wpisowego; podział puli na miejsca 1–3
   tiers: [
-    { id: 'free', name: 'Free', entry: 0 },
-    { id: 'bronze', name: 'Bronze', entry: 1 },
-    { id: 'silver', name: 'Silver', entry: 5 },
-    { id: 'gold', name: 'Gold', entry: 20 },
+    { id: 'free', name: 'Free', entry: 0 },           // tryb jest darmowy: jedno lobby, bez wpisowego
   ],
   maps: ['Oaza', 'Magazyn', 'Baza'],
   armor: {
@@ -66,14 +65,11 @@ export function sanitizeConfig(src = {}) {
   o.wantedMinKills = Math.round(num(s.wantedMinKills, 0, 100, D.wantedMinKills));
   o.spawnProtect = num(s.spawnProtect, 0, 10, D.spawnProtect);
   o.minDeathTime = num(s.minDeathTime, 0.5, 10, D.minDeathTime);
-  o.shopTimeout = num(s.shopTimeout, 5, 300, D.shopTimeout);
+  o.idleDead = num(s.idleDead, 20, 1800, D.idleDead);
   o.houseFee = num(s.houseFee, 0, 0.5, D.houseFee);
   const sp = Array.isArray(s.prizeSplit) && s.prizeSplit.length === 3 ? s.prizeSplit.map((v, i) => num(v, 0, 1, D.prizeSplit[i])) : D.prizeSplit.slice();
   const sum = sp.reduce((a, b) => a + b, 0) || 1; o.prizeSplit = sp.map((v) => Math.round((v / sum) * 1000) / 1000);
-  const tiers = Array.isArray(s.tiers) && s.tiers.length ? s.tiers : D.tiers;
-  o.tiers = tiers.slice(0, 8).map((t, i) => ({ id: String(t.id || 'tier' + i).replace(/[^a-z0-9_-]/gi, '').slice(0, 16) || 'tier' + i,
-    name: String(t.name || '').slice(0, 24) || 'Tier ' + (i + 1), entry: Math.round(num(t.entry, 0, 1000, 0) * 100) / 100 }));
-  { const seen = new Set(); o.tiers = o.tiers.filter((t) => !seen.has(t.id) && seen.add(t.id)); }
+  o.tiers = D.tiers.map((t) => ({ ...t }));            // Deathmatch jest full free to play – wpisowe zawsze 0 (stare ustawienia z poziomami są pomijane)
   const maps = Array.isArray(s.maps) ? s.maps.filter((m) => D.maps.includes(m)) : []; o.maps = maps.length ? maps : D.maps.slice();
   o.armor = {};
   for (const k of ['vest', 'helmet']) { const a = (s.armor || {})[k] || {}, d = D.armor[k];
@@ -97,7 +93,7 @@ export function sanitizeConfig(src = {}) {
 }
 // to, co dostaje przeglądarka (ceny, statystyki do przewidywania strzałów, zasady)
 export const publicConfig = (c) => ({ duration: c.duration, killReward: c.killReward, wantedMult: c.wantedMult, startMoney: c.startMoney, spawnProtect: c.spawnProtect,
-  minDeathTime: c.minDeathTime, shopTimeout: c.shopTimeout, maxPlayers: c.maxPlayers, minPlayers: c.minPlayers, queueTimeout: c.queueTimeout,
+  minDeathTime: c.minDeathTime, idleDead: c.idleDead, maxPlayers: c.maxPlayers, minPlayers: c.minPlayers, queueTimeout: c.queueTimeout,
   houseFee: c.houseFee, prizeSplit: c.prizeSplit, tiers: c.tiers, armor: c.armor, weapons: c.weapons, guns: DM_GUNS });
 
 // ---------------- szybki promień po siatce mapy (DDA po komórkach 2 m) ----------------
@@ -168,23 +164,30 @@ function newPlayer(pid, info, cfg) {
   return { pid, uid: info.uid, nick: info.nick, skin: info.skin || '', bot: !!info.bot,
     guns: Array.isArray(info.guns) ? new Set(info.guns) : null,     // Arsenał: bronie, które gracz może kupić (null = wszystkie)
     x: 0, y: 0, z: 0, yaw: 0, pitch: 0, cr: 0, sl: 0, ads: 0, w: WIDS.indexOf(PISTOL), run: 0, air: 0, legYaw: 0,
-    hp: 100, armor: 0, helmet: false, alive: false, dead: true, deadAt: -99, life: 0, protUntil: 0, inShop: false,
+    hp: 100, armor: 0, helmet: false, alive: false, dead: true, deadAt: -99, life: 0, protUntil: 0, level: 0,
     money: cfg.startMoney, kills: 0, deaths: 0, damage: 0, heads: 0, shots: 0, hits: 0, streak: 0, best: 0, joinOrder: pid,
     owned: new Set([PISTOL]), ammo: {}, reloadW: -1, reloadAt: 0, bloom: 0, bloomT: 0, tokens: 1, tokT: 0, lastQ: 0,
     lastT: 0, lastGroundY: 0, airSince: 0, ground: true, hist: [], trail: [], viol: [], kicked: false, left: false,
     rtt: 0.1, lastStT: 0, lastFix: 0, speed01: 0, killer: null, lastSpawnAt: -99, spawnIdx: -1, sent: new Map() };
 }
+const ownedFor = (level) => new Set([PISTOL, DM_GUNS[Math.min(DM_GUNS.length - 1, Math.max(0, level))]]);
 function refillOwned(p, cfg) { p.ammo = {}; for (const id of p.owned) p.ammo[id] = { mag: cfg.weapons[id].mag, res: cfg.weapons[id].reserve }; p.reloadW = -1; p.bloom = 0; }
 
-export function createRoom(cfg, mapName, players, now) {
+// stałe lobby: pokój żyje, dopóki ktoś w nim gra; gracze dochodzą (addPlayer) i wychodzą (leave) w dowolnej chwili
+export function createRoom(cfg, mapName, now) {
   const map = MECZ.mapByName(mapName); if (!map) throw new Error('Brak mapy ' + mapName);
   if (!map.grid) throw new Error('Mapa bez siatki');
-  const room = { cfg, map, mapName, phase: 'count', t0: now, liveAt: now + cfg.startDelay, endAt: now + cfg.startDelay + cfg.duration, overAt: Infinity,
-    p: new Map(), order: [], wanted: 0, tick: 0, boardDirty: true, boardT: 0, log: [], over: false, results: null, recentSpawns: [] };
-  players.forEach((info, i) => { const p = newPlayer(i + 1, info, cfg); room.p.set(p.pid, p); room.order.push(p.pid); });
-  // pierwsze rozstawienie: każdy w innym miejscu, jak najdalej od pozostałych
-  for (const p of room.p.values()) spawnPlayer(room, p, now, null, true);
-  return room;
+  return { cfg, map, mapName, phase: 'live', t0: now, liveAt: now, endAt: Infinity,
+    p: new Map(), nextPid: 0, wanted: 0, tick: 0, boardDirty: true, boardT: 0, log: [], over: false, recentSpawns: [], removed: [] };
+}
+export const playerCount = (room) => room.p.size;
+// nowy gracz w trwającym lobby: odradza się od razu, pozostali dostają {t:'joined'}
+export function addPlayer(room, info, now, out) {
+  const p = newPlayer(++room.nextPid, info, room.cfg); room.p.set(p.pid, p);
+  spawnPlayer(room, p, now, null);
+  out(-1, { t: 'joined', id: p.pid, nick: p.nick, skin: p.skin });
+  room.boardDirty = true;
+  return p.pid;
 }
 const alivePlayers = (room) => [...room.p.values()].filter((p) => p.alive && !p.left);
 
@@ -230,15 +233,16 @@ function pickSpawn(room, p, now, initial) {
 function spawnPlayer(room, p, now, out, initial = false) {
   const s = pickSpawn(room, p, now, initial);
   p.life++;
-  Object.assign(p, { x: s.x, y: s.y, z: s.z, yaw: s.yaw, pitch: 0, hp: 100, alive: true, dead: false, inShop: false, lastT: now, lastGroundY: s.y, airSince: 0, ground: true, gx: s.x, gy: s.y, gz: s.z,
-    hist: [], trail: [], protUntil: (initial ? room.liveAt : now) + room.cfg.spawnProtect, lastSpawnAt: now, w: WIDS.indexOf(PISTOL), lastStT: now, killer: null });
+  p.owned = ownedFor(p.level);
+  Object.assign(p, { x: s.x, y: s.y, z: s.z, yaw: s.yaw, pitch: 0, hp: 100, alive: true, dead: false, lastT: now, lastGroundY: s.y, airSince: 0, ground: true, gx: s.x, gy: s.y, gz: s.z,
+    hist: [], trail: [], protUntil: now + room.cfg.spawnProtect, lastSpawnAt: now, w: WIDS.indexOf(DM_GUNS[p.level] || PISTOL), lastStT: now, killer: null });
   refillOwned(p, room.cfg);
   MECZ.pushHist(p, now);
   room.recentSpawns.push({ x: s.x, z: s.z, t: now }); if (room.recentSpawns.length > 40) room.recentSpawns.shift();
   const msg = { t: 'spawn', life: p.life, p: [s.x, s.y, s.z].map((v) => +v.toFixed(3)), yaw: +s.yaw.toFixed(3), prot: room.cfg.spawnProtect, ...invOf(p) };
   if (out) out(p.pid, msg); else p.pendingSpawn = msg;
 }
-const invOf = (p) => ({ money: p.money, owned: DM_GUNS.filter((g) => p.owned.has(g)), armor: p.armor, helmet: p.helmet, hp: p.hp });
+const invOf = (p) => ({ money: p.money, owned: DM_GUNS.filter((g) => p.owned.has(g)), gun: DM_GUNS[p.level] || PISTOL, level: p.level, armor: p.armor, helmet: p.helmet, hp: p.hp });
 
 // ---------------- ruch ----------------
 function accept(p, s, now) {
@@ -361,35 +365,30 @@ function applyDamage(room, t, raw, head) {
 }
 function onKill(room, k, v, wid, head, dist, now, out) {
   const cfg = room.cfg, wasWanted = room.wanted === v.pid;
-  v.alive = false; v.dead = true; v.deadAt = now; v.deaths++; v.streak = 0; v.killer = k ? k.pid : null; v.inShop = false;
-  // zakupy przepadają; kasa zostaje
-  v.owned = new Set([PISTOL]); v.armor = 0; v.helmet = false; v.reloadW = -1;
-  let reward = 0;
-  if (k && k !== v) { reward = Math.round(cfg.killReward * (wasWanted ? cfg.wantedMult : 1)); k.money += reward; k.kills++; k.streak++; k.best = Math.max(k.best, k.streak); }
+  v.alive = false; v.dead = true; v.deadAt = now; v.deaths++; v.streak = 0; v.killer = k ? k.pid : null;
+  // śmierć: drabinka broni od początku (Glock)
+  v.level = 0; v.owned = ownedFor(0); v.armor = 0; v.helmet = false; v.reloadW = -1;
+  let up = null;
+  if (k && k !== v) {
+    k.kills++; k.streak++; k.best = Math.max(k.best, k.streak);
+    // zabójstwo: od razu następna broń z drabinki (pełny magazynek), w rękach
+    // Ekwipunek: drabinka pomija bronie, których zabójca nie ma odblokowanych (k.guns; null = wszystkie)
+    let nl = k.level + 1; while (nl < DM_GUNS.length && k.guns && !k.guns.has(DM_GUNS[nl])) nl++;
+    if (nl < DM_GUNS.length) {
+      k.level = nl; const gun = DM_GUNS[k.level], W = cfg.weapons[gun];
+      k.owned = ownedFor(k.level); k.ammo[gun] = { mag: W.mag, res: W.reserve }; k.w = WIDS.indexOf(gun); k.reloadW = -1; k.bloom = 0;
+      up = gun;
+    }
+  }
   out(-1, { t: 'kf', k: k ? k.pid : 0, v: v.pid, w: WIDS.indexOf(wid), h: head ? 1 : 0, wanted: wasWanted ? 1 : 0, d: Math.round(dist) });
-  if (k && k !== v) out(k.pid, { t: 'reward', money: k.money, plus: reward, wanted: wasWanted ? 1 : 0, streak: k.streak });
+  if (k && k !== v) out(k.pid, { t: 'upgrade', up: up || '', wanted: wasWanted ? 1 : 0, streak: k.streak, ...invOf(k) });
   out(v.pid, { t: 'dead', by: k ? k.pid : 0, w: WIDS.indexOf(wid), h: head ? 1 : 0, d: Math.round(dist), killerHp: k ? Math.round(k.hp) : 0, killerAr: k ? Math.round(k.armor) : 0,
-    stats: { kills: v.kills, deaths: v.deaths, damage: Math.round(v.damage) }, money: v.money, minDeath: cfg.minDeathTime, shopTimeout: cfg.shopTimeout });
+    stats: { kills: v.kills, deaths: v.deaths, damage: Math.round(v.damage) }, minDeath: cfg.minDeathTime, idleDead: cfg.idleDead });
   room.boardDirty = true;
   updateWanted(room, out);
 }
 
-// ---------------- sklep i powrót do walki ----------------
-function buy(room, p, item, out) {
-  const cfg = room.cfg; let ok = false, why = '';
-  if (!p.dead || room.phase === 'end') why = 'alive';
-  else if (cfg.weapons[item] && item !== PISTOL) {
-    const W = cfg.weapons[item];
-    if (p.owned.has(item)) why = 'owned'; else if (p.guns && !p.guns.has(item)) why = 'locked';   // Arsenał: broń bez tokenu
-    else if (p.money < W.price) why = 'funds'; else { p.money -= W.price; p.owned.add(item); ok = true; }
-  } else if (item === 'vest' || item === 'helmet') {
-    const A = cfg.armor[item], cur = p.armor > 0 ? (p.helmet ? 'helmet' : 'vest') : '';
-    if (cur === item || (cur === 'helmet' && item === 'vest')) why = 'owned';
-    else if (p.money < A.price) why = 'funds';
-    else { p.money -= A.price; p.armor = A.hp; p.helmet = item === 'helmet'; ok = true; }
-  } else why = 'item';
-  out(p.pid, { t: 'inv', ok: ok ? 1 : 0, item, why, ...invOf(p) });
-}
+// ---------------- powrót do walki (Spacja na ekranie śmierci) ----------------
 function deploy(room, p, now, out) {
   if (!p.dead || p.left || room.phase !== 'live') return;
   if (now - p.deadAt < room.cfg.minDeathTime - 0.15) return;      // za wcześnie (ekran WASTED jeszcze trwa)
@@ -408,16 +407,17 @@ export function handleMessage(room, pid, m, now, out) {
       if (W && a && p.reloadW < 0 && a.mag < W.mag && a.res > 0) { p.reloadW = p.w; p.reloadAt = now + W.reload * 0.9; }
       return;
     }
-    case 'shop': if (p.dead) p.inShop = true; return;
-    case 'buy': return buy(room, p, String(m.item || ''), out);
     case 'deploy': return deploy(room, p, now, out);
     case 'po': { const rtt = now - (+m.s || 0); if (rtt >= 0 && rtt < 2) p.rtt = p.rtt * 0.7 + rtt * 0.3; return; }
     case 'ready': p.ready = true; return;
   }
 }
-export function leave(room, pid, now, out) {
+// wyjście z lobby: gracz znika z pokoju (miejsce wolne dla kolejnego); serwer.mjs odczytuje room.removed (statystyki, zamknięcie połączenia)
+export function leave(room, pid, now, out, why = 'leave') {
   const p = room.p.get(pid); if (!p || p.left) return;
   p.left = true; p.alive = false; p.dead = true;
+  room.p.delete(pid); for (const q of room.p.values()) q.sent.delete(pid);
+  room.removed.push({ pid, why, stats: { kills: p.kills, deaths: p.deaths, damage: Math.round(p.damage), heads: p.heads, shots: p.shots, hits: p.hits } });
   out(-1, { t: 'left', id: pid });
   room.boardDirty = true; updateWanted(room, out);
 }
@@ -445,13 +445,11 @@ export function tick(room, now, out) {
   room.tick++;
   const cfg = room.cfg;
   for (const p of room.p.values()) if (p.pendingSpawn) { out(p.pid, p.pendingSpawn); p.pendingSpawn = null; }
-  if (room.phase === 'count' && now >= room.liveAt) { room.phase = 'live'; out(-1, { t: 'go', left: +(room.endAt - now).toFixed(2) }); }
-  if (room.phase === 'live' && now >= room.endAt) return finish(room, now, out);
-  if (room.phase === 'end') { if (now >= room.overAt) room.over = true; return; }
-  for (const p of room.p.values()) {
+  for (const p of [...room.p.values()]) {
     if (p.reloadW >= 0 && now >= p.reloadAt) finishReload(p, cfg);
-    if (p.kicked && !p.left) { out(p.pid, { t: 'error', code: 'cheat', message: 'Wyrzucono z meczu: serwer wykrył niedozwolony ruch.' }); leave(room, p.pid, now, out); p.kickedOut = true; }
-    if (p.dead && !p.left && room.phase === 'live' && now - p.deadAt > cfg.minDeathTime + cfg.shopTimeout) deploy(room, p, now, out);   // za długo w sklepie: wraca sam
+    if (p.kicked) { out(p.pid, { t: 'error', code: 'cheat', message: 'Wyrzucono z meczu: serwer wykrył niedozwolony ruch.' }); leave(room, p.pid, now, out, 'cheat'); continue; }
+    // za długo na ekranie śmierci (bez Spacji i bez Esc): powrót do lobby, żeby nie zajmować miejsca
+    if (p.dead && now - p.deadAt > cfg.idleDead) { out(p.pid, { t: 'error', code: 'idle', message: 'Za długo na ekranie śmierci – wróciłeś do lobby.' }); leave(room, p.pid, now, out, 'idle'); }
   }
   // paczki stanu: każdy dostaje widocznych przeciwników (widoczność liczona co 3. tick dla każdej pary, na zmianę)
   const list = [...room.p.values()].filter((p) => !p.left);
@@ -470,27 +468,10 @@ export function tick(room, now, out) {
   if (room.wanted && room.tick % 5 === 0) { const w = room.p.get(room.wanted); if (w && w.alive) out(-1, { t: 'wp', id: w.pid, x: r2(w.x), z: r2(w.z) }); }
   if (room.boardDirty && now - room.boardT > 0.4) { room.boardDirty = false; room.boardT = now; out(-1, boardMsg(room)); }
   if (room.tick % 40 === 0) out(-1, { t: 'pi', s: +now.toFixed(3) });
-  if (room.tick % 100 === 0 && room.phase === 'live') out(-1, { t: 'tm', left: +(room.endAt - now).toFixed(2) });
-  if (room.phase === 'live' && list.length === 0) finish(room, now, out);
 }
-// koniec meczu: kolejność liczy serwer (zabójstwa → obrażenia), podium z trzech pierwszych (gracze, którzy wyszli, nie dostają nagród)
-function finish(room, now, out) {
-  if (room.phase === 'end') return;
-  room.phase = 'end'; room.overAt = now + room.cfg.endDelay;
-  const r = ranking(room);
-  const eligible = r.filter((p) => !p.left);
-  room.results = r.map((p, i) => ({ pid: p.pid, uid: p.uid, nick: p.nick, skin: p.skin, bot: p.bot, rank: i + 1, kills: p.kills, deaths: p.deaths, damage: Math.round(p.damage),
-    heads: p.heads, shots: p.shots, hits: p.hits, best: p.best, left: p.left, place: p.left ? 0 : eligible.indexOf(p) + 1 }));
-  room.podium = eligible.slice(0, 3).map((p) => p.pid);
-}
-// wyniki z nagrodami (serwer.mjs dopisuje kwoty po rozliczeniu)
-export function endMessage(room, prizes = {}) {
-  return { t: 'end', podium: room.podium, wanted: room.wanted,
-    standings: room.results.map((s) => ({ id: s.pid, nick: s.nick, skin: s.skin, rank: s.rank, place: s.place, kills: s.kills, deaths: s.deaths, damage: s.damage, heads: s.heads, left: s.left ? 1 : 0, prize: prizes[s.pid] || 0 })) };
-}
-// stan początkowy dla gracza (po starcie pokoju)
+// stan początkowy dla gracza (po wejściu do lobby)
 export function startMessage(room, pid, now) {
   const p = room.p.get(pid);
-  return { t: 'dm', you: pid, map: room.mapName, liveIn: +(room.liveAt - now).toFixed(2), duration: room.cfg.duration, cfg: publicConfig(room.cfg),
+  return { t: 'dm', you: pid, map: room.mapName, liveIn: 0, duration: 0, persistent: 1, cfg: publicConfig(room.cfg),
     players: [...room.p.values()].map((q) => ({ id: q.pid, nick: q.nick, skin: q.skin })), ...invOf(p), ...(p.guns ? { guns: [...p.guns] } : {}) };
 }

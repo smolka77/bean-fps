@@ -18,7 +18,7 @@ import { derivePath } from 'ed25519-hd-key';
 import * as bip39 from 'bip39';
 import { WebSocketServer } from 'ws';
 import * as MECZ from './mecz.mjs';
-import * as DM from './dm.mjs';                                   // tryb Deathmatch: do 20 graczy, 3 minuty, kasa meczu, WANTED, sklep po śmierci
+import * as DM from './dm.mjs';                                   // tryb Deathmatch: stałe darmowe lobby do 20 graczy, broń za zabójstwa, WANTED
 import * as ARS from './arsenal.mjs';                             // Arsenał: bronie za trzymanie tokenu na adresie depozytu (1v1 i Deathmatch)
 import * as OCH from './ochrona.mjs';
 import * as ANTY from './antycheat.mjs';                          // ocena ryzyka cheatów po meczu (aimbot, triggerbot, silent aim)
@@ -600,19 +600,19 @@ const routes = {
       limits: { dailyUsd: WD_DAILY_USD, reviewUsd: WD_REVIEW_USD } };
   },
   // ---- Deathmatch ----
-  // lobby: poziomy (wpisowe), zasady i ilu graczy czeka w każdej kolejce
-  'GET /api/dm/info': async () => ({ ...DM.publicConfig(dmCfg), price: PRICE, queues: Object.fromEntries(dmCfg.tiers.map((t) => [t.id, (dmQueues.get(t.id) || []).length])), live: dmRooms.size }),
+  // lobby gry: zasady i ilu graczy jest teraz w stałym lobby Deathmatch (komplet = full)
+  'GET /api/dm/info': async () => { const n = dmCount(); return { ...DM.publicConfig(dmCfg), players: n, full: n >= dmCfg.maxPlayers, queues: { [dmCfg.tiers[0].id]: n }, live: dmRooms.size }; },
   // panel admina: wszystkie ustawienia trybu, kolejki, trwające mecze i ostatnie wyniki
   'GET /api/admin/dm': async ({ req }) => {
     adminGate(req);
     const recent = q(`SELECT room, MAX(COALESCE(ended,t)) te, MAX(map) map, MAX(tier) tier, MAX(players) players, SUM(lamports) pot, SUM(payout_lamports) paid, MAX(price) price FROM dm_entries
-      WHERE room IS NOT NULL AND state IN ('won','lost','left') GROUP BY room ORDER BY te DESC LIMIT 40`).all().map((r) => {
+      WHERE room IS NOT NULL AND state IN ('won','lost','left','played') GROUP BY room ORDER BY te DESC LIMIT 40`).all().map((r) => {
       const top = q('SELECT e.place, e.kills, e.damage, e.payout_lamports, e.price, u.username FROM dm_entries e JOIN users u ON u.id=e.user_id WHERE e.room=? AND e.place BETWEEN 1 AND 3 ORDER BY e.place').all(r.room);
       return { room: r.room, t: r.te, map: r.map, tier: r.tier, players: r.players, pot: Math.round(r.pot / 1e9 * r.price * 100) / 100, paid: Math.round(r.paid / 1e9 * r.price * 100) / 100,
         top: top.map((x) => ({ place: x.place, name: x.username, kills: x.kills, damage: x.damage, prize: Math.round(x.payout_lamports / 1e9 * x.price * 100) / 100 })) };
     });
-    return { config: dmCfg, defaults: DM.sanitizeConfig({}), queues: dmCfg.tiers.map((t) => ({ tier: t.id, name: t.name, n: (dmQueues.get(t.id) || []).length })),
-      rooms: [...dmRooms].map((r) => ({ id: r.id, tier: r.tier.id, map: r.game.mapName, phase: r.game.phase, players: r.entries.length, left: Math.max(0, Math.round(r.game.endAt - nowS())) })), recent };
+    return { config: dmCfg, defaults: DM.sanitizeConfig({}), queues: [],
+      rooms: [...dmRooms].map((r) => ({ id: r.id, tier: r.tier.id, map: r.game.mapName, phase: r.game.phase, players: DM.playerCount(r.game), left: 0 })), recent };
   },
   'POST /api/admin/dm': async ({ body, req, ip }) => {
     const adm = adminGate(req);
@@ -646,13 +646,47 @@ const routes = {
 const STATIC = { '/': 'index.html', '/index.html': 'index.html', '/skins.json': 'skins.json', '/kreator-skinow.html': 'zrodla/kreator-skinow.html',
   '/privacy.html': 'privacy.html', '/privacy': 'privacy.html', '/polityka-prywatnosci': 'privacy.html' };
 const PUBLIC_PAGES = new Set(['/privacy.html', '/privacy', '/polityka-prywatnosci']);   // dostępne bez hasła bramki (Google sprawdza politykę prywatności)
-function serveGame(p, res) {
-  const f = STATIC[p] && path.join(GAME_DIR, STATIC[p]);
-  if (!f || !fs.existsSync(f)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Nie znaleziono'); }
-  let b = fs.readFileSync(f);
-  if (f.endsWith('index.html')) { const s = b.toString('utf8'), i = s.indexOf('<head>'); b = Buffer.from(i >= 0 ? s.slice(0, i + 6) + '<script>window.BEANLADEN_API=location.origin</script>' + s.slice(i + 6) : s); }
-  res.writeHead(200, { 'Content-Type': f.endsWith('.json') ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(b);
+// Pliki gry z pamięci: czytane raz (ponownie dopiero, gdy zmieni się plik po git pull), gzip i brotli liczone raz w tle (pula wątków zlib),
+// więc wejście gracza na stronę nie zatrzymuje pętli serwera, która liczy mecze. Pliki w gra/ mają skrót treści w nazwie → cache na rok;
+// index.html i skins.json → 'no-cache' + ETag (przeglądarka dostaje 304, gdy nic się nie zmieniło).
+const GAME_TYPES = { '.html': 'text/html; charset=utf-8', '.json': 'application/json; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
+  '.glb': 'model/gltf-binary', '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.mp3': 'audio/mpeg', '.svg': 'image/svg+xml' };
+const GAME_CACHE = new Map();
+const zgz = (b) => new Promise((ok, no) => zlib.gzip(b, { level: 9 }, (e, r) => (e ? no(e) : ok(r))));
+const zbr = (b) => new Promise((ok, no) => zlib.brotliCompress(b, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 9, [zlib.constants.BROTLI_PARAM_SIZE_HINT]: b.length } }, (e, r) => (e ? no(e) : ok(r))));
+async function gameFile(f) {
+  let st; try { st = await fs.promises.stat(f); } catch { return null; }
+  const c = GAME_CACHE.get(f);
+  if (c && c.mtime === st.mtimeMs && c.size === st.size) return c.ready;
+  const ready = (async () => {
+    let b = await fs.promises.readFile(f);
+    if (f.endsWith('index.html')) { const s = b.toString('utf8'), i = s.indexOf('<head>'); b = Buffer.from(i >= 0 ? s.slice(0, i + 6) + '<script>window.BEANLADEN_API=location.origin</script>' + s.slice(i + 6) : s); }
+    const ext = path.extname(f).toLowerCase(), pack = /^\.(html|json|js|css|glb|svg)$/.test(ext) && b.length > 1024;
+    const [gz, br] = pack ? await Promise.all([zgz(b), zbr(b)]) : [null, null];
+    return { raw: b, gz, br, type: GAME_TYPES[ext] || 'application/octet-stream', etag: '"' + crypto.createHash('sha1').update(b).digest('base64url').slice(0, 22) + '"' };
+  })();
+  GAME_CACHE.set(f, { mtime: st.mtimeMs, size: st.size, ready });
+  ready.catch(() => GAME_CACHE.delete(f));
+  return ready;
 }
+async function serveGame(p, res, req) {
+  const name = p.startsWith('/gra/') && /^\/gra\/[A-Za-z0-9._-]+$/.test(p) && !p.includes('..') ? p.slice(1) : STATIC[p];
+  const e = name ? await gameFile(path.join(GAME_DIR, name)).catch(() => null) : null;
+  if (!e) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Nie znaleziono'); }
+  const head = { 'Content-Type': e.type, ETag: e.etag, Vary: 'Accept-Encoding', 'Cache-Control': name.startsWith('gra/') ? 'public, max-age=31536000, immutable' : 'no-cache' };
+  if (req && req.headers['if-none-match'] === e.etag) { res.writeHead(304, head); return res.end(); }
+  const ae = (req && req.headers['accept-encoding']) || '';
+  const [body, enc] = e.br && /\bbr\b/.test(ae) ? [e.br, 'br'] : e.gz && /\bgzip\b/.test(ae) ? [e.gz, 'gzip'] : [e.raw, null];
+  if (enc) head['Content-Encoding'] = enc;
+  head['Content-Length'] = body.length;
+  res.writeHead(200, head); res.end(body);
+}
+// po starcie od razu przygotuj (w tle) stronę, skiny i pliki gry, żeby pierwsi gracze nie czekali na kompresję
+setTimeout(() => {
+  const files = ['index.html', 'skins.json'];
+  try { for (const f of fs.readdirSync(path.join(GAME_DIR, 'gra'))) files.push('gra/' + f); } catch {}
+  (async () => { for (const f of files) await gameFile(path.join(GAME_DIR, f)).catch(() => {}); })();
+}, 500);
 // ---------------- bramka: czarny ekran z kotem i hasłem (jak na cryptostrike.pl) ----------------
 // Ustawione COVER_PASSWORD = cała strona i API dopiero po wpisaniu hasła na ekranie z serwer/cover.html.
 // Dobre hasło -> ciasteczko bl_cover (HttpOnly, 30 dni) podpisane kluczem z DATA_DIR/cover.key; zmiana hasła unieważnia stare wejścia.
@@ -867,8 +901,6 @@ const arsenal = ARS.createArsenal({ getCfg: () => arsCfg, rpcUrl: (env.TOKEN_RPC
   solOf: (uid) => { const u = fresh(uid); return u ? u.lamports / LAMPORTS_PER_SOL : 0; } });   // tryb SOL: saldo w grze (nic się nie pobiera)
 console.log(!ARS.active(arsCfg) ? '[arsenał] wyłączony – wszystkie bronie dla każdego'
   : arsCfg.unit === 'token' ? `[arsenał] włączony: token ${arsCfg.symbol} (${arsCfg.mint}), sieć ${arsCfg.network}` : '[arsenał] włączony: progi w SOL (saldo w grze)');
-// progi do sklepu meczu (kłódka z kwotą); null = Arsenał wyłączony
-const arsenalInfo = () => ARS.active(arsCfg) ? { unit: ARS.unitLabel(arsCfg), need: arsCfg.need } : null;
 // true = najpierw trzeba sprawdzić saldo (wtedy `again` wywoła się po sprawdzeniu, jeśli karta jest dalej otwarta)
 function arsenalWait(ws, user, again) {
   if (!ARS.active(arsCfg) || arsenal.isFresh(user.id, ARS.QUEUE_AGE)) return false;
@@ -879,163 +911,82 @@ function arsenalWait(ws, user, again) {
 // bronie gracza w meczu (null = Arsenał wyłączony); `ids` = bronie, które zna dany tryb; lam = stawka / wpisowe zamrożone na ten mecz (liczy się do salda SOL)
 const arsenalGuns = (uid, ids, lam = 0) => { const g = arsenal.gunsFor(uid, (lam || 0) / LAMPORTS_PER_SOL); return g ? g.filter((id) => ids.includes(id)) : null; };
 
-// ---------------- DEATHMATCH: kolejki według poziomu (wpisowego), pokoje do 20 graczy, rozliczenie podium ----------------
-// Gracz łączy się z /ws i wysyła {t:'dmq', tier, skin}. Serwer pobiera wpisowe z salda (poziom darmowy: 0), wstawia gracza do kolejki
-// poziomu i co sekundę wysyła stan kolejki. Mecz startuje od razu przy komplecie (maxPlayers) albo po queueTimeout s z tyloma graczami,
-// ilu czeka (co najmniej minPlayers). Wyjście z kolejki (albo zamknięta karta) = zwrot wpisowego. W meczu wszystko liczy dm.mjs;
-// po meczu serwer rozdziela pulę (wpisowe wszystkich minus prowizja) na miejsca 1–3 według rankingu: zabójstwa, potem obrażenia.
+// ---------------- DEATHMATCH: jedno stałe, zawsze otwarte lobby (za darmo, do maxPlayers = 20 graczy) ----------------
+// Gracz łączy się z /ws i wysyła {t:'dmq', skin}. Jeśli w lobby jest wolne miejsce, od razu do niego wchodzi (odradza się w trwającej grze),
+// a jeśli jest komplet, dostaje błąd 'full'. Lobby nie ma końca: gracze wchodzą i wychodzą (Esc na ekranie śmierci, zamknięta karta).
+// Pokój powstaje przy pierwszym graczu (losowa mapa) i znika, gdy wyjdzie ostatni. Bez wpisowego i nagród – statystyki konta zapisują się przy wyjściu.
 let dmCfg = (() => { try { const r = q("SELECT value FROM config WHERE key='dm'").get(); return DM.sanitizeConfig(r ? JSON.parse(r.value) : {}); } catch { return DM.sanitizeConfig({}); } })();
-const dmQueues = new Map();                                     // tier -> [{ws, user, nick, skin, tier, entryId, lamports, price, t}]
-const dmRooms = new Set();
-const dmUsers = new Map();                                      // user.id -> wpis (w kolejce albo w meczu): jeden mecz/kolejka na gracza
+const dmRooms = new Set();                                      // najwyżej jedno lobby (Set zostaje dla panelu admina)
+const dmUsers = new Map();                                      // user.id -> wpis gracza w lobby: jedno lobby na konto
 let dmSeq = 0;
 const inDuel = (uid) => mmQueue.some((x) => x.user.id === uid) || [...rooms].some((r) => !r.over && r.p.some((p) => p.user.id === uid));
-function dmRefund(e, why) {
-  try {
-    tx(() => {
-      const row = q("SELECT * FROM dm_entries WHERE id=? AND state='queued'").get(e.entryId); if (!row) return;
-      q("UPDATE dm_entries SET state='refunded', ended=? WHERE id=?").run(Date.now(), row.id);
-      if (row.lamports > 0) {
-        q('UPDATE users SET lamports=lamports+? WHERE id=?').run(row.lamports, row.user_id);
-        const st = q("SELECT id FROM txs WHERE user_id=? AND type='stake' AND lamports=? AND t>=? ORDER BY t DESC, id DESC LIMIT 1").get(row.user_id, -row.lamports, row.t - 5000);
-        if (st) q('DELETE FROM txs WHERE id=?').run(st.id);
-      }
-    });
-  } catch (er) { console.error('[dm] zwrot wpisowego', er); }
-  if (why) console.log(`[dm] ${e.nick}: wyjście z kolejki ${e.tier.id} (${why})`);
-}
-function dmLeaveQueue(e, refund, why) {
-  const qu = dmQueues.get(e.tier.id) || []; const i = qu.indexOf(e); if (i < 0) return false;
-  qu.splice(i, 1); if (dmUsers.get(e.user.id) === e) dmUsers.delete(e.user.id); if (e.ws.dm === e) e.ws.dm = null;
-  if (refund) dmRefund(e, why);
-  dmQueueStatus(e.tier.id);
-  return true;
-}
-function dmQueueStatus(tierId) {
-  const qu = dmQueues.get(tierId) || [], now = Date.now(), wait = qu.length ? (now - qu[0].t) / 1000 : 0;
-  for (const e of qu) wsSend(e.ws, { t: 'dmq', n: qu.length, max: dmCfg.maxPlayers, min: dmCfg.minPlayers, wait: +wait.toFixed(1), timeout: dmCfg.queueTimeout, tier: tierId });
+const dmLobby = () => [...dmRooms][0] || null;
+const dmCount = () => { const r = dmLobby(); return r ? DM.playerCount(r.game) : 0; };
+function dmOpenLobby() {
+  const maps = dmMapsReady(dmCfg.maps), map = maps[Math.floor(Math.random() * maps.length)];
+  const key = Date.now().toString(36) + '-d' + (++dmSeq);
+  const room = { id: dmSeq, key, tier: dmCfg.tiers[0], entries: new Map(), game: DM.createRoom(dmCfg, map, nowS()) };
+  room.out = (pid, msg) => {
+    if (pid < 0) { const s = JSON.stringify(msg); for (const e of room.entries.values()) if (e.ws.readyState === 1) e.ws.send(s); return; }
+    const e = room.entries.get(pid); if (e) wsSend(e.ws, msg);
+  };
+  dmRooms.add(room);
+  console.log(`[dm] lobby ${key}: otwarte, mapa ${map}`);
+  return room;
 }
 function dmJoin(ws, user, m, arsChecked = false) {
   if (ws.dm || ws.mm) return wsSend(ws, { t: 'error', code: 'dup', message: 'Już szukasz meczu albo grasz.' });
   const u = fresh(user.id) || {};
   if (u.banned) return wsSend(ws, { t: 'error', code: 'banned', message: BANNED_MSG });
   if (inDuel(user.id)) return wsSend(ws, { t: 'error', code: 'dup', message: 'Grasz już mecz 1v1.' });
-  const tier = dmCfg.tiers.find((t) => t.id === String(m.tier || '')); if (!tier) return wsSend(ws, { t: 'error', code: 'tier', message: 'Nie ma takiego poziomu.' });
-  if (!arsChecked && arsenalWait(ws, user, () => { if (!ws.dm && !ws.mm) dmJoin(ws, user, m, true); })) return;   // Arsenał: najpierw aktualne saldo tokenu
+  if (!arsChecked && arsenalWait(ws, user, () => { if (!ws.dm && !ws.mm) dmJoin(ws, user, m, true); })) return;   // Ekwipunek: najpierw aktualne saldo
   const old = dmUsers.get(user.id);
-  if (old) {
-    if (old.room) return wsSend(ws, { t: 'error', code: 'dup', message: 'Grasz już mecz Deathmatch w innej karcie.' });
-    dmLeaveQueue(old, true, 'nowa karta'); wsSend(old.ws, { t: 'error', code: 'dup', message: 'Szukasz meczu w innej karcie.' });
-  }
-  let lam = 0, price = PRICE;
-  if (tier.entry > 0) {
-    if (!PRICE) return wsSend(ws, { t: 'error', code: 'price', message: 'Brak kursu SOL – spróbuj za chwilę.' });
-    lam = Math.round(tier.entry / PRICE * LAMPORTS_PER_SOL);
-  }
-  let entryId;
-  try {
-    entryId = tx(() => {
-      const cur = fresh(user.id); if (cur.lamports < lam) throw new E('funds', 'Za mało środków na wpisowe');
-      if (lam > 0) { q('UPDATE users SET lamports=lamports-? WHERE id=?').run(lam, user.id); addTx(user.id, 'stake', -lam, -tier.entry, { note: 'Deathmatch ' + tier.name }); }
-      return Number(q('INSERT INTO dm_entries(user_id,t,tier,entry_usd,lamports,price) VALUES(?,?,?,?,?,?)').run(user.id, Date.now(), tier.id, tier.entry, lam, price || 0).lastInsertRowid);
-    });
-  } catch (er) { return wsSend(ws, { t: 'error', code: er.code || 'funds', message: er.message || 'Za mało środków' }); }
-  const e = { ws, user, nick: user.username, skin: String(m.skin || '').slice(0, 64), tier, entryId, lamports: lam, price, t: Date.now(), room: null, pid: 0 };
-  if (!dmQueues.has(tier.id)) dmQueues.set(tier.id, []);
-  dmQueues.get(tier.id).push(e); dmUsers.set(user.id, e); ws.dm = e;
-  wsSend(ws, { t: 'dmqueued', tier: tier.id, account: publicUser(fresh(user.id)) });
-  dmQueueStatus(tier.id);
-  dmMatchmake();
-}
-// dobieranie: komplet od razu; po czasie oczekiwania najstarszego gracza – tylu, ilu jest (co najmniej minPlayers); puste pokoje nie powstają
-function dmMatchmake() {
-  const now = Date.now();
-  for (const [tierId, qu] of dmQueues) {
-    for (let i = qu.length - 1; i >= 0; i--) if (qu[i].ws.readyState !== 1) dmLeaveQueue(qu[i], true, 'rozłączony');
-    while (qu.length >= dmCfg.maxPlayers) dmStart(qu.splice(0, dmCfg.maxPlayers));
-    if (qu.length >= dmCfg.minPlayers && now - qu[0].t >= dmCfg.queueTimeout * 1000) dmStart(qu.splice(0, qu.length));
-  }
-}
-function dmStart(entries) {
-  const tier = entries[0].tier, cfg = dmCfg, maps = dmMapsReady(cfg.maps), map = maps[Math.floor(Math.random() * maps.length)];
-  const key = Date.now().toString(36) + '-d' + (++dmSeq);
-  let game;
-  try { game = DM.createRoom(cfg, map, entries.map((e) => ({ uid: e.user.id, nick: e.nick, skin: e.skin, guns: arsenalGuns(e.user.id, DM.DM_GUNS, e.lamports) })), nowS()); }
-  catch (er) { console.error('[dm] start pokoju', er); for (const e of entries) { dmRefund(e); dmUsers.delete(e.user.id); e.ws.dm = null; wsSend(e.ws, { t: 'error', code: 'start', message: 'Nie udało się utworzyć meczu – wpisowe wróciło.' }); } return; }
-  const room = { id: dmSeq, key, tier, entries, game, settled: false };
-  entries.forEach((e, i) => { e.pid = i + 1; e.room = room; });
-  room.byPid = new Map(entries.map((e) => [e.pid, e]));
-  room.out = (pid, msg) => {
-    if (pid < 0) { const s = JSON.stringify(msg); for (const e of room.entries) if (!e.gone && e.ws.readyState === 1) e.ws.send(s); return; }
-    const e = room.byPid.get(pid); if (e && !e.gone) wsSend(e.ws, msg);
-  };
-  dmRooms.add(room);
-  try { for (const e of entries) q("UPDATE dm_entries SET state='playing', room=?, map=?, players=? WHERE id=?").run(key, map, entries.length, e.entryId); } catch (er) { console.error('[dm] zapis pokoju', er); }
+  if (old) { wsSend(old.ws, { t: 'error', code: 'dup', message: 'Wszedłeś do Deathmatch w innej karcie.' }); dmPlayerGone(old, 'nowa karta'); }
+  if (dmCount() >= dmCfg.maxPlayers) return wsSend(ws, { t: 'error', code: 'full', message: `Lobby Deathmatch jest pełne (${dmCfg.maxPlayers}/${dmCfg.maxPlayers}). Spróbuj za chwilę.` });
+  let room = dmLobby();
+  if (!room) { try { room = dmOpenLobby(); } catch (er) { console.error('[dm] lobby', er); return wsSend(ws, { t: 'error', code: 'start', message: 'Nie udało się otworzyć lobby Deathmatch.' }); } }
+  const e = { ws, user, nick: user.username, skin: String(m.skin || '').slice(0, 64), room, pid: 0, entryId: 0 };
+  try { e.entryId = Number(q("INSERT INTO dm_entries(user_id,t,tier,entry_usd,lamports,price,state,room,map) VALUES(?,?,?,?,?,?,'playing',?,?)")
+    .run(user.id, Date.now(), room.tier.id, 0, 0, 0, room.key, room.game.mapName).lastInsertRowid); } catch (er) { console.error('[dm] zapis wejścia', er); }
   const t = nowS();
-  const ars = arsenalInfo();
-  for (const e of entries) wsSend(e.ws, { ...DM.startMessage(game, e.pid, t), ...(ars ? { ars } : {}) });
-  dmQueueStatus(tier.id);
-  console.log(`[dm] pokój ${key}: ${entries.length} graczy, poziom ${tier.id} ($${tier.entry}), mapa ${map}`);
+  e.pid = DM.addPlayer(room.game, { uid: user.id, nick: e.nick, skin: e.skin, guns: arsenalGuns(user.id, DM.DM_GUNS) }, t, room.out);   // pozostali dostają {t:'joined'} (nowy gracz jeszcze nie jest na liście)
+  room.entries.set(e.pid, e); dmUsers.set(user.id, e); ws.dm = e;
+  wsSend(ws, DM.startMessage(room.game, e.pid, t));
+  console.log(`[dm] lobby ${room.key}: ${e.nick} wszedł (${dmCount()}/${dmCfg.maxPlayers})`);
 }
-// rozliczenie: pula = wpisowe wszystkich (także tych, którzy wyszli) minus prowizja; podział na miejsca 1–3 (mniej graczy = podział tylko na tych, którzy są)
-function dmSettle(room) {
-  if (room.settled) return; room.settled = true;
-  const g = room.game, cfg = g.cfg, res = g.results || [];
-  const pot = room.entries.reduce((a, e) => a + e.lamports, 0), fee = Math.round(pot * cfg.houseFee), dist = pot - fee;
-  const podium = g.podium || [], split = cfg.prizeSplit.slice(0, podium.length), sum = split.reduce((a, b) => a + b, 0) || 1;
-  const pay = new Map(); podium.forEach((pid, i) => pay.set(pid, Math.floor(dist * split[i] / sum)));
-  const prizesUsd = {};
+// gracz wychodzi z lobby (sam, rozłączony albo wyrzucony przez dm.mjs): wpis i statystyki konta z wyniku serwera
+function dmPlayerGone(e, why, stats) {
+  const room = e.room; if (!room || e.gone) return;
+  e.gone = true;
+  if (!stats) { DM.leave(room.game, e.pid, nowS(), room.out, why); const r = room.game.removed.findIndex((x) => x.pid === e.pid); if (r >= 0) stats = room.game.removed.splice(r, 1)[0].stats; }
+  room.entries.delete(e.pid);
+  if (dmUsers.get(e.user.id) === e) dmUsers.delete(e.user.id); if (e.ws.dm === e) e.ws.dm = null;
+  const s = stats || {};
   try {
     tx(() => {
-      for (const e of room.entries) {
-        const r = res.find((x) => x.pid === e.pid) || {}, lam = pay.get(e.pid) || 0, usd = e.price ? Math.round(lam / 1e9 * e.price * 100) / 100 : 0;
-        const state = e.gone || r.left ? 'left' : lam > 0 || (r.place >= 1 && r.place <= 3) ? 'won' : 'lost';
-        q('UPDATE dm_entries SET state=?, rank=?, place=?, kills=?, deaths=?, damage=?, payout_lamports=?, fee_lamports=?, ended=? WHERE id=?')
-          .run(state, r.rank || null, r.place || 0, r.kills || 0, r.deaths || 0, r.damage || 0, lam, e.pid === podium[0] ? fee : 0, Date.now(), e.entryId);
-        if (lam > 0) { q('UPDATE users SET lamports=lamports+? WHERE id=?').run(lam, e.user.id); addTx(e.user.id, 'win', lam, usd, { note: `Deathmatch · ${r.place}. miejsce` }); }
-        else if (e.lamports > 0) addTx(e.user.id, 'loss', 0, 0, { note: `Deathmatch · ${r.rank || '-'}. miejsce` });
-        prizesUsd[e.pid] = usd;
-        // statystyki konta z wyniku serwera (nie z przeglądarki)
-        const u = fresh(e.user.id); if (u) { const st = JSON.parse(u.stats || '{}');
-          for (const [k, v] of [['shots', r.shots], ['hits', r.hits], ['heads', r.heads], ['kills', r.kills], ['deaths', r.deaths]]) if (v > 0) st[k] = (st[k] || 0) + v;
-          q('UPDATE users SET stats=?, last_active=? WHERE id=?').run(JSON.stringify(st), Date.now(), u.id); }
-      }
+      if (e.entryId) q("UPDATE dm_entries SET state='played', kills=?, deaths=?, damage=?, players=?, ended=? WHERE id=?").run(s.kills || 0, s.deaths || 0, s.damage || 0, room.game.nextPid, Date.now(), e.entryId);
+      const u = fresh(e.user.id); if (u) { const st = JSON.parse(u.stats || '{}');
+        for (const [k, v] of [['shots', s.shots], ['hits', s.hits], ['heads', s.heads], ['kills', s.kills], ['deaths', s.deaths]]) if (v > 0) st[k] = (st[k] || 0) + v;
+        q('UPDATE users SET stats=?, last_active=? WHERE id=?').run(JSON.stringify(st), Date.now(), u.id); }
     });
-  } catch (er) { console.error('[dm] rozliczenie', er); }
-  const top = podium.map((pid, i) => { const e = room.byPid.get(pid); return `${i + 1}. ${e ? e.nick : '?'}`; }).join(', ');
-  console.log(`[dm] pokój ${room.key}: koniec – ${top}; pula ${pot / LAMPORTS_PER_SOL} SOL, prowizja ${fee / LAMPORTS_PER_SOL} SOL`);
-  if (g.log.length) console.log(`[dm] pokój ${room.key}: odrzucone ruchy (${g.log.length}):`, g.log.slice(-10).join(' | '));
-  const end = DM.endMessage(g, prizesUsd);
-  for (const e of room.entries) if (!e.gone) wsSend(e.ws, { ...end, you: e.pid, account: publicUser(fresh(e.user.id)) });
-}
-function dmClose(room) {
-  dmRooms.delete(room);
-  for (const e of room.entries) { if (dmUsers.get(e.user.id) === e) dmUsers.delete(e.user.id); if (e.ws.dm === e) e.ws.dm = null; }
-}
-function dmPlayerGone(e, why) {
-  const room = e.room; if (!room || e.gone) return;
-  e.gone = true; DM.leave(room.game, e.pid, nowS(), room.out);
-  if (dmUsers.get(e.user.id) === e) dmUsers.delete(e.user.id); if (e.ws.dm === e) e.ws.dm = null;
-  console.log(`[dm] pokój ${room.key}: ${e.nick} wyszedł (${why})`);
+  } catch (er) { console.error('[dm] zapis wyjścia', er); }
+  console.log(`[dm] lobby ${room.key}: ${e.nick} wyszedł (${why}) – zostało ${DM.playerCount(room.game)}`);
+  if (!DM.playerCount(room.game)) { dmRooms.delete(room); console.log(`[dm] lobby ${room.key}: puste – zamknięte`); }
 }
 function onDmMessage(ws, user, m) {
   if (m.t === 'dmq') return dmJoin(ws, user, m);
-  const e = ws.dm; if (!e) return;
-  if (m.t === 'dmc') { if (!e.room) { dmLeaveQueue(e, true, 'anulowane'); wsSend(ws, { t: 'dmcancelled' }); } return; }
-  if (!e.room || e.gone) return;
-  if (m.t === 'leave') { dmPlayerGone(e, 'wyjście'); return; }
+  const e = ws.dm; if (!e || e.gone) return;
+  if (m.t === 'leave' || m.t === 'dmc') { dmPlayerGone(e, 'wyjście'); return; }
   DM.handleMessage(e.room.game, e.pid, m, nowS(), e.room.out);
 }
 setInterval(() => {
   const t = nowS();
   for (const room of dmRooms) {
     DM.tick(room.game, t, room.out);
-    for (const e of room.entries) { const p = room.game.p.get(e.pid); if (p && p.kickedOut && !e.gone) { e.gone = true; if (e.ws.dm === e) e.ws.dm = null; dmUsers.delete(e.user.id); } }
-    if (room.game.phase === 'end' && !room.settled) dmSettle(room);
-    if (room.game.over) dmClose(room);
+    // wyrzuceni przez serwer trybu (antycheat, za długo na ekranie śmierci)
+    for (const r of room.game.removed.splice(0)) { const e = room.entries.get(r.pid); if (e) dmPlayerGone(e, r.why, r.stats); }
   }
 }, 50);
-setInterval(() => { dmMatchmake(); for (const id of dmQueues.keys()) dmQueueStatus(id); }, 1000);
 
 wss.on('connection', (ws, req, user) => {
   ws.alive = true; ws.on('pong', () => { ws.alive = true; });
@@ -1050,7 +1001,7 @@ wss.on('connection', (ws, req, user) => {
     } catch (e) { console.error(`[ws] wiadomość od ${user.id} odrzucona:`, e && e.message); }
   });
   ws.on('close', () => {
-    const e = ws.dm; if (e) { if (!e.room) dmLeaveQueue(e, true, 'zamknięta karta'); else dmPlayerGone(e, 'rozłączony'); }
+    const e = ws.dm; if (e) dmPlayerGone(e, 'rozłączony');
     const me = ws.mm; if (!me) return;
     if (!me.room) leaveQueue(ws, true);                           // zamknięta karta w trakcie szukania: zwrot stawki
     else if (!me.room.over) endRoom(me.room, 1 - me.seat, 'left');   // wyjście z meczu: wygrywa przeciwnik
@@ -1089,7 +1040,7 @@ async function handleHttp(req, res) {
     }
   }
   const key = req.method + ' ' + url.pathname, h = routes[key];
-  if (!h && req.method === 'GET' && !url.pathname.startsWith('/api/')) return serveGame(url.pathname, res);
+  if (!h && req.method === 'GET' && !url.pathname.startsWith('/api/')) return serveGame(url.pathname, res, req);
   if (!h) return send(res, 404, { error: 'not_found', message: 'Nie ma takiej ścieżki' }, origin);
   try {
     const body = req.method === 'POST' ? await readBody(req) : {};

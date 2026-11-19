@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node build_game.mjs ../zrodla ../index.html"
+    "build": "node build_game.mjs ../zrodla ../index.html",
+    "build:offline": "node build_game.mjs ../zrodla ../gra-offline.html --offline"
   },
   "devDependencies": {
     "esbuild": "0.24.0",

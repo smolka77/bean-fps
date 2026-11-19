@@ -671,7 +671,7 @@ const X_BTN = `<button class="lb-x" type="button" aria-label="Zamknij">${IC.x}</
 const HTML = `
 <div class="lb-shade"></div>
 <header class="lb-top">
-  <div class="lb-logo"><b>GTA</b>SSAULT</div>
+  <div class="lb-logo"><b>GTASSAULT</b></div>
   <div class="lb-sp"></div>
   <div class="lb-lang"><button class="lb-chip lb-lchip" id="lb-langbtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Language"><i class="lb-flag" id="lb-langflag"></i><b id="lb-langcode">EN</b><svg class="lb-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4.5 6 8.5 10 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
     <div class="lb-langmenu" id="lb-langmenu" role="menu" hidden></div></div>
@@ -754,7 +754,7 @@ const HTML = `
   <aside class="lb-aart" id="lb-aart" aria-hidden="true">
     <div class="lb-abg" id="lb-abg"></div>
     <div class="lb-ashade"></div>
-    <div class="lb-atop"><div class="lb-alogo"><b>GTA</b>SSAULT</div><p data-i18n="auth.tag"></p></div>
+    <div class="lb-atop"><div class="lb-alogo"><b>GTASSAULT</b></div><p data-i18n="auth.tag"></p></div>
     <ul class="lb-afeat"><li><i>🏆</i><span data-i18n="auth.f1"></span></li><li><i><svg viewBox="0 0 398 312" width="14" height="11"><defs><linearGradient id="lbasol" x1="361" y1="-37" x2="141" y2="383" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#00ffa3"/><stop offset="1" stop-color="#dc1fff"/></linearGradient></defs><g fill="url(#lbasol)"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1z"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1z"/></g></svg></i><span data-i18n="auth.f2"></span></li><li><i>⚡</i><span data-i18n="auth.f3"></span></li></ul>
   </aside>
   <div class="lb-aform">
@@ -958,6 +958,10 @@ export const BUILTIN_SKINS = [
 ];
 // skiny z kreatora: najpierw te wbudowane w plik gry (skins-data.js), potem lobby wczytuje aktualne ./skins.json z repo
 export const SKINS = [...BUILTIN_SKINS, ...CUSTOM_SKINS];
+// skins.json z serwera: jedno pobranie na stronę (lobby i gra dzielą wynik); cache 'no-cache' = przeglądarka pyta serwer,
+// czy plik się zmienił (304 bez treści), więc nowe skiny widać od razu po odświeżeniu, a niezmieniony plik nie leci ponownie
+let skinsJsonP = null;
+export const loadSkinsJson = () => skinsJsonP || (skinsJsonP = fetch('./skins.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null));
 const SKIN_GLSL = `uniform float uPat,uRim,uHasTex;uniform vec3 uC2,uC3,uRimC;uniform sampler2D uTex;uniform vec4 uProj;uniform float uVmap[129],uVmapOn;varying vec3 vObj;
   float skinV(float y){float t=clamp((y-uProj.z)/(uProj.w-uProj.z),0.,1.);if(uVmapOn<.5)return t;t*=128.;int i=int(min(floor(t),127.));return mix(uVmap[i],uVmap[i+1],t-float(i));}
   float h3(vec3 p){return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453);}
@@ -1031,7 +1035,7 @@ function skinIcon(sk) {
 const DEFAULT_MODES = [
   { id: 'range', name: 'Strzelnica', desc: 'Solo · strzelnica w bunkrze, tarcze-fasolki', icon: 'range', tag: 'SOLO' },
   { id: '1v1', name: '1v1', desc: 'Mapa Bagno · bot · do 5 trafień', icon: 'duel', tag: '1 NA 1' },
-  { id: 'dm', name: 'Deathmatch', desc: 'Do 20 graczy · 3 minuty · top 3 wygrywa', icon: 'dm', tag: 'FFA' },
+  { id: 'dm', name: 'Deathmatch', desc: 'Za darmo · do 20 graczy · wchodzisz kiedy chcesz', icon: 'dm', tag: 'FFA' },
   // tryb „Z botem” schowany (kod trybu zostaje w grze); żeby go przywrócić, dopisz kafelek:
   // { id: 'bot', name: 'Z botem', desc: 'Trening 1 na 1 · bez stawki i serwera · do 3 wygranych rund', icon: 'bot', tag: 'BOT' },
 ];
@@ -1040,7 +1044,9 @@ const DEFAULT_MODES = [
 function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
 
 export function createLobby({ renderer, bean, animate = () => {}, onPlay = () => {}, onSkin = () => {}, modes = DEFAULT_MODES, skins: skinsIn = SKINS, weaponArt = null }) {
-  let skins = skinsIn.slice();
+  const BASIC_IDS = new Set(BUILTIN_SKINS.map(k => k.id));   // podstawowe skiny to tylko zapas: w wyborze skinów są same skiny z kreatora
+  const noBasic = l => { const c = l.filter(k => !BASIC_IDS.has(k.id)); return c.length ? c : l; };
+  let skins = noBasic(skinsIn.slice());
   const rnd = rng(7);
   const R = (a, b) => a + (b - a) * rnd();
 
@@ -1479,15 +1485,14 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   const BUILTIN_IDS = new Set(BUILTIN_SKINS.map(k => k.id));
   // podmienia skiny z kreatora (z skins.json albo z panelu admina) i od razu przebudowuje kafelki
   const setCustomSkins = list => {
-    skins = [...BUILTIN_SKINS, ...list.filter(k => k && k.id && !BUILTIN_IDS.has(k.id))];
+    skins = noBasic([...BUILTIN_SKINS, ...list.filter(k => k && k.id && !BUILTIN_IDS.has(k.id))]);
     const want = skins.find(k => k.id === store.get('fasolka-skin'));
     if (want && want !== skin) setSkin(want, true);
     else if (!skins.some(k => k.id === skin.id)) setSkin(skins[0], true);
     else { const same = skins.find(k => k.id === skin.id); if (same !== skin) setSkin(same, true); }
     buildSkinGrid();
   };
-  fetch('./skins.json?v=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.json() : null)
-    .then(list => { if (Array.isArray(list)) setCustomSkins(list); }).catch(() => {});
+  loadSkinsJson().then(list => { if (Array.isArray(list)) setCustomSkins(list); }).catch(() => {});
   addEventListener('fasolka:skins', e => { if (Array.isArray(e.detail)) setCustomSkins(e.detail); });   // panel admina: podgląd zmian na żywo
   const openSkins = () => { skinPanel.hidden = false; picker.hidden = true; };
   const closeSkins = () => { skinPanel.hidden = true; };

@@ -1,4 +1,4 @@
-// Deathmatch – sceny 3D poza areną: sklep po śmierci (pokaz broni / pancerza i fasolka gracza) oraz podium po meczu
+// Deathmatch – sceny 3D poza areną: podium po meczu
 // (trzy miejsca, każdy z trójki tańczy własną emotkę, konfetti). Rysuje je ten sam renderer co grę, z własną kamerą.
 import * as THREE from 'three';
 
@@ -92,51 +92,6 @@ function floorMat(c1, c2) {
   const g = x.createRadialGradient(128, 128, 10, 128, 128, 128); g.addColorStop(0, c1); g.addColorStop(1, c2); x.fillStyle = g; x.fillRect(0, 0, 256, 256);
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
   return new THREE.MeshStandardMaterial({ map: t, roughness: 0.35, metalness: 0.2 });
-}
-
-// ---------------- sklep ----------------
-export function createShopScene(ctx) {
-  const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0b0b0f); scene.fog = new THREE.Fog(0x0b0b0f, 9, 22);
-  const cam = new THREE.PerspectiveCamera(32, 16 / 9, 0.05, 60); cam.position.set(4.6, 1.25, 0.25); cam.lookAt(0, 1.05, 0.25);
-  scene.add(new THREE.HemisphereLight(0xd8d8ff, 0x181820, 0.75));
-  const key = new THREE.SpotLight(0xffffff, 40, 14, 0.55, 0.6, 1.4); key.position.set(3.5, 5, 1.5); key.target.position.set(0, 1, 0); key.castShadow = true; key.shadow.mapSize.set(1024, 1024); scene.add(key, key.target);
-  const rimP = new THREE.PointLight(0xff4fa3, 9, 9, 1.6); rimP.position.set(-2.2, 2.2, 2.6); scene.add(rimP);
-  const rimC = new THREE.PointLight(0x47d6ff, 6, 9, 1.6); rimC.position.set(-2.2, 1.6, -2.8); scene.add(rimC);
-  scene.add(new THREE.DirectionalLight(0xffffff, 0.6).translateX(4).translateY(2));
-  const floor = new THREE.Mesh(new THREE.CircleGeometry(9, 48), floorMat('#2a2a33', '#0b0b0f')); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
-  // neonowa linia na podłodze (styl Vice)
-  const ring = new THREE.Mesh(new THREE.RingGeometry(1.55, 1.6, 64), new THREE.MeshBasicMaterial({ color: 0xff4fa3, transparent: true, opacity: 0.55, fog: false }));
-  ring.rotation.x = -Math.PI / 2; ring.position.set(-3.2, 0.005, -2.75); scene.add(ring);
-  // fasolka gracza (po prawej z tyłu) w aktualnym wyposażeniu
-  const bean = ctx.makeBean(ctx.color()); bean.position.set(-3.2, 0, -2.75); bean.rotation.y = -Math.PI / 2 - 0.55; bean.traverse((o) => { if (o.isMesh) o.castShadow = true; }); scene.add(bean);
-  ctx.gear(bean);
-  // pokaz: broń obracająca się na środku albo fasolka w pancerzu
-  const stage = new THREE.Group(); stage.position.set(0, 1.18, 0.55); scene.add(stage);
-  const guns = {}; let cur = null, curId = '', tAnim = 0, spinT = 0;
-  const armorBean = ctx.makeBean(ctx.color()); armorBean.visible = false; armorBean.position.set(0.2, 0, 0.55); armorBean.rotation.y = -Math.PI / 2 + 0.35; scene.add(armorBean); ctx.gear(armorBean);
-  function gunModel(id) {
-    if (guns[id]) return guns[id];
-    const w = ctx.createWeapon(id, { fx: false }), g = w.group; const box = new THREE.Box3().setFromObject(g), len = box.max.z - box.min.z || 1;
-    const k = (w.pistol ? 1.2 : 2.6) / len; g.scale.setScalar(k);
-    const c = box.getCenter(V3()); const holder = new THREE.Group(); g.position.set(-c.x * k, -c.y * k, -c.z * k); holder.add(g);
-    holder.traverse((o) => { if (o.isMesh) o.castShadow = true; }); guns[id] = holder; return holder;
-  }
-  function preview(id) {
-    if (id === curId) return; curId = id; tAnim = 0;
-    if (cur) stage.remove(cur); cur = null; armorBean.visible = false;
-    if (id === 'vest' || id === 'helmet') { armorBean.visible = true; armorBean.userData.gear.set(true, id === 'helmet'); return; }
-    cur = gunModel(id); stage.add(cur);
-  }
-  function setLoadout(color, armor, helmet, skin) { if (skin) ctx.skin(bean, skin); bean.userData.gear.set(armor > 0, helmet && armor > 0); if (skin) ctx.skin(armorBean, skin); }
-  function render(renderer, dt) {
-    tAnim += dt; spinT += dt;
-    const w = renderer.domElement.width, h = renderer.domElement.height; if (w && h && Math.abs(cam.aspect - w / h) > 1e-3) { cam.aspect = w / h; cam.updateProjectionMatrix(); }
-    if (cur) { cur.rotation.y = Math.sin(spinT * 0.6) * 0.35; cur.rotation.x = Math.sin(spinT * 0.45) * 0.05; cur.position.y = Math.sin(spinT * 1.1) * 0.02; const s = Math.min(1, tAnim * 4); cur.scale.setScalar(0.85 + 0.15 * s); }
-    if (armorBean.visible) { armorBean.rotation.y = -Math.PI / 2 + 0.35 + Math.sin(spinT * 0.6) * 0.5; EMOTES.idle(ctx, armorBean, spinT); }
-    EMOTES.idle(ctx, bean, spinT + 1.3);
-    renderer.render(scene, cam);
-  }
-  return { preview, setLoadout, render };
 }
 
 // ---------------- podium ----------------

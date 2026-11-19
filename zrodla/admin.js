@@ -34,7 +34,7 @@ const CSS = `
 #fa-admin .fa-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px}
 #fa-admin .fa-brand{display:flex;align-items:baseline;gap:12px}
 #fa-admin .fa-brand b{font:400 30px/1 Anton,Oswald,Impact,sans-serif;letter-spacing:.04em;transform:skewX(-6deg)}
-#fa-admin .fa-brand b i{color:var(--acc);font-style:normal}
+#fa-admin .fa-brand b{font-family:Anton,Impact,'Arial Narrow Bold',sans-serif;background:linear-gradient(100deg,#ff2e93 0%,#ff5470 48%,#ff9a3c 100%);-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.05em}
 #fa-admin .fa-brand span{font:700 20px/1 Rajdhani,Oswald,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
 #fa-admin .fa-live{display:inline-flex;align-items:center;gap:7px;font:600 12px/1 Inter,sans-serif;color:var(--mut);padding:6px 10px;border:1px solid var(--line2);border-radius:999px}
 #fa-admin .fa-live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--mut)}
@@ -227,7 +227,7 @@ export async function openAdmin({ onClose } = {}) {
   const onKey = e => { if (e.key !== 'Escape' || !root) return; const rp = root.querySelector('.fa-rp'), d = root.querySelector('.fa-drw');
     if (rp && !rp.hidden) rp.querySelector('[data-rpx]').click(); else if (d && !d.hidden) d.hidden = true; else close(); };
   addEventListener('keydown', onKey); cleanup.push(() => removeEventListener('keydown', onKey));
-  root.innerHTML = `<div class="fa-wrap"><div class="fa-head"><div class="fa-brand"><b><i>GTA</i>SSAULT</b><span>Panel admina</span></div><div class="fa-sp"></div>
+  root.innerHTML = `<div class="fa-wrap"><div class="fa-head"><div class="fa-brand"><b>GTASSAULT</b><span>Panel admina</span></div><div class="fa-sp"></div>
     <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div><p class="fa-empty">Ładowanie danych…</p></div>`;
   root.querySelector('[data-close]').addEventListener('click', close);
 
@@ -300,7 +300,7 @@ async function srvGet(p) {
 const DM_FIELDS = [
   ['Mecz', [['maxPlayers', 'Graczy w meczu (max)', 1], ['minPlayers', 'Najmniej graczy do startu', 1], ['queueTimeout', 'Czekanie w kolejce (s)', 1], ['duration', 'Czas meczu (s)', 1], ['startDelay', 'Odliczanie przed startem (s)', 0.5], ['endDelay', 'Podium po meczu (s)', 1]]],
   ['Kasa meczu i WANTED', [['startMoney', 'Kasa na start ($)', 10], ['killReward', 'Nagroda za zabójstwo ($)', 10], ['wantedMult', 'Mnożnik za WANTED (×)', 0.5], ['wantedMinKills', 'WANTED od zabójstw', 1]]],
-  ['Odrodzenie i sklep', [['spawnProtect', 'Ochrona po odrodzeniu (s)', 0.5], ['minDeathTime', 'Ekran WASTED (s)', 0.1], ['shopTimeout', 'Sklep – powrót sam po (s)', 1]]],
+  ['Odrodzenie', [['spawnProtect', 'Ochrona po odrodzeniu (s)', 0.5], ['minDeathTime', 'Ekran WASTED (s)', 0.1], ['idleDead', 'Ekran śmierci – powrót do lobby po (s)', 5]]],
   ['Nagrody (pula = wpisowe graczy)', [['houseFee', 'Prowizja (0–0,5)', 0.01], ['prizeSplit.0', '1. miejsce (część puli)', 0.05], ['prizeSplit.1', '2. miejsce', 0.05], ['prizeSplit.2', '3. miejsce', 0.05]]],
   ['Pancerz', [['armor.vest.price', 'Kamizelka – cena ($)', 50], ['armor.vest.hp', 'Kamizelka – punkty', 5], ['armor.helmet.price', 'Kamizelka + hełm – cena ($)', 50], ['armor.helmet.hp', 'Kamizelka + hełm – punkty', 5], ['armor.helmet.headMult', 'Hełm – obrażenia głowy (×)', 0.05]]],
 ];
@@ -371,7 +371,7 @@ function mountDeathmatch($) {
   async function pull() {
     try {
       const j = await srvGet('/api/admin/dm'); defs = j.defaults; if (!cfg) { cfg = JSON.parse(JSON.stringify(j.config)); render(); }
-      $('fa-dm-live').textContent = `kolejki: ${j.queues.map((q) => `${q.name} ${q.n}`).join(' · ')} · trwające mecze: ${j.rooms.length}${j.rooms.length ? ' (' + j.rooms.map((r) => `${r.map} ${r.players} gr., ${r.left} s`).join(', ') + ')' : ''}`;
+      $('fa-dm-live').textContent = j.rooms.length ? 'lobby: ' + j.rooms.map((r) => `${r.map}, ${r.players}/${cfg.maxPlayers} graczy`).join(', ') : 'lobby: puste (otworzy się przy pierwszym graczu)';
       $('fa-dm-recent').innerHTML = j.recent.length ? j.recent.map((r) => `<li><div><b>${esc(r.map || '—')} · ${esc(r.tier)} · ${r.players} graczy</b><small>${new Date(r.t).toLocaleString('pl-PL')} · pula $${r.pot.toFixed(2)} · wypłacone $${r.paid.toFixed(2)}</small></div>
         <span class="mut">${r.top.map((x) => `${x.place}. ${esc(x.name)} (${x.kills} K, ${x.damage} DMG${x.prize ? ', $' + x.prize.toFixed(2) : ''})`).join(' · ')}</span></li>`).join('') : '<li class="fa-empty">Jeszcze nie było meczów.</li>';
     } catch (e) { if (e.code === 'admin2fa') return relockAdmin(); box.innerHTML = `<p class="fa-empty">${esc(e.message)}</p>`; }
@@ -516,7 +516,7 @@ function relockAdmin() { admTok.set(''); cleanup.forEach(f => { try { f(); } cat
 
 function buildDashboard(db, close) {
   root.innerHTML = `<div class="fa-wrap">
-    <div class="fa-head"><div class="fa-brand"><b><i>GTA</i>SSAULT</b><span>Panel admina</span></div><span class="fa-live" id="fa-live">Łączenie…</span><div class="fa-sp"></div>
+    <div class="fa-head"><div class="fa-brand"><b>GTASSAULT</b><span>Panel admina</span></div><span class="fa-live" id="fa-live">Łączenie…</span><div class="fa-sp"></div>
       ${SRV ? '<button class="fa-btn" type="button" id="fa-lock" title="Kończy sesję panelu – następne wejście wymaga loginu, hasła i kodu 2FA">Wyloguj z panelu</button>' : ''}
       <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div>
     <p class="fa-note" id="fa-note" hidden></p>
