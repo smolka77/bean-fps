@@ -816,6 +816,18 @@ const ART = {
       ${glyph(u, 162, 131, 86, 'VS', `url(#gold${u})`, '#3a1a04')}
       ${finish(u)}</svg>`;
   },
+  bot() {
+    // zielony „ekran” z siatką i dużym napisem trybu w języku gry
+    const u = ++artN;
+    return `<svg class="art" viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice"><defs>${DEFS(u)}
+      <linearGradient id="bg${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3fe0a0"/><stop offset=".5" stop-color="#119a74"/><stop offset="1" stop-color="#063c3a"/></linearGradient></defs>
+      <rect width="320" height="200" fill="url(#bg${u})"/>${stripes(18, .06)}${halftone(u)}
+      <g stroke="#fff" stroke-opacity=".13" stroke-width="2">${Array.from({ length: 9 }, (_, i) => `<line x1="${i * 40}" y1="0" x2="${i * 40}" y2="200"/>`).join('')}${Array.from({ length: 6 }, (_, i) => `<line x1="0" y1="${i * 40}" x2="320" y2="${i * 40}"/>`).join('')}</g>
+      <g fill="#fff" fill-opacity=".2"><circle cx="40" cy="40" r="5"/><circle cx="280" cy="160" r="5"/><circle cx="240" cy="40" r="4"/><circle cx="80" cy="160" r="4"/></g>
+      <rect width="320" height="200" fill="url(#hl${u})"/>
+      ${(() => { const w = String(tr('mode.bot.name')).toUpperCase().replace(/[<&>"]/g, ''), fs = Math.min(62, Math.round(600 / Math.max(w.length, 1) * (/[А-яЁё]/.test(w) ? .76 : 1))); return bigText(u, 100, fs, w, '<tspan fill="url(#slv' + u + ')">' + w + '</tspan>', '#053027'); })()}
+      ${finish(u)}</svg>`;
+  },
   soon() {
     const u = ++artN;
     return `<svg class="art" viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice"><defs>${DEFS(u)}
@@ -918,8 +930,8 @@ function skinIcon(sk) {
 }
 const DEFAULT_MODES = [
   { id: 'range', name: 'Strzelnica', desc: 'Solo · zestrzel czerwone fasolki', icon: 'range', tag: 'SOLO' },
-  { id: '1v1', name: '1v1', desc: 'Mapa Oaza · bot · do 5 trafień', icon: 'duel', tag: '1 NA 1' },
-  { soon: true },
+  { id: '1v1', name: '1v1', desc: 'Mapa Bagno · bot · do 5 trafień', icon: 'duel', tag: '1 NA 1' },
+  { id: 'bot', name: 'Z botem', desc: 'Trening 1 na 1 · bez stawki i serwera · do 3 wygranych rund', icon: 'bot', tag: 'BOT' },
 ];
 
 // deterministyczny generator losowy, żeby las wyglądał zawsze tak samo
@@ -955,7 +967,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
     $('lb-mode-name').textContent = mName(mode); $('lb-mode-desc').textContent = mDesc(mode);
     $('lb-mode-ic').innerHTML = ART[mode.icon] ? ART[mode.icon]() : '';
     // napisy na obrazkach trybów (Strzelnica, Wkrótce) są w języku gry – po zmianie języka rysujemy je od nowa
-    const lk = tr('mode.range.name') + '|' + tr('soon.art');
+    const lk = tr('mode.range.name') + '|' + tr('mode.bot.name') + '|' + tr('soon.art');
     if (tiles._lk !== lk) { tiles._lk = lk; tiles.querySelectorAll('.lb-tile[data-icon]').forEach(t => { const a = t.querySelector('svg.art'); if (a && ART[t.dataset.icon]) a.outerHTML = ART[t.dataset.icon](); }); }
     tiles.querySelectorAll('.lb-tile').forEach(t => {
       if (t.dataset.id) { const m = modes.find(x => x.id === t.dataset.id); t.classList.toggle('sel', m === mode); t.setAttribute('aria-pressed', m === mode);

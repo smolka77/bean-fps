@@ -11,7 +11,9 @@ Pobierz go i otwórz dwuklikiem w Chrome, Edge albo Firefoksie. Działa bez serw
 - **Tryby:**
   - **Strzelnica:** trening solo z celami-fasolkami i tablicą ustawień.
   - **1v1:** mecz z botem do 3 wygranych rund, na jednej z trzech map.
-- **Mapy:** Oaza, Magazyn, Baza, Strzelnica.
+- **Mapy:** Bagno (dawna Oaza), Magazyn, Zatoka (dawna Baza), Strzelnica.
+  Bagno to miasteczko z drewnianych chat na mokradłach (cyprysy z mchem, trzciny, aligatory), Zatoka to neonowy port o zachodzie słońca
+  (ocean, panorama wieżowców, palmy, diabelski młyn). Wygląd tych dwóch map ustawia `zrodla/klimaty.js`: tylko grafika, kolizje i spawny są te same.
 - **Bronie:** AK-47, M4A1-S, Glock-18, USP-S (z oglądaniem broni pod klawiszem F).
 
 Sterowanie: WASD ruch, Shift bieg, Spacja skok, C kucanie/slide, LPM strzał, PPM celowanie, R przeładowanie,

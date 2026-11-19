@@ -265,6 +265,7 @@ import {createLobby,applySkin,SKINS} from './lobby.js';
 import {payout,t as i18n,getLang,mapName} from './lobby-ui.js';
 import {srvText} from './wallet.js';   // komunikaty serwera w języku gry   // i18n: słownik lobby (PL/EN/RU/ES) – menu pauzy
 import {loader} from './loader.js';
+import {createClimates} from './klimaty.js';   // wygląd map 1v1: Baza = neonowa zatoka o zachodzie słońca, Oaza = bagno
 import {createMatch} from './match.js';
 import {createNet} from './net.js';
 import {createRange} from './range.js';
@@ -291,7 +292,7 @@ document.body.prepend(renderer.domElement);
 const scene=new THREE.Scene();
 const SKY=0x9cc3e4;
 scene.background=new THREE.Color(SKY);scene.fog=new THREE.Fog(SKY,35,130);
-scene.add(new THREE.HemisphereLight(0xffffff,0x5c6470,1.45));
+const hemi=new THREE.HemisphereLight(0xffffff,0x5c6470,1.45);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff2dd,2.3);
 sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.bias=-0.0004;
 Object.assign(sun.shadow.camera,{left:-22,right:22,top:22,bottom:-22,near:1,far:80});
@@ -299,6 +300,7 @@ scene.add(sun,sun.target);
 // odbicia PBR (metal broni) z mapy otoczenia; światła świecą też na warstwie 1 (broń w widoku z pierwszej osoby)
 {const pm=new THREE.PMREMGenerator(renderer);scene.environment=pm.fromScene(new RoomEnvironment(),.04).texture;scene.environmentIntensity=.38;pm.dispose()}
 scene.traverse(o=>{if(o.isLight)o.layers.enable(1)});
+const climates=createClimates({scene,hemi,sun});   // niebo, mgła i światło zależne od mapy (domyślne: lobby, Magazyn, Strzelnica)
 const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.03,300);
 scene.add(camera);
 // kamera broni w FPS: ten sam punkt widzenia, ale stały kąt widzenia – broń nie rozciąga się przy zmianach FOV świata
@@ -873,7 +875,7 @@ function pmShow(v){$('pmMenu').hidden=v!=='menu';$('pmSet').hidden=v!=='set';$('
   $('pmTag').textContent=v==='set'?i18n('set.title').toUpperCase():v==='quit'?i18n('pm.tagQuit'):pmTag();
   if(v==='set'){const s={volume:80,vGame:100,fov:78,sens:SENS_K,sensAds:SENS_ADS,...readSet()};for(const r of $('pmRows').children)if(r._fill)r._fill(s)}
 }
-function pmTag(){return MODE==='1v1'?i18n('tag.1v1')+(oaza.map?' · '+mapName(oaza.map.name).toUpperCase():''):i18n('mode.range.name').toUpperCase()}
+function pmTag(){return MODE==='1v1'?(BOT.on?i18n('tag.bot'):i18n('tag.1v1'))+(oaza.map?' · '+mapName(oaza.map.name).toUpperCase():''):i18n('mode.range.name').toUpperCase()}
 // napisy menu pauzy w języku lobby (statyczny HTML jest po polsku) – przy każdym otwarciu menu i przy setPauseText
 function pmI18n(){
   const sp=(id,sel,k,html)=>{const el=$(id)&&(sel?$(id).querySelector(sel):$(id));if(el)el[html?'innerHTML':'textContent']=html?k:i18n(k)};
@@ -1357,7 +1359,7 @@ function stepEnemies(dt){
   if(range.active){range.update(dt,playing);return}      // Strzelnica (mapa treningowa): cele pojawiają się w punktach mapy
   for(const e of enemies){
     const r=e.root;
-    if(MODE==='1v1'){if(e===duel.bot)stepRemote(e,dt);continue}
+    if(MODE==='1v1'){if(e===duel.bot){if(BOT.on&&!ON.active)stepDuelBot(e,dt);else stepRemote(e,dt)};continue}
     if(e.dead>0){
       e.dead-=dt;e.fall=Math.min(1,e.fall+dt*3);
       if(e.flash>0){e.flash-=dt;e.mats.skin.emissive.setScalar(.9)}else e.mats.skin.emissive.setScalar(0);
@@ -1433,7 +1435,7 @@ function frame(){
   if(player.view==='fps'){poseViewmodel(dt);me.visible=false}else{poseThirdPerson(dt)}
   if(window.__frameHook)window.__frameHook(dt);          // testy: odczyt pozy broni po każdej klatce
   updateCamera(dt);updateFx(dt);shells.update(dt,0);updateCross();match.update(dt,!live());
-  sun.position.set(player.pos.x+14,26,player.pos.z+10);sun.target.position.copy(player.pos);
+  climates.update(dt);const so=climates.sunOff;sun.position.set(player.pos.x+so.x,so.y,player.pos.z+so.z);sun.target.position.copy(player.pos);
   // świat, a potem broń z pierwszej osoby z wyczyszczoną głębią – broń nigdy nie wchodzi w ściany
   camera.layers.set(0);renderer.render(scene,camera);
   if(player.view==='fps'){
@@ -1448,6 +1450,7 @@ setHud();
 // ================= tryb 1v1: pojedynek z botem do 5 trafień =================
 let MODE='range';
 const WIN=5,duel={bot:null,hp:100,botScore:0,inv:0};
+const BOT={on:false};   // mecz 1v1 z botem: bez serwera, logowania i stawki (tryb „Z botem” w lobby)
 function setPauseText(){pmI18n()}
 function setHp(v){duel.hp=Math.max(0,v);const w=duel.hp+'%';$('hpbar').style.width=w;$('hpghost').style.width=w;$('hpnum').textContent=Math.ceil(duel.hp);const h=$('hp');h.classList.toggle('low',duel.hp<=20);h.classList.toggle('mid',duel.hp>20&&duel.hp<=50)}
 function banner(t,c){const b=$('banner');b.textContent=t;b.style.color=c||'#fff';b.classList.remove('show');void b.offsetWidth;b.classList.add('show')}
@@ -1489,6 +1492,49 @@ function playerHit(d){
 }
 // przeciwnik w 1v1: drugi gracz. Jego stan (pozycja, patrzenie, kucanie, bieg, broń) przychodzi z serwera ~20 razy na sekundę,
 // między paczkami pozycja jest wygładzana. Bot do 1v1 został usunięty – mecze są tylko z prawdziwymi graczami.
+// bot do trybu „Z botem”: chodzi, robi uniki i strzela, gdy widzi gracza. Zabójstwo kończy rundę meczu (match.kill), respawn robi resetRound.
+const _be=V3(),_bp=V3(),_bt=V3(),_bm=V3();
+function stepDuelBot(e,dt){
+  const r=e.root,ud=r.userData;r.visible=true;
+  if(e.flash>0){e.flash-=dt;e.mats.skin.emissive.setScalar(.9)}else e.mats.skin.emissive.setScalar(0);
+  if(e.dead>0){
+    if(!e.counted){e.counted=true;if(match.on)match.kill('me');else if(kills>=WIN){endMatch(true);return}else banner(i18n('g.hit'),'#ffe14a')}
+    e.fall=Math.min(1,e.fall+dt*3);r.rotation.z=e.fall*(Math.PI/2);r.position.y=Math.sin(e.fall*Math.PI/2)*.28;
+    if(!match.on){e.dead-=dt;if(e.dead<=0)duelSpawn(e)}          // poza meczem (podgląd map): bot wstaje sam
+    return;
+  }
+  const dx=player.pos.x-r.position.x,dz=player.pos.z-r.position.z,dist=Math.hypot(dx,dz)||1;
+  _be.set(r.position.x,1.25,r.position.z);_bp.set(player.pos.x,player.pos.y+1.1-player.crouch*.4,player.pos.z);
+  const see=!player.dead&&(oaza.active?!segHitsBoxes(_be,_bp,oaza.boxes):true);
+  let moving=0;
+  if(playing&&!match.frozen){
+    duel.inv=Math.max(0,duel.inv-dt);
+    e.turn-=dt;if(e.turn<=0){e.turn=1.2+rnd()*2.2;e.strafe*=-1}
+    const radial=clamp((dist-(see?13:6))*.25,-1,1);
+    let mx=-dz/dist*e.strafe*.9+dx/dist*radial,mz=dx/dist*e.strafe*.9+dz/dist*radial;const ml=Math.hypot(mx,mz)||1;
+    // ruch z kolizjami: pełny krok, a przy ścianie ślizg wzdłuż niej (osobno X i Z)
+    const ox=r.position.x,oz=r.position.z,sx=mx/ml*2.6*dt,sz=mz/ml*2.6*dt;
+    const blocked=(x,z,m=.45)=>(oaza.active?(Math.abs(x)>oaza.bx||Math.abs(z)>oaza.bz):Math.hypot(x,z)>40)||boxes.some(b=>x>b.minX-m&&x<b.maxX+m&&z>b.minZ-m&&z<b.maxZ+m&&b.top>.5&&!(b.bottom>1.6));
+    const stuck=blocked(ox,oz);
+    const tryMove=(x,z)=>{if(!blocked(x,z)||(stuck&&!blocked(x,z,.3))){r.position.x=x;r.position.z=z;moving=1;return true}return false};
+    if(!tryMove(ox+sx,oz+sz)&&!tryMove(ox+sx,oz)&&!tryMove(ox,oz+sz)){e.strafe*=-1;e.turn=1}
+    e.react=see?e.react-dt:.55;e.cd-=dt;
+    if(see&&e.react<=0&&e.cd<=0&&dist<45){
+      e.cd=.32+rnd()*.35;
+      const pHit=clamp(.62-dist*.011-player.speed01*.25-player.crouch*.1-(player.onGround?0:.15),.1,.6),hit=rnd()<pHit;
+      e.rifle.muzzle.getWorldPosition(_bm);_bt.copy(_bp);if(!hit)_bt.add(V3((rnd()-.5)*2.2,(rnd()-.3)*1.4,(rnd()-.5)*2.2));
+      spawnTracer(_bm,_bt);sndFar();if(hit)playerHit(rnd()<.18?24:12);
+    }
+  }
+  r.rotation.y+=angDiff(Math.atan2(dx,dz)+Math.PI,r.rotation.y)*Math.min(1,dt*8);
+  e.phase+=dt*9.7*moving;poseLegs(ud,e.phase,.42*moving,0,0);
+  ud.upper.position.y=Math.abs(Math.sin(e.phase))*.03*moving;leanTorso(ud,-.04,0,Math.sin(e.phase)*.04*moving);
+  e.holder.rotation.x=clamp(Math.atan2(_bp.y-1.0,dist),-.3,.3);e.holder.rotation.y=0;
+  keepRifleOut(ud,e.rifle.group);r.updateWorldMatrix(true,true);
+  _gr.copy(e.rifle.gripR);e.rifle.group.localToWorld(_gr);ud.torso.worldToLocal(_gr);
+  _gl.copy(e.rifle.gripLTP);e.rifle.group.localToWorld(_gl);ud.torso.worldToLocal(_gl);
+  poseArmsTo(ud,_gr,_gl);
+}
 const _ra=V3();
 function stepRemote(e,dt){
   const r=e.root,ud=r.userData,s=ON.st;
@@ -1546,6 +1592,7 @@ function useOaza(on,forced){                         // forced: konkretna mapa (
   boxMeshes.length=0;boxMeshes.push(...(on?m.meshes:arenaMeshes));
   for(const a of arenaMeshes)a.visible=!on;arenaGround.visible=!on;
   window.__ground=on?m.ground:arenaGround;
+  climates.use(on?m.name:null);
   if(on)Object.assign(oaza,{boxes:m.boxes,meshes:m.meshes,spawns:m.spawns,ladders:m.ladders,bx:m.bx,bz:m.bz});else oaza.ladders=[];
 }
 // ---- podesty startowe w mapach 1v1: zostaje sam pierścień z kafelków i tarcza; flagi z literą, litera na podeście i strzałka znikają ----
@@ -1596,6 +1643,7 @@ const loadMaps=(async()=>{                         // mapy ładują się w tle, 
         let inRoof=false;for(let p=o;p;p=p.parent)if(p===roof)inRoof=true;
         o.castShadow=!inRoof;o.receiveShadow=true;M.meshes.push(o)});   // dach nie rzuca cienia – w hali jest jasno
       M.ground=M.meshes.find(o=>/floor|ground|teren/i.test(o.name))||M.meshes[0];
+      if(!M.range)try{climates.decorate(M,g.scene)}catch(e){console.warn('Klimat mapy '+M.name+':',e)}   // tylko grafika: kolizje bez zmian
       g.scene.visible=false;scene.add(g.scene);M.group=g.scene;M.spawns=D.spawns;
       const cols=stripPadColliders(D,D.colliders),clips=stripPadColliders(D,D.clips);
       M.boxes=cols.concat(clips).map(([x0,y0,z0,x1,y1,z1])=>({minX:x0,maxX:x1,minZ:z0,maxZ:z1,top:y1,bottom:y0}));   // clips: blokady ruchu gracza (kule i tak lecą po siatce mapy)
@@ -1628,7 +1676,9 @@ function lobbyAnimate(b,t,dt,st){
 let mySkin='';   // przed createLobby: lobby od razu wywołuje onSkin z zapisanym skinem
 loader.set(.85);
 const lobby=createLobby({renderer,bean:lobbyBean,animate:lobbyAnimate,
-  onPlay:(m,o)=>{o=o||{};if(m==='1v1'){matchLock();lobby.hide();ON.active=false;match.start({stake:o.stake});    // 1v1: kolejka na serwerze, mapę losuje serwer
+  onPlay:(m,o)=>{o=o||{};
+    if(m==='bot'){BOT.on=true;matchLock();lobby.hide();ON.active=false;ON.opp=null;ON.seat=Math.random()<.5?0:1;match.start({stake:0});match.found(i18n('g.bot'));return}   // z botem: od razu „przeciwnik znaleziony”, mapę losuje mecz
+    if(m==='1v1'){BOT.on=false;matchLock();lobby.hide();ON.active=false;match.start({stake:o.stake});    // 1v1: kolejka na serwerze, mapę losuje serwer
       NET.queue({matchId:o.matchId,skin:mySkin}).catch(e=>netFail(e.message));return}
     setMode(m,null);lobby.hide();document.body.classList.remove('in-lobby');startPlay()},
   onSkin:s=>{mySkin=s.id||'';applySkin(me.userData.mats.skin,s);applySkin(me.userData.mats.body,s);applySkin(fpsSkin,s);me.userData.eyes.visible=lobbyBean.userData.eyes.visible=s.eyes!==false}});   // skin z lobby także na postaci w grze
@@ -1667,9 +1717,9 @@ function matchLock(){                                   // wołane w obsłudze k
 }
 function toLobbyBg(){playing=false;gun.firing=false;player.dead=false;document.body.classList.remove('mt-dead');document.body.classList.add('in-lobby')}
 const match=createMatch({
-  online:()=>true,                                      // 1v1 tylko z prawdziwymi graczami (kolejka na serwerze)
+  online:()=>!BOT.on,                                   // 1v1 z prawdziwymi graczami (kolejka na serwerze); tryb „Z botem” działa bez serwera
   cancelQueue:()=>{NET.cancel();setTimeout(()=>NET.close(),400);ON.active=false;dispatchEvent(new CustomEvent('fasolka:cancelled'))},
-  localReady:()=>NET.send({t:'ready'}),
+  localReady:()=>{if(!BOT.on)NET.send({t:'ready'})},
   money:v=>'$'+(Math.round(v*100)/100).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2}),
   prize:s=>payout(s),                                   // wypłata za wygraną (pula 2 × stawka minus prowizja lobby)
   matchEnd:won=>dispatchEvent(new CustomEvent('fasolka:match',{detail:{won:!!won}})),   // lobby rozlicza stawkę w portfelu
@@ -1677,7 +1727,7 @@ const match=createMatch({
   maps:()=>MAPS.map(M=>({name:M.name,ready:!!M.ready,thumb:M.thumb||null})),
   mapsSettled:()=>mapsSettled,
   nick:()=>{const p=lobby.ui.querySelector('#lb-plate-name');return(p&&p.textContent.trim())||'Gracz'},
-  enterGame:mi=>{setMode('1v1',mi,true);setTeam(ON.seat);applyOppSkin();resetPlayer();duelSpawn(duel.bot);lobby.hide();document.body.classList.remove('in-lobby');$('overlay').style.display='none';
+  enterGame:mi=>{setMode('1v1',mi,true);setTeam(ON.seat);if(BOT.on)restoreOppSkin();else applyOppSkin();resetPlayer();duelSpawn(duel.bot);lobby.hide();document.body.classList.remove('in-lobby');$('overlay').style.display='none';
     playing=!!document.pointerLockElement;renderer.domElement.focus({preventScroll:true})},
   resetRound:()=>{                                      // początek rundy: obaj na spawnach, pełne HP i amunicja, czysta mapa
     player.dead=false;document.body.classList.remove('mt-dead');deathK=0;
@@ -1728,6 +1778,7 @@ window.__net={NET,ON};
 const thumbCam=new THREE.PerspectiveCamera(46,16/10,.5,700);
 function snapMap(M,ow=480,oh=300){
   const cv=renderer.domElement,W=cv.width,H=cv.height;if(!M.group||!W||!H)return;
+  const prevClimate=climates.save();climates.use(M.name);   // miniatura w klimacie tej mapy
   const sc=sun.shadow.camera,keep={near:scene.fog.near,far:scene.fog.far,sun:sun.position.clone(),tgt:sun.target.position.clone(),me:me.visible,ground:arenaGround.visible,
     sh:[sc.left,sc.right,sc.top,sc.bottom,sc.far],maps:ALLMAPS.map(X=>X.group?X.group.visible:false),arena:arenaMeshes.map(a=>a.visible),en:enemies.map(e=>e.root.visible),roof:M.roof?M.roof.visible:true};
   for(const X of ALLMAPS)if(X.group)X.group.visible=X===M;
@@ -1736,7 +1787,7 @@ function snapMap(M,ow=480,oh=300){
   scene.fog.near=200;scene.fog.far=700;
   thumbCam.fov=v.fov||46;thumbCam.aspect=16/10;thumbCam.position.set(...v.pos);thumbCam.lookAt(...v.look);thumbCam.updateProjectionMatrix();
   const R=Math.max(M.bx,M.bz)+6;Object.assign(sc,{left:-R,right:R,top:R,bottom:-R,far:150});sc.updateProjectionMatrix();
-  sun.target.position.set(v.look[0],0,v.look[2]);sun.position.set(v.look[0]+29.4,54.6,v.look[2]+21);sun.target.updateMatrixWorld();sun.updateMatrixWorld();
+  sun.target.position.set(v.look[0],0,v.look[2]);const so=climates.sunOff;sun.position.set(v.look[0]+so.x*2.1,so.y*2.1,v.look[2]+so.z*2.1);sun.target.updateMatrixWorld();sun.updateMatrixWorld();
   const pr=renderer.getPixelRatio(),cw=W/pr,ch=H/pr,vw=Math.min(cw,ch*1.6),vh=vw/1.6;      // kadr 16:10 w lewym dolnym rogu płótna (też na pionowym ekranie)
   renderer.setViewport(0,0,vw,vh);renderer.setScissor(0,0,vw,vh);renderer.setScissorTest(true);
   renderer.render(scene,thumbCam);
@@ -1748,6 +1799,7 @@ function snapMap(M,ow=480,oh=300){
   [sc.left,sc.right,sc.top,sc.bottom,sc.far]=keep.sh;sc.updateProjectionMatrix();
   ALLMAPS.forEach((X,i)=>{if(X.group)X.group.visible=keep.maps[i]});arenaMeshes.forEach((a,i)=>a.visible=keep.arena[i]);arenaGround.visible=keep.ground;
   enemies.forEach((e,i)=>e.root.visible=keep.en[i]);me.visible=keep.me;if(M.roof)M.roof.visible=keep.roof;
+  climates.restore(prevClimate);
 }
 
 // pomoc dla testów: pozycje stawów ręki w świecie i test kolizji punktu (świat) z korpusem fasolki
@@ -1797,7 +1849,7 @@ function inspectProbe(){
   out.shoulderVisible=shVis;out.sl=+rifle.slideBack.toFixed(4);
   return out;
 }
-window.__game={TEAM,slotList,match,MAPS,snapMap,playerHit,armJoints,bodyHit,inv,selectWeapon,get curW(){return curW},get rifle(){return rifle},solveArm,armR,armL,TP_HOLD,VM,me,poseArmsTo,makeBean,scene,keepRifleOut,placeTP,createWeapon,lobby,duel,setMode,player,gun,enemies,camera,setView:attachRifle,startPlay,start:()=>{playing=true;$('overlay').style.display='none'},fire:()=>{if(gun.mag>0&&gun.cd<=0&&gun.reloading<=0)fireShot()},reload:startReload,inspect:startInspect,inspectProbe,INSP,fpsArms:[fpsArmR,fpsArmL],viewModel,vmCam,WRIST,setAds:v=>adsHeld=v,keys};
+window.__game={climates,TEAM,slotList,match,MAPS,snapMap,playerHit,armJoints,bodyHit,inv,selectWeapon,get curW(){return curW},get rifle(){return rifle},solveArm,armR,armL,TP_HOLD,VM,me,poseArmsTo,makeBean,scene,keepRifleOut,placeTP,createWeapon,lobby,duel,setMode,player,gun,enemies,camera,setView:attachRifle,startPlay,start:()=>{playing=true;$('overlay').style.display='none'},fire:()=>{if(gun.mag>0&&gun.cd<=0&&gun.reloading<=0)fireShot()},reload:startReload,inspect:startInspect,inspectProbe,INSP,fpsArms:[fpsArmR,fpsArmL],viewModel,vmCam,WRIST,setAds:v=>adsHeld=v,keys};
 loader.hide();window.__ready=true;if(!window.__mobileGate)frame();   // na telefonie gra nie rusza (ekran „coming soon”)
 </script>
 
