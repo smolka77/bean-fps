@@ -890,7 +890,7 @@ function damageEnemy(e,dmg,point){
 // ================= efekty =================
 const tracers=[];const holes=[];const sparks=[];
 const tracerMat=new THREE.MeshBasicMaterial({color:0xffe6a0,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
-const tracerGeo=new THREE.CylinderGeometry(.008,.008,1,5);tracerGeo.rotateX(Math.PI/2);tracerGeo.translate(0,0,-.5);
+const tracerGeo=new THREE.CylinderGeometry(.008,.008,1,5);tracerGeo.rotateX(Math.PI/2);tracerGeo.translate(0,0,.5);   // +Z: Mesh.lookAt kieruje oś +Z na cel – smuga od lufy do celu (było -Z, czyli do tyłu)
 function spawnTracer(from,to){
   const m=new THREE.Mesh(tracerGeo,tracerMat.clone());const len=from.distanceTo(to);
   m.position.copy(from);m.lookAt(to);m.scale.set(1,1,Math.max(.1,len));scene.add(m);tracers.push({m,life:.07});
