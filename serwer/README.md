@@ -44,6 +44,7 @@ Testowe SOL na devnecie: <https://faucet.solana.com> (wklej adres z zakładki **
 | `WITHDRAW_REVIEW_USD` | `100` | wypłata powyżej tej kwoty czeka na akceptację w panelu admina |
 | `SECURITY_HOLD_HOURS` | `24` | blokada wypłat po zmianie hasła albo e-maila |
 | `CORS_ORIGINS` | `*` | adresy gry, np. `https://smolka77.github.io` |
+| `PUBLIC_URL` | – | domena gry do linku w poście na X (Deathmatch), np. `https://twoja-domena.pl`; bez niej – pierwsza domena z `CORS_ORIGINS`, potem domena z adresu żądania (nigdy IP) |
 | `DATA_DIR` | `serwer/dane` | baza SQLite i fraza – **musi być na trwałym dysku** |
 | `HOUSE_FEE` | `0.10` | prowizja od puli |
 | `REVIEW_STAKE_USD` | `250` | od takiej stawki każda wygrana czeka na sprawdzenie w panelu admina (sekcja Antycheat) |

@@ -631,11 +631,12 @@ const routes = {
     need(user); if (limited('xs:' + user.id, 6) || limited('xsip:' + ip, 20)) throw new E('rate', 'Za dużo prób – odczekaj minutę', 429);
     return xshare.verify(user.id, body && body.url, originOf(req), E);
   },
-  'GET /api/admin/xshare': async ({ req }) => { adminGate(req); return { config: xsCfg, defaults: XS.sanitize({}), stats: xshare.stats(), ca: xsCfg.ca || (arsCfg.unit === 'token' ? arsCfg.mint : ''), preview: xshare.textFor('GTA-XXXXX', originOf(req)) }; },
+  'GET /api/admin/xshare': async ({ req }) => { adminGate(req); return { config: xsCfg, defaults: XS.sanitize({}), stats: xshare.stats(), ca: xsCfg.ca || (arsCfg.unit === 'token' ? arsCfg.mint : ''), site: originOf(req), preview: xshare.textFor('GTA-XXXXX', originOf(req)) }; },
   'POST /api/admin/xshare': async ({ body, req, ip }) => {
     const adm = adminGate(req);
     const next = XS.sanitize(body && body.reset ? {} : (body.config || {}));
     if (body && body.config && String(body.config.ca || '').trim() && !next.ca) throw new E('ca', 'Nieprawidłowy adres CA (Solana)');
+    if (body && body.config && String(body.config.url || '').trim() && !next.url) throw new E('url', 'Link do gry musi mieć domenę (np. https://twoja-domena.pl), nie adres IP');
     cfgPut('xshare', JSON.stringify(next)); xsCfg = next;
     audit(adm.username, ip, 'xshare_config', body && body.reset ? 'reset' : (next.enabled ? 'wł.' : 'wył.'));
     return { config: xsCfg, preview: xshare.textFor('GTA-XXXXX', originOf(req)) };
@@ -933,8 +934,17 @@ const arsenalGuns = (uid, ids, lam = 0) => { const g = arsenal.gunsFor(uid, (lam
 // ---------------- Udostępnienie na X (warunek wejścia do Deathmatch, xshare.mjs) ----------------
 let xsCfg = (() => { try { const r = q("SELECT value FROM config WHERE key='xshare'").get(); return XS.sanitize(r ? JSON.parse(r.value) : {}); } catch { return XS.sanitize({}); } })();
 const xshare = XS.createXShare({ db, getCfg: () => xsCfg, getCa: () => (arsCfg.unit === 'token' ? arsCfg.mint : ''), randomBytes: (n) => crypto.randomBytes(n) });
-// adres gry do tekstu posta, gdy admin nie wpisał własnego: z nagłówków żądania (za nginx: X-Forwarded-Proto)
-const originOf = (req) => { const h = req && req.headers || {}, host = String(h['x-forwarded-host'] || h.host || '').split(',')[0].trim(); if (!/^[a-z0-9.-]+(:\d+)?$/i.test(host)) return ''; const pr = String(h['x-forwarded-proto'] || '').split(',')[0].trim() || (/^(localhost|127\.)/.test(host) ? 'http' : 'https'); return pr + '://' + host; };
+// adres gry do tekstu posta, gdy admin nie wpisał własnego – zawsze domena (DNS), nigdy goły adres IP ani localhost:
+// PUBLIC_URL z .env → pierwsza domena z CORS_ORIGINS → domena, pod którą przyszło żądanie (za nginx: X-Forwarded-Host/Proto)
+const isDomainHost = (host) => /^(?=.*[a-z])[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?$/i.test(host) && !/^\d+(\.\d+){3}(:\d+)?$/.test(host) && !/^localhost(:|$)/i.test(host);
+const domainUrl = (u) => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) && isDomainHost(x.host) ? x.origin : ''; } catch { return ''; } };
+const PUBLIC_URL = domainUrl((env.PUBLIC_URL || '').trim()) || ORIGINS.map(domainUrl).find(Boolean) || '';
+const originOf = (req) => {
+  if (PUBLIC_URL) return PUBLIC_URL;
+  const h = req && req.headers || {}, host = String(h['x-forwarded-host'] || h.host || '').split(',')[0].trim();
+  if (!isDomainHost(host)) return '';
+  const pr = String(h['x-forwarded-proto'] || '').split(',')[0].trim() || 'https'; return pr + '://' + host;
+};
 // Deathmatch: bez zweryfikowanego posta nie ma wejścia; co recheckHours post sprawdzany ponownie (w tle, potem ponowna próba wejścia)
 function xshareWait(ws, user, again) {
   if (!xsCfg.enabled) return false;

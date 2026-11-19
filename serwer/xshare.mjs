@@ -19,7 +19,7 @@ export function sanitize(s = {}) {
     enabled: !!(s.enabled ?? D.enabled),
     text: text.includes('{code}') ? text : (text.trim() + ' {code}'),     // bez kodu nie da się sprawdzić, czyj to post
     ca: isB58(ca) ? ca : '',
-    url: /^https?:\/\/[^\s]{3,200}$/.test(url) ? url : '',
+    url: /^https?:\/\/(?=[^/\s]*[a-z])[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?(\/[^\s]{0,180})?$/i.test(url) && !/^https?:\/\/\d+(\.\d+){3}/.test(url) ? url : '',   // tylko domena (DNS), nie adres IP
     requireCa: !!(s.requireCa ?? D.requireCa),
     recheckHours: Math.max(0, Math.min(24 * 30, Math.round(+(s.recheckHours ?? D.recheckHours) || 0))),
   };
