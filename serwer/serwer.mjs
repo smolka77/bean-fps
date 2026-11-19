@@ -42,6 +42,7 @@ const STAKE_MSG = { 5: 'Nowe konto: stawka najwyżej $5 (więcej po 5 meczach)',
 const MM_BLOCK_LINKED = env.MM_BLOCK_LINKED === '1';                 // 1 = kolejka 1v1 nie paruje kont z tym samym IP/urządzeniem/adresem wypłat (domyślnie wyłączone; wygrana takich kont i tak czeka na admina)
 const REVIEW_STAKE_USD = +(env.REVIEW_STAKE_USD || 250);               // od takiej stawki każda wygrana czeka na sprawdzenie przez admina
 const REPLAY_DAYS = +(env.REPLAY_DAYS || 60);                          // powtórki meczów trzymamy tyle dni (wstrzymane i odrzucone – zawsze)
+const GAME_PROTO = 2;                                                  // wersja gry wymagana do meczu 1v1 (stara karta musi się odświeżyć)
 const TX_FEE = 5000;
 const GOOGLE_CLIENT_ID = (env.GOOGLE_CLIENT_ID || '').trim();   // logowanie przez Google (OAuth, typ: aplikacja internetowa)
 const HOST = env.HOST || '127.0.0.1';                                   // tylko ta maszyna (nginx); 0.0.0.0 = cały internet (niezalecane)
@@ -181,11 +182,10 @@ function banUser(uid, reason, on = true) {
   q('UPDATE users SET banned=?, ban_reason=? WHERE id=?').run(on ? 1 : 0, on ? String(reason || '').slice(0, 200) : null, uid);
   console.log(`[antycheat] ${on ? 'zablokowane' : 'odblokowane'} konto ${u.username}${on ? ': ' + reason : ''}`);
 }
-// dwa konta jednej osoby: wspólne urządzenie, adres wypłat albo adres IP (z ostatnich 30 dni)
+// dwa konta jednej osoby: wspólne urządzenie albo adres wypłat (wspólne IP – np. jedno wifi – się NIE liczy)
 function linkOf(a, b) {
-  const since = Date.now() - 30 * 864e5;
   return q(`SELECT s1.kind FROM seen s1 JOIN seen s2 ON s2.kind=s1.kind AND s2.value=s1.value AND s2.user_id=?
-    WHERE s1.user_id=? AND (s1.kind!='ip' OR (s1.last>? AND s2.last>?)) LIMIT 1`).get(b, a, since, since) || null;
+    WHERE s1.user_id=? AND s1.kind!='ip' LIMIT 1`).get(b, a) || null;
 }
 const linkedAccounts = uid => q(`SELECT u.username name, u.banned, GROUP_CONCAT(DISTINCT s1.kind) kinds FROM seen s1
   JOIN seen s2 ON s2.kind=s1.kind AND s2.value=s1.value AND s2.user_id!=s1.user_id JOIN users u ON u.id=s2.user_id WHERE s1.user_id=? GROUP BY u.id LIMIT 30`).all(uid);
@@ -197,7 +197,7 @@ const isOurs = new Set();                                              // podpis
 async function scanUser(u) {
   const pk = new PublicKey(u.address);
   const sigs = await conn.getSignaturesForAddress(pk, { limit: 50, ...(u.last_sig ? { until: u.last_sig } : {}) });
-  if (!sigs.length) return;
+  if (!sigs.length) return 0;
   for (const s of sigs.slice().reverse()) {                            // od najstarszego
     if (s.err || isOurs.has(s.signature) || q('SELECT 1 FROM deposits WHERE sig=?').get(s.signature)) continue;
     const t = await conn.getTransaction(s.signature, { maxSupportedTransactionVersion: 0, commitment: 'confirmed' });
@@ -216,6 +216,7 @@ async function scanUser(u) {
   }
   q('UPDATE users SET last_sig=? WHERE id=?').run(sigs[0].signature, u.id);
   await sweep(u);
+  return sigs.length;
 }
 async function sweep(u) {                                              // cały depozyt (minus opłata) idzie do skarbca
   const bal = await conn.getBalance(new PublicKey(u.address));
@@ -227,11 +228,40 @@ async function sweep(u) {                                              // cały 
   catch (e) { console.warn('[skarbiec] przeniesienie nieudane', u.username, e.message); }
 }
 let scanning = false;
+// salda adresów depozytów czytamy zbiorczo (getMultipleAccountsInfo: 1 zapytanie na 100 graczy); pełny skan historii
+// (getSignaturesForAddress + getTransaction) tylko dla adresów, których saldo zmieniło się od ostatniego skanu
+const lastBal = new Map();                                             // adres -> saldo (lamporty) przy ostatnim udanym skanie
+const misses = new Map();                                              // adres -> ile skanów z rzędu bez nowych podpisów mimo zmiany salda
 async function scanAll() {
   if (scanning) return; scanning = true;
-  try { for (const u of q('SELECT * FROM users ORDER BY last_active DESC').all()) { try { await scanUser(u); } catch (e) { console.warn('[skan]', u.username, e.message); } } }
-  finally { scanning = false; }
+  try {
+    const users = q('SELECT * FROM users WHERE address IS NOT NULL ORDER BY last_active DESC').all();
+    for (let i = 0; i < users.length; i += 100) {
+      const part = users.slice(i, i + 100);
+      let infos;
+      try { infos = await conn.getMultipleAccountsInfo(part.map(u => new PublicKey(u.address)), 'confirmed'); }
+      catch (e) { console.warn('[skan] salda', e.message); continue; }
+      for (let j = 0; j < part.length; j++) {
+        const u = part[j], bal = infos[j] ? infos[j].lamports : 0;
+        if (bal === 0 || lastBal.get(u.address) === bal) { lastBal.set(u.address, bal); continue; }   // pusto (wszystko w skarbcu) albo bez zmian
+        try {                                                          // saldo już widać, a historii jeszcze nie (opóźnienie węzła RPC) – ponawiamy, najwyżej 8 razy
+          const n = await scanUser(u), m = n ? 0 : (misses.get(u.address) || 0) + 1;
+          if (n || m >= 8) { lastBal.set(u.address, bal); misses.delete(u.address); } else misses.set(u.address, m);
+        } catch (e) { console.warn('[skan]', u.username, e.message); }
+      }
+    }
+  } finally { scanning = false; }
 }
+// „Sprawdź wpłatę” / odświeżanie otwartego portfela (co 8 s): najwyżej raz na 10 s na gracza, a pełny skan tylko gdy saldo adresu się zmieniło
+const quickAt = new Map();
+async function scanQuick(u) {
+  if (!u.address || Date.now() - (quickAt.get(u.id) || 0) < 10e3) return;
+  quickAt.set(u.id, Date.now());
+  const bal = await conn.getBalance(new PublicKey(u.address));
+  if (bal === 0 || lastBal.get(u.address) === bal) return;
+  if (await scanUser(u)) { lastBal.set(u.address, bal); misses.delete(u.address); }
+}
+setInterval(() => { const lim = Date.now() - 60e3; for (const [k, t] of quickAt) if (t < lim) quickAt.delete(k); }, 300e3).unref();
 
 // ---------------- HTTP ----------------
 const limited = OCH.makeLimiter();                                     // limity prób: klucz (IP, nick) -> czasy prób w oknie
@@ -317,7 +347,7 @@ const routes = {
   'GET /api/me': async ({ user }) => { need(user); return { account: publicUser(fresh(user.id)), history: histOf(user.id) }; },
   // jednorazowy bilet (30 s) do połączenia z /ws – token sesji nie trafia do adresu
   'POST /api/ws-ticket': async ({ user }) => { need(user); return { ticket: OCH.wsTicket(user.id) }; },
-  'POST /api/scan': async ({ user }) => { need(user); await scanUser(fresh(user.id)); return { account: publicUser(fresh(user.id)), history: histOf(user.id) }; },
+  'POST /api/scan': async ({ user }) => { need(user); await scanQuick(fresh(user.id)); return { account: publicUser(fresh(user.id)), history: histOf(user.id) }; },
   'GET /api/earnings': async ({ user }) => {
     need(user);
     const rows = q(`SELECT t, ended, state, stake_usd, payout_lamports, price, map FROM matches WHERE user_id=? AND state IN ('won','lost') ORDER BY COALESCE(ended,t)`).all(user.id);
@@ -361,7 +391,9 @@ const routes = {
     return { ok: true, sig, url: explorer(sig), account: publicUser(fresh(user.id)), history: histOf(user.id) };
   },
   'POST /api/match/start': async ({ user, body }) => {
-    need(user); const usd = Math.round(+body.stakeUsd * 100) / 100;
+    need(user);
+    if (+body.pv !== GAME_PROTO) throw new E('old', 'Jest nowa wersja gry – odśwież stronę (Ctrl+F5) i zagraj jeszcze raz.', 409);   // stara karta z pamięci przeglądarki
+    const usd = Math.round(+body.stakeUsd * 100) / 100;
     if (!(usd >= STAKE_MIN_USD && usd <= STAKE_MAX_USD)) throw new E('stake', `Stawka od $${STAKE_MIN_USD} do $${STAKE_MAX_USD}`);
     if (fresh(user.id).banned) throw new E('banned', BANNED_MSG, 403);
     const cap = stakeCap(user.id); if (usd > cap.cap) throw new E('stake_cap', STAKE_MSG[cap.cap] || `Stawka najwyżej $${cap.cap}`, 403);
@@ -895,7 +927,7 @@ function onDuelMessage(ws, user, raw, arsChecked = false) {
   const room = me.room, op = room.p[1 - me.seat];
   if (m.t === 'ready') {
     room.ready[me.seat] = true;
-    if (room.ready[0] && room.ready[1] && room.game.phase === 'wait') { MECZ.startRound(room.game, nowS(), MECZ.START_DELAY); room.out(-1, { t: 'go' }); }
+    if (room.ready[0] && room.ready[1] && room.game.phase === 'wait') { MECZ.beginIntro(room.game, nowS()); room.out(-1, { t: 'go' }); }
     return;
   }
   if (m.t === 'leave') return endRoom(room, 1 - me.seat, 'left');

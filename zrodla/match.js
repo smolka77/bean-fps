@@ -306,6 +306,7 @@ export function createMatch(g) {
   let phase = 'idle', t = 0, frozen = false, lastWinner = null;
   let searchDur = 3, nameT = 0, oppReadyT = 1, countN = 0, curtainT = -1, roul = null, drawDone = -1, switched = false;
   let oppGo = false, sentReady = false;                    // online: przeciwnik gotowy (serwer: 'go'), my już zgłosiliśmy gotowość
+  let inSent = false, srvCount = false, lastNow = 0;       // online: zgłosiliśmy koniec intro ('in'); serwer kazał odliczać ('count'); zegar rzeczywisty
   const online = () => !!(g.online && g.online());
 
   const sfx = n => { try { g.sfx(n); } catch (e) {} };
@@ -336,7 +337,7 @@ export function createMatch(g) {
   const ENTER = {
     search() {
       Object.assign(S, { me: 0, op: 0, round: 1, nick: g.nick(), opp: '', mapIdx: -1, mapName: '', stake: +opts.stake > 0 ? +opts.stake : 0, preset: opts.map || null, forceWin: false });
-      oppGo = false; sentReady = false;
+      oppGo = false; sentReady = false; inSent = false; srvCount = false;
       frozen = false; lastWinner = null; switched = false; roul = null; drawDone = -1;
       root.classList.remove('needclick');
       mm.hidden = false; mm.classList.remove('out'); vs.classList.remove('compact'); mapsEl.hidden = true; mapsEl.classList.remove('done');
@@ -474,7 +475,12 @@ export function createMatch(g) {
       if (t >= 1.9 && curtainT < 0) { curtainT = 0; curtain.classList.add('on'); }
       if (curtainT >= 0) { curtainT += DT; if (curtainT >= .4) { g.enterGame(S.mapIdx); if (ldOn) { ldOn = false; loader.hide(); } go('intro'); curtain.classList.remove('on'); } }
     },
-    intro() { if (t >= 4.4) go('count'); },
+    intro() {
+      if (!online()) { if (t >= 4.4) go('count'); return; }
+      // online: po intro czekamy, aż przeciwnik też będzie na mapie – odliczanie startuje u obu na sygnał serwera ('count')
+      if (srvCount) return go('count');
+      if (t >= 4.4 && !inSent) { inSent = true; if (g.introDone) g.introDone(); hideStrip(); count.classList.add('on'); $('mt-cround').textContent = tr('mt.waitOpp'); $('mt-cnum').textContent = ''; }
+    },
     count() {
       const n = 3 - Math.floor(t / .8);
       if (n !== countN && n > 0) { countN = n; setCount(String(n)); sfx('count'); }
@@ -495,7 +501,11 @@ export function createMatch(g) {
   let DT = 0, hold = false, ldOn = false;
 
   function update(dt, paused) {
+    // online: plansze i odliczanie liczone zegarem rzeczywistym (dt klatki jest obcięte do 0,05 s – przy niskim FPS
+    // czas meczu u gracza płynąłby wolniej niż na serwerze i gracze rozjeżdżali się w czasie)
+    const nowMs = performance.now(), rdt = lastNow ? Math.min(1, (nowMs - lastNow) / 1000) : dt; lastNow = nowMs;
     if (phase === 'idle') return;
+    if (online()) dt = Math.max(dt, rdt);
     const inGame = !LOBBY_PHASES.has(phase);
     root.classList.toggle('needclick', phase === 'intro' && paused);
     if ((inGame && paused && !online()) || hold) return;  // pauza (Esc) zatrzymuje plansze i odliczanie (offline); hold = testy
@@ -538,6 +548,8 @@ export function createMatch(g) {
     found(opp, mapName) { if (phase !== 'search') return; S.opp = String(opp || 'Gracz'); if (mapName) S.preset = mapName; go('found'); },
     // online: obaj gracze wczytali mapę (serwer: 'go')
     oppGo() { oppGo = true; },
+    // online: obaj gracze są na mapie po intro – serwer zaczyna odliczanie pierwszej rundy
+    serverCount() { srvCount = true; },
     // online: przeciwnik wyszedł albo się rozłączył – wygrana walkowerem
     oppLeft() { if (phase === 'idle' || phase === 'final') return; S.forceWin = true; lastWinner = 'me'; hideAll(); curtain.classList.remove('on'); go('final'); },
     get frozen() { return frozen; },

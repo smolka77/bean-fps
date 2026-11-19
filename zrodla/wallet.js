@@ -281,7 +281,7 @@ export function createWallet({ api, root, getLang, toast, onChange, local = null
     async restore() { if (!token) return null; try { return take(await call('GET', '/me')); } catch (e) { if (e.status !== 401) online = false; return null; } },
     async logout() { try { await call('POST', '/logout'); } catch {} setSession(null); },
     async refresh(scan) { if (!token) return; try { take(await call(scan ? 'POST' : 'GET', scan ? '/scan' : '/me')); } catch { online = false; render(); } },
-    async startMatch(stakeUsd) { const j = await call('POST', '/match/start', { stakeUsd }); take(j); return j.matchId; },
+    async startMatch(stakeUsd) { const j = await call('POST', '/match/start', { stakeUsd, pv: 2 /* wersja gry, serwer: GAME_PROTO */ }); take(j); return j.matchId; },
     async endMatch(matchId, won, forfeit, map) { const j = await call('POST', '/match/end', { matchId, won, forfeit, map }); earn = null; take(j); },
     async stats(o) { try { await call('POST', '/stats', o); } catch {} },
     async earnings() { try { earn = (await call('GET', '/earnings')).points; } catch { earn = earn || []; } return earn; },
@@ -289,8 +289,7 @@ export function createWallet({ api, root, getLang, toast, onChange, local = null
     async password(oldPassword, newPassword) { await call('POST', '/password', { oldPassword, newPassword }); },
     open, close,
   };
-  // co 12 s świeże saldo (wpłaty wykrywa serwer); przy otwartym portfelu – co 8 s z wymuszeniem skanu
-  const loop = () => { clearTimeout(pollT); pollT = setTimeout(async () => { if (token && !document.hidden) await api$.refresh(!wrap.hidden); loop(); }, wrap && !wrap.hidden ? 8000 : 12000); };
+  // bez cyklicznego odpytywania: saldo z bazy przy otwarciu portfela i powrocie do lobby, skan wpłat (RPC) tylko po kliknięciu „Sprawdź”
 
   // ---------- okno ----------
   if (!document.getElementById('bl-w-css')) { const st = document.createElement('style'); st.id = 'bl-w-css'; st.textContent = CSS; document.head.appendChild(st); }
@@ -356,8 +355,8 @@ export function createWallet({ api, root, getLang, toast, onChange, local = null
     b.disabled = false; b.textContent = T('send');
   });
 
-  function open(t = 'dep') { tab = t === 'deposit' ? 'dep' : t === 'withdraw' ? 'wd' : t === 'history' ? 'hist' : t; wrap.hidden = false; render(); api$.refresh(true); if (tab === 'earn') loadEarn(); loop(); }
-  function close() { wrap.hidden = true; loop(); }
+  function open(t = 'dep') { tab = t === 'deposit' ? 'dep' : t === 'withdraw' ? 'wd' : t === 'history' ? 'hist' : t; wrap.hidden = false; render(); api$.refresh(false); if (tab === 'earn') loadEarn(); }
+  function close() { wrap.hidden = true; }
   async function loadEarn() { try { earn = (await call('GET', '/earnings')).points; } catch { earn = earn || []; } renderEarn(); }
 
   // ---------- rysowanie ----------
@@ -403,6 +402,5 @@ export function createWallet({ api, root, getLang, toast, onChange, local = null
   const earnState = {};
   function renderEarn() { renderEarnings($('bw-earn'), earn, getLang(), earnState); }
 
-  loop();
   return api$;
 }
