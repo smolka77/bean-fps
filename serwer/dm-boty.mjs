@@ -29,7 +29,7 @@ export const botSkin = () => SKINS[(Math.random() * SKINS.length) | 0];
 // skill 0–1 (z ustawień): czas reakcji, celność, szybkość obrotu, częstość strzałów w głowę
 export function createBot(pid, skill) {
   const s = clamp(skill + rnd(-0.12, 0.12), 0, 1);                // każdy bot trochę inny
-  return { pid, skill: s, q: 0, deployAt: 0, goal: null, goalT: 0, dir: Math.random() * 6.28, yaw: 0, pitch: 0, legYaw: 0, legDir: 1, run: 0,
+  return { pid, skill: s, q: 0, deployAt: 0, goal: null, goalT: 0, path: null, pi: 0, dir: Math.random() * 6.28, yaw: 0, pitch: 0, legYaw: 0, legDir: 1, run: 0,
     tgt: 0, seenAt: 0, err: [0, 0], aimHead: false, nextShot: 0, burst: 0, strafe: 1, strafeT: 0, hurtFrom: null, hurtT: 0, stuck: 0, lastLife: -1,
     react: 0.75 - s * 0.5,                                          // s do pierwszego strzału po zobaczeniu przeciwnika
     jit: 0.05 - s * 0.038,                                          // losowy błąd celowania na strzał (rad)
@@ -39,7 +39,7 @@ export function createBot(pid, skill) {
 // wiadomości, które serwer wysłałby graczowi – bot reaguje tylko na kilka
 export function botMessage(b, m, now, cfg) {
   if (m.t === 'dead') b.deployAt = now + (m.minDeath || cfg.minDeathTime) + rnd(0.6, 2.2);          // jak Spacja na ekranie śmierci
-  else if (m.t === 'fix') { b.dir += Math.PI * rnd(0.6, 1.4); b.goal = null; }
+  else if (m.t === 'fix') { b.dir += Math.PI * rnd(0.6, 1.4); b.goal = null; b.path = null; }
   else if (m.t === 'dmg' && Array.isArray(m.from)) { b.hurtFrom = m.from; b.hurtT = now; }
 }
 
@@ -50,6 +50,13 @@ function pickGoal(game, b, p) {
   return pts[(Math.random() * pts.length) | 0];
 }
 
+function setGoal(game, b, p, goal, now) {
+  b.goal = goal; b.goalT = now; b.pi = 0;
+  b.path = goal ? DM.navPath(game.map, p.x, p.z, goal[0], goal[1]) : null;
+  if (b.path && !b.path.length) b.path = null;
+  if (b.path) b.goal = b.path[b.path.length - 1];                   // cel na podłodze (np. strzelec stał na flybridge albo przy relingu)
+}
+
 // próba ruchu w kierunku dir: wysokość z podłogi (stopnie w górę do ~0,6 m, zejścia w dół), ta sama kontrola co u graczy
 function tryMove(game, p, dir, sp, dt, now) {
   const nx = p.x - Math.sin(dir) * sp * dt, nz = p.z - Math.cos(dir) * sp * dt;
@@ -57,6 +64,11 @@ function tryMove(game, p, dir, sp, dt, now) {
   const s = { x: nx, y: ny, z: nz };
   if (MECZ.checkMove({ map: game.map }, p, s, now)) return null;
   if (MECZ.insideSolid(game.map, nx, ny, nz)) return null;
+  const clip = MECZ.inClip(game.map, nx, ny, nz);                   // niewidzialne blokady (relingi nad wodą) – jak u gracza w przeglądarce
+  if (clip && clip !== MECZ.inClip(game.map, p.x, p.y, p.z)) return null;
+  // ciało (promień 0,3 m) nie wchodzi w nową bryłę – bez tego bot przeciskał się przez szczeliny między wąskimi bryłami
+  const was = new Set(MECZ.bodyHits(game.map, p.x, p.y, p.z));
+  if (MECZ.bodyHits(game.map, nx, ny, nz).some((b) => !was.has(b))) return null;
   return s;
 }
 
@@ -64,7 +76,7 @@ function tryMove(game, p, dir, sp, dt, now) {
 export function botStep(game, b, now, dt, send) {
   const p = game.p.get(b.pid); if (!p || p.left) return;
   if (!p.alive) { if (p.dead && b.deployAt && now >= b.deployAt) { b.deployAt = 0; send({ t: 'deploy' }); } return; }
-  if (p.life !== b.lastLife) { b.lastLife = p.life; b.yaw = p.yaw; b.dir = p.yaw; b.goal = null; b.tgt = 0; b.hurtFrom = null; }
+  if (p.life !== b.lastLife) { b.lastLife = p.life; b.yaw = p.yaw; b.dir = p.yaw; b.goal = null; b.path = null; b.tgt = 0; b.hurtFrom = null; }
   const cfg = game.cfg, gun = DM.DM_GUNS[p.level] || DM.PISTOL, W = cfg.weapons[gun];
 
   // cel: najbliższy przeciwnik, którego serwer pokazuje temu botowi
@@ -89,9 +101,15 @@ export function botStep(game, b, now, dt, send) {
     want = toT + b.strafe * (Math.PI / 2) * (1 - Math.abs(approach) * 0.6) + (approach < 0 ? Math.PI * -approach * 0.5 * b.strafe : 0);
     sp = dist < 4 ? 3.0 : 3.4;
   } else {
-    if (b.hurtFrom && now - b.hurtT < 2.5) { b.goal = [b.hurtFrom[0], b.hurtFrom[1]]; b.goalT = now; b.hurtFrom = null; }   // ktoś strzela – idzie sprawdzić
-    if (!b.goal || Math.hypot(b.goal[0] - p.x, b.goal[1] - p.z) < 1.5 || now - b.goalT > 14) { b.goal = pickGoal(game, b, p); b.goalT = now; }
-    want = b.goal ? angTo(b.goal[0] - p.x, b.goal[1] - p.z) : b.dir;
+    if (b.hurtFrom && now - b.hurtT < 2.5) { setGoal(game, b, p, [b.hurtFrom[0], b.hurtFrom[1]], now); b.hurtFrom = null; }   // ktoś strzela – idzie sprawdzić
+    if (!b.goal || Math.hypot(b.goal[0] - p.x, b.goal[1] - p.z) < 1.5 || now - b.goalT > 14) setGoal(game, b, p, pickGoal(game, b, p), now);
+    // idzie drogą po siatce podłogi (punkt po punkcie), a bez drogi – prosto do celu
+    let wp = b.goal;
+    if (b.path) {
+      while (b.pi < b.path.length - 1 && Math.hypot(b.path[b.pi][0] - p.x, b.path[b.pi][1] - p.z) < 0.7) b.pi++;
+      wp = b.path[b.pi];
+    }
+    want = wp ? angTo(wp[0] - p.x, wp[1] - p.z) : b.dir;
     sp = 4.8;
   }
   // płynny skręt w stronę żądanego kierunku; jak ściana – szuka obejścia (±45°, ±90°, ±135°)
@@ -102,7 +120,7 @@ export function botStep(game, b, now, dt, send) {
     if (mv) { if (off) { b.dir = d; b.stuck++; } else b.stuck = 0; break; }
   }
   if (!mv) { mv = { x: p.x, y: p.y, z: p.z }; sp = 0; b.stuck += 3; }
-  if (b.stuck > 40) { b.goal = null; b.stuck = 0; b.strafe = -b.strafe; }
+  if (b.stuck > 40) { b.goal = null; b.path = null; b.stuck = 0; b.strafe = -b.strafe; }
 
   // ---- patrzenie: na cel (z ograniczoną szybkością obrotu) albo w stronę ruchu ----
   const eye = MECZ.EYE(p);

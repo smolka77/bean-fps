@@ -40,7 +40,9 @@ export async function loadMaps(gameDir, names = ['Oaza', 'Magazyn', 'Baza']) {
     const boxes = D.colliders.map(([x0, y0, z0, x1, y1, z1]) => ({ x0, y0, z0, x1, y1, z1 }));
     const ladders = (D.ladders || []).map(([x0, y0, z0, x1, y1, z1]) => ({ x0, y0, z0, x1, y1, z1 }));
     const bx = Math.max(...D.colliders.map((c) => Math.max(-c[0], c[3]))), bz = Math.max(...D.colliders.map((c) => Math.max(-c[2], c[5])));
-    MAPS[name] = { name, boxes, ladders, spawns: D.spawns, bx, bz, grid: makeGrid(boxes) };
+    // clips: niewidzialne blokady ruchu (np. relingi nad wodą na mapie Jachty) – zatrzymują gracza, nie kule
+    const clips = (D.clips || []).map(([x0, y0, z0, x1, y1, z1]) => ({ x0, y0, z0, x1, y1, z1 }));
+    MAPS[name] = { name, boxes, ladders, clips, spawns: D.spawns, bx, bz, grid: makeGrid(boxes), clipGrid: makeGrid(clips) };
   }
   return MAPS;
 }
@@ -62,6 +64,28 @@ function near(map, x, z, r) {
     const l = g.get(gx * 4096 + gz); if (l) for (const i of l) out.add(i);
   }
   return [...out].map((i) => map.boxes[i]);
+}
+// blokady ruchu (clips) w pobliżu punktu
+function nearClips(map, x, z, r) {
+  if (!map.clips || !map.clips.length) return [];
+  const { g, C } = map.clipGrid, out = new Set();
+  for (let gx = Math.floor((x - r) / C); gx <= Math.floor((x + r) / C); gx++) for (let gz = Math.floor((z - r) / C); gz <= Math.floor((z + r) / C); gz++) {
+    const l = g.get(gx * 4096 + gz); if (l) for (const i of l) out.add(i);
+  }
+  return [...out].map((i) => map.clips[i]);
+}
+// ciało gracza (promień r, od y+0,3 do y+1,6) zachodzi na blokadę ruchu
+function inClip(map, x, y, z, r = 0.35) {
+  for (const b of nearClips(map, x, z, r + 0.1)) {
+    if (b.y1 <= y + 0.3 || b.y0 >= y + 1.6) continue;
+    if (x > b.x0 - r && x < b.x1 + r && z > b.z0 - r && z < b.z1 + r) return b;
+  }
+  return null;
+}
+// bryły, na które zachodzi ciało gracza (promień r, od y+0,3 do y+1,6) – dla botów: insideSolid sprawdza tylko środek,
+// więc między wąskimi bryłami (np. schodkowe zwężenie dziobu na Jachtach, paski po 0,5 m) zostają szczeliny, przez które bot by przeszedł
+function bodyHits(map, x, y, z, r = 0.3) {
+  return near(map, x, z, r + 0.1).filter((b) => b.y1 > y + 0.3 && b.y0 < y + 1.6 && x > b.x0 - r && x < b.x1 + r && z > b.z0 - r && z < b.z1 + r);
 }
 
 // promień o + d*t, t ∈ [0, tMax]: pierwsze trafienie w bryłę (slab test)
@@ -522,4 +546,4 @@ export function tick(room, now, out) {
 }
 export { START_DELAY, ROUND_DELAY, acceptMove as __accept, canSee as __canSee };
 // wspólne z trybem Deathmatch (dm.mjs): trafienia w fasolkę, historia ruchu do kompensacji opóźnienia, podpory i drabiny
-export { rayBean, stateAt, pushHist, supportTop, inLadder, insideSolid, near, EYE, CROUCH_DROP, JUMP_H, SEVERE };
+export { rayBean, stateAt, pushHist, supportTop, inLadder, insideSolid, near, nearClips, inClip, bodyHits, EYE, CROUCH_DROP, JUMP_H, SEVERE };

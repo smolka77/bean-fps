@@ -140,29 +140,62 @@ function lineClear(map, a, b) {
   return rayGrid(map, a, [d[0] / L, d[1] / L, d[2] / L], L) >= L - 0.05;
 }
 
-// ---------------- punkty odrodzenia: siatka 1 m na podłodze, osiągalna z punktu startu mapy ----------------
-const SPAWNS = new WeakMap();
+// ---------------- punkty odrodzenia: siatka 0,5 m na podłodze, osiągalna z punktu startu mapy ----------------
+// (0,5 m, bo na Jachtach przejścia przy salonie mają ~1,7 m, a trap i motorówka ~2,5 m – siatka 1 m ich nie widziała)
+const SPAWNS = new WeakMap(), NAV = new WeakMap(), NAV_S = 0.5, NAV_M = 0.45, NAV_STEP = 0.35;   // krok siatki, zapas od ścian, najwyższy stopień między sąsiednimi komórkami (bot wchodzi na ~0,45 m)
 function spawnGrid(map) {
   if (SPAWNS.has(map)) return SPAWNS.get(map);
-  const S = 1, nx = Math.floor(map.bx / S) - 1, nz = Math.floor(map.bz / S) - 1, free = new Map();
-  const blocked = (x, z) => MECZ.near(map, x, z, 0.75).some((b) => b.y0 < 1.9 && b.y1 > 0.3 && x > b.x0 - 0.55 && x < b.x1 + 0.55 && z > b.z0 - 0.55 && z < b.z1 + 0.55);
-  for (let i = -nx; i <= nx; i++) for (let j = -nz; j <= nz; j++) if (!blocked(i * S, j * S)) free.set(i * 4096 + j, [i * S, j * S]);
+  const S = NAV_S, M = NAV_M, nx = Math.floor(map.bx / S) - 1, nz = Math.floor(map.bz / S) - 1, free = new Map();
+  // bryły i blokady ruchu (clips: np. relingi nad wodą na mapie Jachty – bez nich siatka wychodziła nad wodę między jachtami)
+  // podłoga komórki: najwyższa niska bryła pod punktem (do 0,8 m – np. płyta podłogi na Oazie ma wierzch na 0,5 m), inaczej 0
+  const floorAt = (x, z) => { let f = 0; for (const b of MECZ.near(map, x, z, 0.1)) if (b.y1 <= 0.8 && b.y1 > f && x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1) f = b.y1; return f; };
+  const hit = (b, x, z, f) => b.y0 < f + 1.9 && b.y1 > f + 0.3 && x > b.x0 - M && x < b.x1 + M && z > b.z0 - M && z < b.z1 + M;
+  const blocked = (x, z, f) => MECZ.near(map, x, z, 0.75).some((b) => hit(b, x, z, f)) || MECZ.nearClips(map, x, z, 0.75).some((b) => hit(b, x, z, f));
+  for (let i = -nx; i <= nx; i++) for (let j = -nz; j <= nz; j++) { const x = i * S, z = j * S, f = floorAt(x, z); if (!blocked(x, z, f)) free.set(i * 4096 + j, [x, z, f]); }
   // dostępne z miejsc startu mapy (przejście po sąsiednich wolnych komórkach)
   const seen = new Set(), q = [];
-  for (const s of map.spawns || []) { const k = Math.round(s.x / S) * 4096 + Math.round(s.z / S); if (free.has(k) && !seen.has(k)) { seen.add(k); q.push(k); } }
+  // start z najbliższej wolnej komórki przy punkcie startu (punkt bywa tuż przy ścianie, np. przy burcie jachtu – wtedy jego komórka jest zajęta)
+  for (const s of map.spawns || []) {
+    const i0 = Math.round(s.x / S), j0 = Math.round(s.z / S); let k0 = null;
+    for (let r = 0; r <= 4 && k0 == null; r++) for (let a = -r; a <= r && k0 == null; a++) for (let b = -r; b <= r; b++) { const k = (i0 + a) * 4096 + (j0 + b); if (free.has(k)) { k0 = k; break; } }
+    if (k0 != null && !seen.has(k0)) { seen.add(k0); q.push(k0); }
+  }
   while (q.length) { const k = q.pop(), i = Math.round(k / 4096), j = k - i * 4096;
-    for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = (i + a) * 4096 + (j + b); if (free.has(n) && !seen.has(n)) { seen.add(n); q.push(n); } } }
+    for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = (i + a) * 4096 + (j + b); if (free.has(n) && !seen.has(n) && Math.abs(free.get(n)[2] - free.get(k)[2]) <= NAV_STEP) { seen.add(n); q.push(n); } } }
   // z zapasem: wszystkie 8 sąsiadów wolne (nie w kącie, nie wciśnięty w ścianę)
   const out = [];
   for (const k of seen) { const i = Math.round(k / 4096), j = k - i * 4096; let ok = true;
     for (let a = -1; a <= 1 && ok; a++) for (let b = -1; b <= 1; b++) if (!seen.has((i + a) * 4096 + (j + b))) { ok = false; break; }
     if (ok) out.push(free.get(k)); }
   const list = out.length >= 8 ? out : [...seen].map((k) => free.get(k));
-  SPAWNS.set(map, list); return list;
+  SPAWNS.set(map, list); NAV.set(map, new Map([...seen].map((k) => [k, free.get(k)[2]]))); return list;
 }
 
 // punkty do chodzenia po mapie (boty): jak przy odradzaniu – punkty startu mapy Deathmatch albo siatka podłogi
 export const navPoints = (map) => { const sp = map.spawns || []; return sp.length >= 8 ? sp.map((s) => [s.x, s.z, s.y || 0]) : spawnGrid(map); };
+
+// droga po siatce podłogi (te same komórki co przy odradzaniu): lista punktów [x, z] od (fx,fz) do (tx,tz) albo null.
+// Boty idą nią zamiast prosto do celu, więc obchodzą burty i przechodzą przez trap/motorówkę zamiast wbijać się w relingi.
+export function navPath(map, fx, fz, tx, tz) {
+  spawnGrid(map); const cells = NAV.get(map); if (!cells || !cells.size) return null;
+  const key = (i, j) => i * 4096 + j, dec = (k) => { const i = Math.round(k / 4096); return [i, k - i * 4096]; };
+  const nearest = (x, z) => { const i0 = Math.round(x / NAV_S), j0 = Math.round(z / NAV_S);
+    for (let r = 0; r <= 6; r++) for (let a = -r; a <= r; a++) for (let b = -r; b <= r; b++) { const k = key(i0 + a, j0 + b); if (cells.has(k)) return k; }
+    return null; };
+  const s = nearest(fx, fz), g = nearest(tx, tz); if (s == null || g == null) return null;
+  const prev = new Map([[s, s]]), q = [s];
+  for (let h = 0; h < q.length && !prev.has(g); h++) {
+    const [i, j] = dec(q[h]);
+    for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const n = key(i + a, j + b); if (!cells.has(n) || prev.has(n) || Math.abs(cells.get(n) - cells.get(q[h])) > NAV_STEP) continue;
+      if (a && b && !(cells.has(key(i + a, j)) && cells.has(key(i, j + b)))) continue;   // po skosie tylko, gdy oba boki wolne (nie przez róg)
+      prev.set(n, q[h]); q.push(n);
+    }
+  }
+  if (!prev.has(g)) return null;
+  const out = []; for (let k = g; k !== s; k = prev.get(k)) { const [i, j] = dec(k); out.push([i * NAV_S, j * NAV_S]); }
+  return out.reverse();
+}
 
 // ---------------- pokój ----------------
 const RW = 0.12;                                            // ile s po śmierci przeciwnik jeszcze jest w historii (żeby strzał oddany chwilę przed śmiercią się liczył)
