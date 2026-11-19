@@ -1443,7 +1443,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   // fasolka
   const holder = new THREE.Group(); holder.add(bean); scene.add(holder);
   // fasolka w lobby 2x większa: postać, znacznik, snop światła i cień kontaktowy w jednej skalowanej grupie
-  const STAGE = 2, stage = new THREE.Group(); stage.scale.setScalar(STAGE); scene.add(stage); stage.add(blob, ring, disc, holder);
+  const STAGE = 2, STAGE_Z = -1.3, stage = new THREE.Group(); stage.scale.setScalar(STAGE); stage.position.z = STAGE_Z; scene.add(stage); stage.add(blob, ring, disc, holder);   // trochę cofnięta od kamery
   const hitProxy = new THREE.Mesh(new THREE.CylinderGeometry(.48, .48, 1.75, 10), new THREE.MeshBasicMaterial({ visible: false })); hitProxy.position.y = .87; holder.add(hitProxy);
   const skinMats = [];                                   // materiały skóry fasolki (z gry: userData.mats.skin, inaczej wszystkie)
   if (bean.userData.mats && bean.userData.mats.skin) skinMats.push(bean.userData.mats.skin, ...(bean.userData.mats.body ? [bean.userData.mats.body] : []));
@@ -1494,7 +1494,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
     camZ = LOBBY_MAP === 'hangar' ? (portrait ? 6.0 : 5.3) : C ? (portrait ? C.zP : C.z) : (portrait ? 6.2 : 6);
     const ty = C ? (portrait ? C.tyP : C.ty) : portrait ? 1.2 : 1.0, cy = C ? C.y : .8;
     camZ *= CAM_K; camY = AIM + (cy - ty) * CAM_K;   // ten sam kąt patrzenia co wcześniej
-    lookAt.set(0, AIM, 0);
+    lookAt.set(0, AIM, STAGE_Z);
     camera.updateProjectionMatrix();
   }
   addEventListener('resize', frameCamera); frameCamera();
