@@ -695,8 +695,8 @@ const HTML = `
     <div class="lb-stakewrap" id="lb-stake-wrap">
       <div class="lb-lbl"><span data-i18n="stake.label"></span><span class="lb-solq" id="lb-stake-sol"></span></div>
       <div class="lb-stake" id="lb-stake">
-        <button type="button" data-stake="5"><b><i>$</i>5</b><small data-sol="5">SOL</small></button><button type="button" data-stake="10"><b><i>$</i>10</b><small data-sol="10">SOL</small></button>
-        <button type="button" data-stake="20"><b><i>$</i>20</b><small data-sol="20">SOL</small></button><button type="button" data-stake="custom"><b data-i18n="stake.custom"></b><small>$1–1000</small></button>
+        <button type="button" data-stake="1"><b><i>$</i>1</b><small data-sol="1">SOL</small></button><button type="button" data-stake="5"><b><i>$</i>5</b><small data-sol="5">SOL</small></button>
+        <button type="button" data-stake="10"><b><i>$</i>10</b><small data-sol="10">SOL</small></button><button type="button" data-stake="custom"><b data-i18n="stake.custom"></b><small>$1–1000</small></button>
       </div>
       <div class="lb-custom" id="lb-stake-custom" hidden><input id="lb-stake-in" type="number" min="1" max="1000" step="1" inputmode="numeric" data-i18n-ph="stake.range" aria-label="USD"><span>USD</span></div>
       <div class="lb-free" id="lb-stake-free" hidden>${IC.info}<span data-i18n="stake.free"></span></div>
