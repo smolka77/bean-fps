@@ -3,7 +3,7 @@
 // Otwierany osobnym linkiem (adres gry z #admin na końcu) albo skrótem Ctrl+Shift+A w lobby – nie ma go w menu.
 // Dostęp ma tylko właściciel artefaktu. Dane: baza artefaktu (accounts/*, matches/*, config/lobby);
 // poza claude.ai – konta z pamięci tej przeglądarki (tryb lokalny).
-import { LOBBY_MAPS, BUILTIN_SKINS, SKINS } from './lobby.js';
+import { LOBBY_MAPS, DEFAULT_LOBBY, BUILTIN_SKINS, SKINS } from './lobby.js';
 import { walletApi } from './wallet-config.js';
 import { AUTH_TXT } from './lobby-ui.js';
 import qrcode from 'qrcode-generator';
@@ -227,7 +227,7 @@ export async function openAdmin({ onClose } = {}) {
   const onKey = e => { if (e.key !== 'Escape' || !root) return; const rp = root.querySelector('.fa-rp'), d = root.querySelector('.fa-drw');
     if (rp && !rp.hidden) rp.querySelector('[data-rpx]').click(); else if (d && !d.hidden) d.hidden = true; else close(); };
   addEventListener('keydown', onKey); cleanup.push(() => removeEventListener('keydown', onKey));
-  root.innerHTML = `<div class="fa-wrap"><div class="fa-head"><div class="fa-brand"><b>BEAN<i>LADEN</i></b><span>Panel admina</span></div><div class="fa-sp"></div>
+  root.innerHTML = `<div class="fa-wrap"><div class="fa-head"><div class="fa-brand"><b>BEAN<i>GTA</i></b><span>Panel admina</span></div><div class="fa-sp"></div>
     <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div><p class="fa-empty">Ładowanie danych…</p></div>`;
   root.querySelector('[data-close]').addEventListener('click', close);
 
@@ -480,7 +480,7 @@ function relockAdmin() { admTok.set(''); cleanup.forEach(f => { try { f(); } cat
 
 function buildDashboard(db, close) {
   root.innerHTML = `<div class="fa-wrap">
-    <div class="fa-head"><div class="fa-brand"><b>BEAN<i>LADEN</i></b><span>Panel admina</span></div><span class="fa-live" id="fa-live">Łączenie…</span><div class="fa-sp"></div>
+    <div class="fa-head"><div class="fa-brand"><b>BEAN<i>GTA</i></b><span>Panel admina</span></div><span class="fa-live" id="fa-live">Łączenie…</span><div class="fa-sp"></div>
       ${SRV ? '<button class="fa-btn" type="button" id="fa-lock" title="Kończy sesję panelu – następne wejście wymaga loginu, hasła i kodu 2FA">Wyloguj z panelu</button>' : ''}
       <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div>
     <p class="fa-note" id="fa-note" hidden></p>
@@ -604,7 +604,7 @@ function buildDashboard(db, close) {
   // ---------- ustawienia: mapa lobby ----------
   const mapsBox = $('fa-maps'); let curMap = null;
   try { curMap = localStorage.getItem('fasolka-lobby-map'); } catch {}
-  const renderMaps = () => { mapsBox.innerHTML = LOBBY_MAPS.map(m => `<label><input type="radio" name="fa-lmap" value="${esc(m.id)}"${m.id === (curMap || LOBBY_MAPS[0].id) ? ' checked' : ''}><div><b>${esc(m.name)}</b><small>${esc(m.desc)}</small></div></label>`).join(''); };
+  const renderMaps = () => { mapsBox.innerHTML = LOBBY_MAPS.map(m => `<label><input type="radio" name="fa-lmap" value="${esc(m.id)}"${m.id === (curMap || DEFAULT_LOBBY) ? ' checked' : ''}><div><b>${esc(m.name)}</b><small>${esc(m.desc)}</small></div></label>`).join(''); };
   renderMaps();
   if (db) db.doc('config/lobby').get().then(s => { if (s.exists && s.data().map) { curMap = s.data().map; renderMaps(); } }).catch(() => {});
   $('fa-map-save').addEventListener('click', async e => {

@@ -9,10 +9,13 @@ Pobierz go i otwórz dwuklikiem w Chrome, Edge albo Firefoksie. Działa bez serw
 
 - **Lobby:** konto i testowy portfel USDT (zapisywane w przeglądarce), stawki, losowanie mapy, skiny, ustawienia (dźwięk, FOV, język).
 - **Tryby:**
-  - **Strzelnica:** trening solo z celami-fasolkami i tablicą ustawień.
-  - **1v1:** mecz z botem do 3 wygranych rund, na jednej z trzech map.
+  - **Strzelnica:** trening solo w podziemnym bunkrze (tunel w skale, tory, świetlówki), tarcze-fasolki na stojakach i tablica ustawień.
+  - **Z botem:** mecz 1v1 z botem do 3 wygranych rund, bez serwera i stawki.
+  - **1v1:** mecz z prawdziwym graczem o stawkę do 3 wygranych rund (serwer meczów), na jednej z trzech map.
   - **Deathmatch:** do 20 graczy, 3 minuty, widok z 3. osoby (wymaga serwera gry – szczegóły niżej).
-- **Mapy:** Oaza, Magazyn, Baza, Strzelnica.
+- **Mapy:** Bagno (dawna Oaza), Magazyn, Zatoka (dawna Baza), Strzelnica.
+  Bagno to miasteczko z drewnianych chat na mokradłach (cyprysy z mchem, trzciny, aligatory), Zatoka to neonowy port o zachodzie słońca
+  (ocean, panorama wieżowców, palmy, diabelski młyn). Wygląd tych dwóch map ustawia `zrodla/klimaty.js`: tylko grafika, kolizje i spawny są te same.
 - **Bronie:** AKM, M4A1 (z kolimatorem), Glock-17, Desert Eagle, SPAS-12, MP5K – modele 3D (GLB) i dźwięki z biblioteki gry
   (strzał, strzał z daleka, wyjęcie, magazynek, zamek, pompka, naboje); oglądanie broni pod klawiszem F.
   - 1v1: drużyna niebieska M4A1 + Desert Eagle, czerwona AKM + Glock-17. Deathmatch: start z Glockiem-17, reszta w sklepie.

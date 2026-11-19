@@ -8,21 +8,21 @@ const TXT = {
 };
 export const EARN_CSS = `
 .be-kpis{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:8px}
-.be-kpi{padding:12px;border-radius:13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
-.be-kpi small{display:block;font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8e9ab0}
-.be-kpi b{display:block;margin-top:7px;font:800 18px/1 Inter,sans-serif;font-variant-numeric:tabular-nums;color:#eef1f7}
+.be-kpi{padding:12px;border-radius:0;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
+.be-kpi small{display:block;font:600 10px/1 Barlow,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#a39aae}
+.be-kpi b{display:block;margin-top:7px;font:800 18px/1 Barlow,sans-serif;font-variant-numeric:tabular-nums;color:#f4eff6}
 .be-kpi.big b{font-size:24px}
 .be-pos{color:#2fd27a!important}.be-neg{color:#ff6b5e!important}
 .be-rng{display:flex;gap:4px;margin:14px 0 8px}
-.be-rng button{height:28px;padding:0 10px;border-radius:8px;border:1px solid rgba(255,255,255,.09);background:none;font:600 12px/1 Inter,sans-serif;color:#8e9ab0;cursor:pointer}
+.be-rng button{height:28px;padding:0 10px;border-radius:0;border:1px solid rgba(255,255,255,.09);background:none;font:600 12px/1 Barlow,sans-serif;color:#a39aae;cursor:pointer}
 .be-rng button.on{color:#fff;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2)}
-.be-chart{position:relative;height:190px;border-radius:14px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.05)}
+.be-chart{position:relative;height:190px;border-radius:0;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.05)}
 .be-chart svg{width:100%;height:100%;display:block}
-.be-chart .ax text{font:600 10px Inter,sans-serif;fill:#7d889c}
-.be-empty{height:100%;display:grid;place-items:center;padding:0 20px;text-align:center;color:#8e9ab0;font:500 13px/1.4 Inter,sans-serif}
-.be-tip{position:absolute;transform:translate(-50%,-115%);pointer-events:none;padding:7px 10px;border-radius:10px;background:#0b111e;border:1px solid rgba(255,255,255,.16);
-  font:700 12px/1.3 Inter,sans-serif;color:#eef1f7;white-space:nowrap;box-shadow:0 8px 20px rgba(0,0,0,.4)}
-.be-tip small{display:block;font-weight:600;color:#8e9ab0}
+.be-chart .ax text{font:600 10px Barlow,sans-serif;fill:#8f8698}
+.be-empty{height:100%;display:grid;place-items:center;padding:0 20px;text-align:center;color:#a39aae;font:500 13px/1.4 Barlow,sans-serif}
+.be-tip{position:absolute;transform:translate(-50%,-115%);pointer-events:none;padding:7px 10px;border-radius:0;background:#0b0610;border:1px solid rgba(255,255,255,.16);
+  font:700 12px/1.3 Barlow,sans-serif;color:#f4eff6;white-space:nowrap;box-shadow:0 8px 20px rgba(0,0,0,.4)}
+.be-tip small{display:block;font-weight:600;color:#a39aae}
 `;
 let cssOn = false;
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);

@@ -1,7 +1,7 @@
-// Strzelnica (tryb solo): mapa treningowa z celami-fasolkami + tablica ustawień na ścianie stanowiska.
+// Strzelnica (tryb solo): podziemna strzelnica w bunkrze z papierowymi tarczami-fasolkami + tablica ustawień na ścianie stanowiska.
 //
-// Gracz stoi w budce strzeleckiej i strzela do czerwonych fasolek, które pojawiają się w punktach mapy
-// (map.targets z strzelnica-data.js: x,y,z = stopy fasolki, zone = near/mid/far, strafe = amplituda ruchu bocznego).
+// Gracz stoi na stanowisku strzeleckim i strzela do tarcz, które wyskakują w punktach mapy
+// (map.targets z bunkier-data.js: x,y,z = stopy fasolki, zone = near/mid/far, strafe = amplituda ruchu bocznego).
 // Obrócony do tylnej ściany, gracz widzi tablicę z ustawieniami (zakres celów, ile naraz, jak często się pojawiają,
 // jak długo stoją, ruchome cele, dźwięk, reset statystyk, trening wł./wył.) i klika w nią celownikiem.
 //
@@ -10,6 +10,7 @@
 // range.onShot() przy każdym strzale i range.onHit(wróg, głowa, zabity) przy trafieniu. Haki opisane przy createRange.
 import * as THREE from 'three';
 import { t as tr } from './lobby-ui.js';   // słownik i aktualny język gry (PL/EN/RU/ES)
+import { makePaperTarget } from './tarcze.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const rnd = (a = 0, b = 1) => a + Math.random() * (b - a);
@@ -23,6 +24,7 @@ const PACE = { slow: 1.6, normal: 1, fast: 0.65 };    // mnożnik czasu, przez j
 //   click()                             – dźwięk kliknięcia w tablicę
 //   isSound() / setSound(on)            – dźwięk gry (to samo co klawisz M)
 //   resetKills()                        – zeruje licznik „Trafione fasolki”
+//   addHit(mesh, e)                     – siatka tarczy staje się celem pocisków za fasolkę e (trafienie = trafienie fasolki)
 export function createRange(g) {
   const { scene, camera, player, enemies } = g;
   const api = { active: false };
@@ -31,12 +33,12 @@ export function createRange(g) {
   let langSig = '', enabled = true, spots = [], panel = null, t = 0, nextSpawn = 0, hover = -2, dirty = true, frozen = false, lastPress = 0;
   const recent = [];
 
-  // ------------------------------------------------------------- niebo, mgła i światło jak w lobby (zachód słońca)
+  // ------------------------------------------------------------- wnętrze bunkra: zimne światło świetlówek, koniec tunelu ginie w jasnej mgiełce
   // Wejście w Strzelnicę zmienia tylko scenę gry, a wyjście przywraca poprzednie wartości (mapy 1v1 zostają jak były).
   const SUNSET = {
-    sky: [[0, '#2b2f6b'], [0.27, '#5a4580'], [0.4, '#c8657c'], [0.5, '#f4a46e'], [0.56, '#d4875a'], [1, '#5a4a30']],   // zenit → róż → bursztyn przy horyzoncie
-    horizon: 0xf4a46e, fog: [90, 290],                       // plac ma 70 m głębokości, wzgórza bledną w bursztynowej mgle
-    hemi: [0xffc2a6, 0x3d3324, 1.2], sun: [0xffb070, 2.7],   // ciepłe światło zza pleców strzelca
+    sky: [[0, '#0b0d11'], [1, '#0b0d11']],                   // tło za sufitem i tak niewidoczne
+    horizon: 0x9aa4b2, fog: [12, 70],                        // tunel ma 35 m: daleki koniec lekko jaśnieje w mgiełce
+    hemi: [0xd4def0, 0x30343c, 1.25], sun: [0xe8f0ff, 1.55], // chłodne, równe światło z sufitu
   };
   let env = null, skyTex = null;
   function makeSky() {
@@ -103,13 +105,13 @@ export function createRange(g) {
     if (recent.length > Math.min(8, Math.floor(spots.length / 3))) recent.shift();
     const r = e.root;
     Object.assign(e, { off: false, hp: 1, dead: 0, fall: 0, flash: 0 });   // hp 1: każde trafienie zabija (trening celności)
-    r.visible = true; r.rotation.z = 0; r.position.set(spot.x, spot.y, spot.z); r.scale.setScalar(0.01);
+    r.visible = true; r.rotation.z = 0; r.rotation.x = 0; r.position.set(spot.x, spot.y, spot.z); r.scale.setScalar(0.01);
     e.rg = { spot, born: t, tState: t, state: 'in', ttl: (1.8 + spot.dist / 16) * PACE[cfg.pace], amp: cfg.moving ? spot.strafe : 0, w: rnd(0.9, 1.35), ph: rnd(0, 6.28) };
     return true;
   }
   function release(e) {
     e.rg = null; e.off = true; e.dead = 0; e.fall = 0; e.flash = 0;
-    e.root.visible = false; e.root.rotation.z = 0; e.root.position.y = 0; e.root.scale.setScalar(1); e.mats.skin.emissive.setScalar(0);
+    e.root.visible = false; e.root.rotation.z = 0; e.root.rotation.x = 0; e.root.position.y = 0; e.root.scale.setScalar(1); e.mats.skin.emissive.setScalar(0);
   }
   function clearActive() { for (const e of enemies) if (e.rg) release(e); }
 
@@ -126,9 +128,11 @@ export function createRange(g) {
       if (!a) continue;
       const r = e.root;
       if (e.flash > 0) { e.flash -= rdt; e.mats.skin.emissive.setScalar(0.9); } else e.mats.skin.emissive.setScalar(0);
+      if (e.paper) e.paper.mat.emissive.setScalar(e.flash > 0 ? 0.35 : 0);
       if (e.dead > 0) {                                  // trafiona: przewraca się i znika
         e.dead -= rdt; e.fall = Math.min(1, e.fall + rdt * 3);
-        r.rotation.z = e.fall * (Math.PI / 2); r.position.y = a.spot.y + Math.sin(e.fall * Math.PI / 2) * 0.28;
+        if (e.paperMode) { r.rotation.x = -e.fall * (Math.PI / 2) * 0.92; r.position.y = a.spot.y; }   // tarcza przewraca się do tyłu
+        else { r.rotation.z = e.fall * (Math.PI / 2); r.position.y = a.spot.y + Math.sin(e.fall * Math.PI / 2) * 0.28; }
         if (e.dead < 2.8 - 0.65) release(e);
         continue;
       }
@@ -214,7 +218,7 @@ export function createRange(g) {
       c.beginPath(); c.moveTo(x + w * s, y); c.lineTo(x + w, y); c.lineTo(x + w * (1 - s), y + h); c.lineTo(x, y + h); c.closePath();
     };
     const vgrad = (y, h, stops) => { const gr = c.createLinearGradient(0, y, 0, y + h); stops.forEach(([p, col]) => gr.addColorStop(p, col)); return gr; };
-    const YELLOW = [[0, '#fff7a8'], [0.38, '#ffe437'], [0.7, '#ffc800'], [1, '#f5ad00']];
+    const YELLOW = [[0, '#ffc2e0'], [0.38, '#ff5fb0'], [0.7, '#ff4a7d'], [1, '#ff7a3d']];
     const RED = [[0, '#ff9a88'], [0.45, '#ee4d38'], [1, '#b92a1e']];
     const text = (s, x, y, font, color, align = 'left', ls = 0, maxW = 0) => {
       c.font = font; c.fillStyle = color; c.textAlign = align; c.textBaseline = 'middle';
@@ -230,39 +234,39 @@ export function createRange(g) {
       c.strokeStyle = 'rgba(255,255,255,0.16)'; c.lineWidth = 8; c.strokeRect(4, 4, W - 8, H - 8);
       for (const y of [16, H - 16]) {
         const gl = c.createLinearGradient(60, 0, W - 60, 0);
-        gl.addColorStop(0, 'rgba(255,225,74,0)'); gl.addColorStop(0.5, '#ffe14a'); gl.addColorStop(1, 'rgba(255,225,74,0)');
+        gl.addColorStop(0, 'rgba(255,46,147,0)'); gl.addColorStop(0.5, '#ff4fa8'); gl.addColorStop(1, 'rgba(255,46,147,0)');
         c.fillStyle = gl; c.fillRect(60, y - 2, W - 120, 4);
       }
-      c.fillStyle = '#ffe14a'; para(60, 30, 236, 38, 0.1); c.fill();
-      text(tr('rg.tag'), 60 + 118, 50, `800 21px ${FS}`, '#1d1400', 'center', 4, 210);
+      c.fillStyle = '#ff4fa8'; para(60, 30, 236, 38, 0.1); c.fill();
+      text(tr('rg.tag'), 60 + 118, 50, `800 21px ${FS}`, '#1a0614', 'center', 4, 210);
       skewed(() => {
         const ty = 122, tx = 60 + 0.14 * ty;
-        text(tr('rg.title'), tx, ty + 8, `400 72px ${FD}`, '#6e4c00', 'left', 3, 840);
-        text(tr('rg.title'), tx, ty + 4, `400 72px ${FD}`, '#a87400', 'left', 3, 840);
-        text(tr('rg.title'), tx, ty, `400 72px ${FD}`, '#ffe14a', 'left', 3, 840);
+        text(tr('rg.title'), tx, ty + 8, `400 72px ${FD}`, '#4a0c34', 'left', 3, 840);
+        text(tr('rg.title'), tx, ty + 4, `400 72px ${FD}`, '#7a1550', 'left', 3, 840);
+        text(tr('rg.title'), tx, ty, `400 72px ${FD}`, '#ff4fa8', 'left', 3, 840);
       });
       const acc = stats.shots ? Math.round((stats.hits / stats.shots) * 100) : 0;
       [[tr('rg.hits'), String(stats.hits)], [tr('rg.acc'), acc + '%']].forEach(([lab, val], i) => {
         const cx = W - 60 - 2 * 250 - 12 + i * 262;
-        c.fillStyle = 'rgba(10,22,48,0.9)'; para(cx, 46, 250, 66, 0.06); c.fill();
+        c.fillStyle = 'rgba(14,6,22,0.9)'; para(cx, 46, 250, 66, 0.06); c.fill();
         c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = 3; para(cx, 46, 250, 66, 0.06); c.stroke();
-        text(lab, cx + 28, 79, `700 21px ${FS}`, '#9fc2ff', 'left', 3, 140);
+        text(lab, cx + 28, 79, `700 21px ${FS}`, '#5ff0e2', 'left', 3, 140);
         text(val, cx + 232, 80, `400 40px ${FD}`, '#ffffff', 'right', 1);
       });
-      ROWS.forEach(([label], r) => text(tr(label).toUpperCase(), 60, rowY0 + r * pitch + bh / 2 + 3, `400 33px ${FD}`, '#cfe0ff', 'left', 2, 490));
+      ROWS.forEach(([label], r) => text(tr(label).toUpperCase(), 60, rowY0 + r * pitch + bh / 2 + 3, `400 33px ${FD}`, '#ece4f0', 'left', 2, 490));
       btns.forEach((b, i) => {
         const on = b.on(), hov = i === hv, red = b.warn && !on;
         if (on || red) {
           c.fillStyle = vgrad(b.y, b.h, red ? RED : YELLOW); para(b.x, b.y, b.w, b.h); c.fill();
           if (hov) { c.fillStyle = 'rgba(255,255,255,0.28)'; para(b.x, b.y, b.w, b.h); c.fill(); }
         } else {
-          c.fillStyle = hov ? 'rgba(52,86,150,0.98)' : 'rgba(18,36,76,0.96)'; para(b.x, b.y, b.w, b.h); c.fill();
+          c.fillStyle = hov ? 'rgba(52,86,150,0.98)' : 'rgba(30,10,40,0.96)'; para(b.x, b.y, b.w, b.h); c.fill();
           c.strokeStyle = 'rgba(255,255,255,0.3)'; c.lineWidth = 3; para(b.x + 2, b.y + 2, b.w - 4, b.h - 4); c.stroke();
         }
         if (hov) { c.strokeStyle = '#ffffff'; c.lineWidth = 5; para(b.x, b.y, b.w, b.h); c.stroke(); }
-        text(b.label().toUpperCase(), b.x + b.w / 2, b.y + b.h / 2 + 3, `400 ${b.h > 60 ? 36 : 34}px ${FD}`, red ? '#ffffff' : on ? '#2a1c00' : '#ffffff', 'center', 2, b.w - 40);
+        text(b.label().toUpperCase(), b.x + b.w / 2, b.y + b.h / 2 + 3, `400 ${b.h > 60 ? 36 : 34}px ${FD}`, red ? '#ffffff' : on ? '#1a0614' : '#ffffff', 'center', 2, b.w - 40);
       });
-      text(tr('rg.hint').toUpperCase(), 60, 750, `700 21px ${FS}`, '#9fc2ff', 'left', 3, 1400);
+      text(tr('rg.hint').toUpperCase(), 60, 750, `700 21px ${FS}`, '#5ff0e2', 'left', 3, 1400);
       tex.needsUpdate = true;
     }
     const btnAt = (px, py) => btns.findIndex((b) => px >= b.x - 6 && px <= b.x + b.w + 6 && py >= b.y - 6 && py <= b.y + b.h + 6);
@@ -292,6 +296,19 @@ export function createRange(g) {
     return true;
   };
 
+  // ------------------------------------------------------------- tarcze zamiast fasolek
+  // W Strzelnicy fasolka-cel wygląda jak papierowa tarcza na stojaku: ciało fasolki znika i przestaje być celem (paperMode),
+  // a pociski trafiają w karton (strefa głowy z oczami tak samo jak głowa fasolki: powyżej 1,12 m).
+  function paperOn(e, on) {
+    if (on && !e.paper) {
+      const t = makePaperTarget(); e.paper = t; e.root.add(t.group); e.root.rotation.order = 'YXZ';   // najpierw obrót do gracza, potem przewrót do tyłu
+      if (g.addHit) g.addHit(t.paper, e);
+    }
+    if (!e.paper) return;
+    e.paperMode = on; e.paper.group.visible = on;
+    for (const c of e.root.children) if (c !== e.paper.group) { if (on) { c.userData.wasVis = c.visible; c.visible = false; } else if (c.userData.wasVis !== undefined) { c.visible = c.userData.wasVis; delete c.userData.wasVis; } }
+  }
+
   // ------------------------------------------------------------- cykl życia
   api.enter = (map) => {
     api.active = true;
@@ -300,14 +317,14 @@ export function createRange(g) {
     if (panel) panel.mesh.visible = true;
     applyEnv();
     enabled = true; t = 0; nextSpawn = 0.6; recent.length = 0; hover = -2;
-    for (const e of enemies) { e.rg = null; e.off = true; e.dead = 0; e.root.visible = false; e.root.scale.setScalar(1); }
+    for (const e of enemies) { e.rg = null; e.off = true; e.dead = 0; e.root.visible = false; e.root.scale.setScalar(1); paperOn(e, true); }
     resetStats();
   };
   api.leave = () => {
     api.active = false;
     if (panel) panel.mesh.visible = false;
     restoreEnv();
-    for (const e of enemies) { e.rg = null; e.root.scale.setScalar(1); e.mats.skin.emissive.setScalar(0); }
+    for (const e of enemies) { e.rg = null; e.root.scale.setScalar(1); e.mats.skin.emissive.setScalar(0); paperOn(e, false); }
   };
   api.update = (dt, playing) => {
     if (!api.active) return;
