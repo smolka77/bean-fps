@@ -1442,6 +1442,8 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
 
   // fasolka
   const holder = new THREE.Group(); holder.add(bean); scene.add(holder);
+  // fasolka w lobby 2x większa: postać, znacznik, snop światła i cień kontaktowy w jednej skalowanej grupie
+  const STAGE = 2, stage = new THREE.Group(); stage.scale.setScalar(STAGE); scene.add(stage); stage.add(blob, ring, disc, holder);
   const hitProxy = new THREE.Mesh(new THREE.CylinderGeometry(.48, .48, 1.75, 10), new THREE.MeshBasicMaterial({ visible: false })); hitProxy.position.y = .87; holder.add(hitProxy);
   const skinMats = [];                                   // materiały skóry fasolki (z gry: userData.mats.skin, inaczej wszystkie)
   if (bean.userData.mats && bean.userData.mats.skin) skinMats.push(bean.userData.mats.skin, ...(bean.userData.mats.body ? [bean.userData.mats.body] : []));
@@ -1481,14 +1483,18 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
 
   // ---------- kamera i sterowanie ----------
   const lookAt = new THREE.Vector3();
-  let camZ = 5.4;
+  let camZ = 5.4, camY = .8;
+  // kadr dla 2x większej fasolki: kamera odsunięta mniej niż postać urosła (fasolka na ekranie ~1,5x większa, na Zatoce ~1,8x), celuje w środek postaci z tabliczką
+  const CAM_K = STAGE / (BAY ? 1.8 : 1.5), AIM = .98 * STAGE;   // na Zatoce kadr ma więcej miejsca nad tabliczką
   function frameCamera() {
     camera.aspect = innerWidth / innerHeight;
     const portrait = camera.aspect < 0.8;
     const C = bay && bay.cam;   // zatoka ma własny, „pocztówkowy” kadr (zatoka.js)
     camera.fov = LOBBY_MAP === 'hangar' ? (portrait ? 44 : 36) : C ? (portrait ? C.fovP : C.fov) : (portrait ? 42 : 30);
     camZ = LOBBY_MAP === 'hangar' ? (portrait ? 6.0 : 5.3) : C ? (portrait ? C.zP : C.z) : (portrait ? 6.2 : 6);
-    lookAt.set(0, C ? (portrait ? C.tyP : C.ty) : portrait ? 1.2 : 1.0, 0);
+    const ty = C ? (portrait ? C.tyP : C.ty) : portrait ? 1.2 : 1.0, cy = C ? C.y : .8;
+    camZ *= CAM_K; camY = AIM + (cy - ty) * CAM_K;   // ten sam kąt patrzenia co wcześniej
+    lookAt.set(0, AIM, 0);
     camera.updateProjectionMatrix();
   }
   addEventListener('resize', frameCamera); frameCamera();
@@ -1541,7 +1547,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
     if (hopT >= 0) { hopT += dt * 2.8; const k = Math.min(hopT, 1); holder.position.y = Math.sin(k * Math.PI) * .35; if (hopT >= 1) { hopT = -1; holder.position.y = 0; } }
 
     cmx = THREE.MathUtils.damp(cmx, mx, 2.5, dt); cmy = THREE.MathUtils.damp(cmy, my, 2.5, dt);
-    camera.position.set(cmx * .35, (bay ? bay.cam.y : .8) - cmy * .1, camZ);
+    camera.position.set(cmx * .35 * CAM_K, camY - cmy * .1 * CAM_K, camZ);
     camera.lookAt(lookAt);
 
     envUpdate(t, dt);
