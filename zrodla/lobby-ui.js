@@ -3,7 +3,7 @@
 // Konta i salda: baza danych artefaktu (claude.use("db")), a poza claude.ai – localStorage.
 
 import { createSfx } from './sfx.js';
-import { weaponSfx } from './weaponry.js';
+import { weaponSfx, setWeaponAccess, weaponAccessFor } from './weaponry.js';
 import { createWallet } from './wallet.js';
 import { walletApi } from './wallet-config.js';
 import { createProfile, paintAvatar } from './profile.js';
@@ -779,7 +779,7 @@ export function initLobbyUI(ctx) {
     activeStake = lastStake; addTx(-lastStake, 'stake');
   });
 
-  function renderAll() { renderTop(); renderStake(); renderAuth(); renderWallet(); if (P) P.render(); }
+  function renderAll() { setWeaponAccess(weaponAccessFor(acct)); renderTop(); renderStake(); renderAuth(); renderWallet(); if (P) P.render(); }   // dostęp do broni (złoty AKM) zależy od konta
   // ---- zakładka Business (ustawienia): e-mail do zapytań biznesowych, regulamin, polityka prywatności ----
   var bizDoc = null, bizEmail = OPERATOR.businessEmail, BIZ_IC = {
     mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',

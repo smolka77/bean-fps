@@ -11,7 +11,7 @@
 import * as MECZ from './mecz.mjs';
 
 // kolejność jak WEAPON_IDS w grze (zrodla/weaponry.js) – w paczkach ruchu broń to indeks w tej liście
-export const WIDS = ['akm', 'm4a1', 'glock17', 'deagle', 'spas12', 'mp5k'];
+export const WIDS = ['akm', 'm4a1', 'glock17', 'deagle', 'spas12', 'mp5k', 'akmgold'];   // akmgold: złoty AKM – jeszcze nie w trybie (brak w DM_GUNS)
 export const DM_GUNS = ['glock17', 'deagle', 'spas12', 'mp5k', 'akm', 'm4a1'];   // bronie trybu, w kolejności slotów (1 = pistolet startowy)
 export const PISTOL = 'glock17';
 

@@ -17,7 +17,7 @@ await MECZ.loadMaps(path.join(here, '..'), MAPS);
 
 const N = +(process.argv[2] || 8), BASE = (process.argv[3] || 'http://127.0.0.1:8787').replace(/\/+$/, ''), TIER = process.argv[4] || 'free';
 const PASS = process.env.BOT_PASS || 'test-bot-haslo-123';
-const WIDS = ['akm', 'm4a1', 'glock17', 'deagle', 'spas12', 'mp5k'];   // jak WEAPON_IDS w grze
+const WIDS = ['akm', 'm4a1', 'glock17', 'deagle', 'spas12', 'mp5k', 'akmgold'];   // jak WEAPON_IDS w grze
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const post = async (p, body, tok) => { const r = await fetch(BASE + p, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) }, body: JSON.stringify(body || {}) }); return { status: r.status, j: await r.json().catch(() => ({})) }; };
 

@@ -139,6 +139,8 @@ export const TIMELINES = {
 };
 // MP5K i SPAS-12: ten sam rytm co M4A1, lewa dłoń na kotwicach guard* danej broni (chwyt przedni / czółenko)
 TIMELINES.mp5k = { ...TIMELINES.m4a1 };
+TIMELINES.akmgold = TIMELINES.akm;                                               // złoty AKM: ten sam model co AKM
+ANCHORS.akmgold = ANCHORS.akm;
 TIMELINES.spas12 = { ...TIMELINES.m4a1, spring: { w: 13, z: 0.82 } };          // cięższa: wolniejsza sprężyna
 
 // ---------------- interpolacja ----------------

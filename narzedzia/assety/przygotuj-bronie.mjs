@@ -36,10 +36,12 @@ const DZWIEKI = process.env.BRONIE_DZWIEKI || path.join(os.homedir(), 'Downloads
 // rotY: obrót wokół osi pionowej [°] ustawiający lufę w −Z; length: długość całkowita [m] (pudełko wzdłuż Z);
 // origin: prawa dłoń na chwycie w układzie „wyśrodkowanym” (środek pudełka modelu = 0) [m];
 // parts: pudełka [x0,y0,z0,x1,y1,z1] w układzie końcowym (początek = dłoń) – kawałki siatki ze środkiem w pudełku idą do części.
-// drop: pudełka kawałków do usunięcia; tex: największy rozmiar tekstur.
+// drop: pudełka kawałków do usunięcia; tex: największy rozmiar tekstur; gold: pozłacanie metalu (patrz goldify niżej).
+const AKM = { src: 'akm.glb', rotY: 90, length: 0.88, origin: [-0.0038, 0.017, 0.157], tex: 1024,
+  parts: { mag: [-1, -1, -0.277, 1, 0.023, -0.067], slide: [0.0208, 0.063, -0.197, 0.0338, 0.073, -0.177] } };              // magazynek, kula rączki zamka
 export const WEAPONS = {
-  akm: { src: 'akm.glb', rotY: 90, length: 0.88, origin: [-0.0038, 0.017, 0.157], tex: 1024,
-    parts: { mag: [-1, -1, -0.277, 1, 0.023, -0.067], slide: [0.0208, 0.063, -0.197, 0.0338, 0.073, -0.177] } },          // magazynek, kula rączki zamka
+  akm: AKM,
+  akmgold: { ...AKM, gold: { color: [236, 186, 84], rough: 0.2, woodRough: 0.42, woodMetal: 0.12 } },                     // złoty AKM: ten sam model, metal pozłacany
   m4a1: { src: 'assault_rifle_m4a1.glb', rotY: 180, length: 0.84, origin: [-0.0008, -0.025, 0.136], tex: 1024,
     parts: { mag: [-1, -1, -0.186, 1, 0.02, -0.066] },
     drop: [-1, 0.108, -0.416, 1, 0.155, -0.296] },                                                                       // oświetlacz na szynie zasłaniał kolimator
@@ -146,9 +148,41 @@ function subset(p, tris) {
   return { material: p.material, A, idx };
 }
 
+// ---------------- pozłacanie ----------------
+// Szary (mało nasycony) metal z tekstury koloru → złoto z zachowaniem jasności (rysy, zużycie, napisy); nasycone drewno
+// zostaje. Mapa metal/chropowatość od nowa: złoto gładkie i w pełni metaliczne, drewno lakierowane, prawie niemetaliczne
+// (kanał R = okluzja zostaje). AKM ma metaliczność 1 na całej teksturze, więc metal od drewna odróżnia dopiero kolor.
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+async function goldify(doc, G) {
+  for (const m of doc.getRoot().listMaterials()) {
+    const bt = m.getBaseColorTexture(); if (!bt) continue;
+    const base = sharp(Buffer.from(bt.getImage())), { width: W, height: H } = await base.metadata(), n = W * H;
+    const px = await base.ensureAlpha().raw().toBuffer();
+    const mrT = m.getMetallicRoughnessTexture();
+    const mr = mrT ? await sharp(Buffer.from(mrT.getImage())).resize(W, H).ensureAlpha().raw().toBuffer() : null;
+    const ob = Buffer.alloc(n * 3), om = Buffer.alloc(n * 3);
+    for (let i = 0; i < n; i++) {
+      const r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2], mx = Math.max(r, g, b), s = mx ? (mx - Math.min(r, g, b)) / mx : 0;
+      const k = 1 - smooth(0.16, 0.32, s);                                     // 1 = metal (szary), 0 = drewno
+      const L = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255, f = Math.min(1.2, Math.max(0.3, 0.42 + 1.55 * L));
+      for (let c = 0; c < 3; c++) ob[i * 3 + c] = Math.round(px[i * 4 + c] + (Math.min(255, G.color[c] * f) - px[i * 4 + c]) * k);
+      om[i * 3] = mr ? mr[i * 4] : 255;
+      om[i * 3 + 1] = Math.round(255 * (G.woodRough + (G.rough - G.woodRough) * k));
+      om[i * 3 + 2] = Math.round(255 * (G.woodMetal + (1 - G.woodMetal) * k));
+    }
+    const png = (buf) => sharp(buf, { raw: { width: W, height: H, channels: 3 } }).png().toBuffer();
+    bt.setImage(await png(ob)).setMimeType('image/png');
+    const mt = mrT || doc.createTexture('mr');
+    mt.setImage(await png(om)).setMimeType('image/png');
+    if (!mrT) m.setMetallicRoughnessTexture(mt);
+    m.setRoughnessFactor(1).setMetallicFactor(1);
+  }
+}
+
 // ---------------- model ----------------
 async function buildModel(id, cfg, io, opt) {
   const doc = await io.read(path.join(MODELE, cfg.src));
+  if (cfg.gold) await goldify(doc, cfg.gold);
   const root = doc.getRoot(), buffer = root.listBuffers()[0] || doc.createBuffer();
   const prims = bake(doc), info = align(prims, cfg);
   const groups = { body: [] }, report = [];
@@ -263,7 +297,7 @@ for (const id of list) {
     if (flag('--raport')) fs.writeFileSync(path.join(glbDir || here, `${id}-raport.json`), JSON.stringify({ info: r.info, groups: r.groups, comps: r.report.sort((a, b) => b.tris - a.tris) }, null, 1));
     console.log(id, 'model', (r.glb.byteLength / 1024).toFixed(0) + ' KB', 'rozmiar [m]', r.info.size.map((v) => v.toFixed(3)).join(' × '), 'części', JSON.stringify(r.groups));
   }
-  if (!flag('--bez-dzwiekow')) {
+  if (!flag('--bez-dzwiekow') && SOUNDS[id]) {          // akmgold: dźwięki AKM (WEAPON_STATS.snd)
     const s = buildSounds(id);
     fs.writeFileSync(path.join(OUT, `${id}-snd.js`), header('Dźwięki (MP3)', id) + `export default ${JSON.stringify(s.out)};\n`);
     console.log(id, 'dźwięki', (s.bytes / 1024).toFixed(0) + ' KB', Object.keys(s.out).join(','));

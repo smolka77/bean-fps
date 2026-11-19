@@ -6,7 +6,7 @@ import { weaponAudio } from './weapons/_audio.js';
 export { weaponAudio };
 
 // kolejność = indeksy w paczkach sieciowych (serwer: serwer/dm.mjs WIDS, pierwsze cztery także serwer/mecz.mjs)
-export const WEAPON_IDS = ['akm', 'm4a1', 'glock17', 'deagle', 'spas12', 'mp5k'];
+export const WEAPON_IDS = ['akm', 'm4a1', 'glock17', 'deagle', 'spas12', 'mp5k', 'akmgold'];
 export const PISTOL_ID = 'glock17';                  // pistolet startowy (Deathmatch)
 
 // Statystyki. recoil.pitch/yaw w radianach na strzał, spread w radianach (połowa kąta stożka). snd = klucz próbek w _audio.js.
@@ -31,6 +31,23 @@ export const WEAPON_STATS = {
              recoil: { pitch: .0072, yaw: .004, kick: .03, rot: .05 }, spread: { hip: .0075, ads: .0022, move: .8, bloom: .09 }, snd: 'mp5k',
              fov: 58, relief: .085, recoilTravel: 0 },
 };
+// Złoty AKM: ta sama broń co AKM (statystyki, dźwięki, animacje), inny model; tylko dla wybranych graczy (restricted)
+WEAPON_STATS.akmgold = { ...WEAPON_STATS.akm, name: 'AKM Gold', slot: 7, restricted: true };
+
+// ---------------- dostęp do broni z ograniczeniami ----------------
+// Broń z restricted: true widać (w slotach, później w sklepie) tylko u graczy, którym dano do niej dostęp.
+// Kryteria: do ustalenia – na razie dostęp ma tylko admin (podgląd). Lobby woła setWeaponAccess(weaponAccessFor(konto))
+// przy każdej zmianie konta, a gra dostaje zdarzenie 'fasolka:weapon-access'.
+const ACCESS = new Set();
+export function weaponAccessFor(acct) {
+  return Object.keys(WEAPON_STATS).filter((id) => WEAPON_STATS[id].restricted && acct && acct.admin);
+}
+export function setWeaponAccess(ids) {
+  const next = new Set(ids || []); if (next.size === ACCESS.size && [...next].every((id) => ACCESS.has(id))) return;
+  ACCESS.clear(); for (const id of next) ACCESS.add(id);
+  try { dispatchEvent(new CustomEvent('fasolka:weapon-access', { detail: [...ACCESS] })); } catch {}
+}
+export const weaponAllowed = (id) => !!WEAPON_STATS[id] && (!WEAPON_STATS[id].restricted || ACCESS.has(id));
 
 // ---------------- modele ----------------
 const MODELS = {};
@@ -269,10 +286,11 @@ const SAMPLE_VOL = { shot: .5, far: .75, draw: .4, magOut: .5, magIn: .55, magHi
 // odtwórz próbkę broni: weaponSfx(AC, master, 'akm', 'magIn'); zwraca false, gdy próbki brak (jeszcze się dekoduje)
 export function weaponSfx(AC, out, id, key, { vol = 1, rate = 1, lp = 0, at = 0 } = {}) {
   if (!AC || !out) return false;
-  const B = weaponAudio(AC), src = B.has(id, key) ? id : 'common';
+  const B = weaponAudio(AC), bank = soundBank(id), src = B.has(bank, key) ? bank : 'common';
   return B.play(src, key, { out, vol: vol * (SAMPLE_VOL[key] || .5), rate, lp, at });
 }
-weaponSfx.has = (AC, id, key) => !!AC && weaponAudio(AC).has(id, key);
+weaponSfx.has = (AC, id, key) => !!AC && weaponAudio(AC).has(soundBank(id), key);
+const soundBank = (id) => (WEAPON_STATS[id] && WEAPON_STATS[id].snd) || id;   // złoty AKM gra próbkami AKM
 // strzał: kind = WEAPON_STATS[id].snd; dist [m] – strzał innego gracza (z daleka: nagranie „distant” i stłumione wysokie tony)
 export function weaponSound(AC, out, noiseBuf, kind, vol = 1, dist = 0) {
   if (!AC) return;

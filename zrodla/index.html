@@ -344,7 +344,7 @@ import {createMatch} from './match.js';
 import {createNet} from './net.js';
 import {createRange} from './range.js';
 import {createDM} from './dm.js';            // tryb Deathmatch (do 20 graczy): HUD, WASTED, sklep po śmierci, podium
-import {WEAPON_IDS,WEAPON_STATS,PISTOL_ID,loadWeaponModels,createWeapon,applyParts,reloadPose,drawPose,magGrabPoint,pouchPoint,createShells,weaponSound,weaponSfx,cyclePose,EJECT_AT} from './weaponry.js';
+import {WEAPON_IDS,WEAPON_STATS,PISTOL_ID,weaponAllowed,loadWeaponModels,createWeapon,applyParts,reloadPose,drawPose,magGrabPoint,pouchPoint,createShells,weaponSound,weaponSfx,cyclePose,EJECT_AT} from './weaponry.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {gunEnvironment} from './weapons/_env.js';   // odbicia dla broni w widoku z pierwszej osoby
 import {TIMELINES,ANCHORS,SETTLE,prepareTimeline,newInspectState,evalInspect,evalLeft} from './inspect.js';
@@ -782,7 +782,8 @@ let DMX=null;                                              // tryb Deathmatch (c
 const DM_ORDER=['glock17','deagle','spas12','mp5k','akm','m4a1'];
 function slotList(){
   if(DMX&&DMX.active&&MODE==='dm')return DM_ORDER.filter(id=>DMX.owned.includes(id)).map(id=>inv.findIndex(w=>w.id===id)).filter(i=>i>=0);
-  return TEAM.me==null?inv.map((_,i)=>i):TEAM_GUNS[TEAM.me].map(id=>inv.findIndex(w=>w.id===id)).filter(i=>i>=0)}
+  return TEAM.me==null?inv.map((_,i)=>i).filter(i=>weaponAllowed(inv[i].id)):TEAM_GUNS[TEAM.me].map(id=>inv.findIndex(w=>w.id===id)).filter(i=>i>=0)}   // Strzelnica: bronie z ograniczonym dostępem tylko dla uprawnionych
+addEventListener('fasolka:weapon-access',()=>{try{const sl=slotList();if(!sl.includes(curW)&&gun.switchTo<0&&sl.length)equipNow(sl[0]);setHud()}catch(e){}});   // konto zmieniło dostęp (lobby może to zgłosić, zanim gra wystartuje)
 function equipNow(i){                                       // broń od razu w rękach (start meczu), bez animacji wyjmowania
   cancelInspect(true);gun.switching=0;gun.switchTo=-1;gun.swapped=false;gun.reloading=0;gun.reloadClick=false;gun.autoReload=0;
   curW=i;rifle=inv[i].inst;attachRifle(player.view);
@@ -883,7 +884,7 @@ function makeEnemy(i){
   root.traverse(o=>{if(o.isMesh&&o.geometry!==undefined){o.userData.enemy=e;enemyMeshes.push(o)}});
   // karabin w rękach (bez efektów strzału; siatki karabinu nie są celem dla pocisków)
   const holder=new THREE.Group();holder.position.copy(HOLDER_PIVOT);root.userData.torso.add(holder);
-  const r=createWeapon(WEAPON_IDS[i%WEAPON_IDS.length],{fx:false});placeTP(r);holder.add(r.group);
+  const open=WEAPON_IDS.filter(id=>!WEAPON_STATS[id].restricted),r=createWeapon(open[i%open.length],{fx:false});placeTP(r);holder.add(r.group);
   e.holder=holder;e.rifle=r;
   // pozycja rąk wrogów: opuszczone na boki
   enemies.push(e);return e;

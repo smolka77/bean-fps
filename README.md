@@ -19,6 +19,8 @@ Pobierz go i otwórz dwuklikiem w Chrome, Edge albo Firefoksie. Działa bez serw
 - **Bronie:** AKM, M4A1 (z kolimatorem), Glock-17, Desert Eagle, SPAS-12, MP5K – modele 3D (GLB) i dźwięki z biblioteki gry
   (strzał, strzał z daleka, wyjęcie, magazynek, zamek, pompka, naboje); oglądanie broni pod klawiszem F.
   - 1v1: drużyna niebieska M4A1 + Desert Eagle, czerwona AKM + Glock-17. Deathmatch: start z Glockiem-17, reszta w sklepie.
+  - **AKM Gold** (złoty AKM): ta sama broń co AKM, pozłacany model; tylko dla wybranych graczy – kryteria dostępu do ustalenia,
+    na razie widzi go tylko admin w Strzelnicy (`weaponAccessFor` w `zrodla/weaponry.js`).
 
 ## Deathmatch
 
