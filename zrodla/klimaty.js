@@ -4,6 +4,7 @@
 // Styl fasolki: low poly, płaskie kolory, cieniowanie płaskie. Dekoracje leżą poza polem gry (albo płasko na ziemi), kule ich nie widzą.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { YACHT, halfAt as yachtHalf } from './magazyn-data.js';   // wymiary jachtów (piana przy burtach)
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const UP = V3(0, 1, 0);
@@ -685,7 +686,117 @@ function themeSwamp(M, root, meshes, ground) {
   };
 }
 
-const THEMES = { Baza: themeBay, Oaza: themeSwamp };
+// ======================================================================================================
+//                    MAGAZYN → JACHTY (dwa jachty na otwartym morzu w słoneczny dzień)
+// ======================================================================================================
+// Mapa i kolizje: magazyn-data.js. Tu tylko otoczenie: niebo z kłębiastymi chmurami, głębokie morze z falami,
+// piana wokół kadłubów, boje, wysepki z palmami, miasto na horyzoncie, przepływający jacht i mewy.
+function themeYachts(M, root) {
+  const rand = rng(20261120), { CX, HALF, STERN, BOW, WL, GATE_BOAT } = YACHT;
+  const sunOff = V3(16, 30, -12);
+  const sunDir = sunOff.clone().normalize();
+  const FOG = '#cfe6f4';
+  const sky = skyTexture({
+    stops: [[90, '#1f63c4'], [60, '#2f7ad6'], [35, '#549dea'], [18, '#86bff2'], [8, '#b5daf7'], [2, '#dcefff'], [0, '#e9f5fc'], [-2, FOG], [-15, '#3d7fb5'], [-90, '#163a66']],
+    sun: { dir: sunDir, r: 22, disc: '#fffdf2', glow: [[420, 'rgba(255,255,240,.28)'], [160, 'rgba(255,252,230,.55)'], [60, 'rgba(255,255,248,.95)']] },
+    paint: (x, W, H, px, wrap) => {
+      const r = rng(311);
+      // kłębiaste cumulusy nisko nad horyzontem (jak na zdjęciu) i rzadkie pierzaste smugi wyżej
+      for (let i = 0; i < 26; i++) {
+        const cx = r() * W, el = 2 + r() * 9, cy = elevY(H, el), w = 60 + r() * 170, n = 5 + Math.floor(r() * 6);
+        for (let k = 0; k < n; k++) {
+          const ox = (k / (n - 1) - 0.5) * w, rr = (14 + r() * 26) * (1 - Math.abs(k / (n - 1) - 0.5)), oy = -rr * (0.3 + r() * 0.5);
+          wrap((o) => {
+            x.fillStyle = 'rgba(190,210,230,.55)'; x.beginPath(); x.arc(cx + ox + o, cy + oy + rr * 0.25, rr, 0, Math.PI * 2); x.fill();   // cień pod spodem
+            x.fillStyle = 'rgba(255,255,255,.92)'; x.beginPath(); x.arc(cx + ox + o, cy + oy, rr, 0, Math.PI * 2); x.fill();
+          });
+        }
+        wrap((o) => { x.fillStyle = 'rgba(220,234,246,.9)'; x.fillRect(cx - w / 2 - 20 + o, cy - 2, w + 40, 6); });
+      }
+      for (let i = 0; i < 18; i++) {
+        const el = 25 + r() * 40, y = elevY(H, el), cx = r() * W, w = 200 + r() * 420;
+        x.fillStyle = `rgba(255,255,255,${0.12 + r() * 0.18})`; wrap((o) => { x.beginPath(); x.ellipse(cx + o, y, w / 2, 3 + r() * 6, -0.05, 0, Math.PI * 2); x.fill(); });
+      }
+    },
+  });
+
+  // ---- morze ----
+  const water = makeWater({ y: WL, color: '#1d5a9a', rough: 0.22, metal: 0.35, env: sky, envI: 0.95, amp: 0.13, freq: 0.16, speed: 0.9 });
+  root.add(water.mesh);
+  const K = new Kit();
+  // piana wzdłuż kadłubów (biały postrzępiony pas przy linii wody) i przy motorówce
+  const foam = (pts, w) => {
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [ax, az] = pts[i], [bx, bz] = pts[i + 1], dx = bz - az, dz = -(bx - ax), l = Math.hypot(dx, dz) || 1, wa = w * (0.6 + rand() * 0.8), wb = w * (0.6 + rand() * 0.8);
+      const A = V3(ax, WL + 0.12, az), B = V3(bx, WL + 0.12, bz), A2 = V3(ax + dx / l * wa, WL + 0.1, az + dz / l * wa), B2 = V3(bx + dx / l * wb, WL + 0.1, bz + dz / l * wb);
+      K.tris([A, B, B2, A, B2, A2], i % 3 ? '#f4fbff' : '#d9eefb');
+    }
+  };
+  for (const c of [-CX, CX]) for (const sx of [-1, 1]) {
+    const pts = []; for (let z = STERN; z <= BOW - 1; z += 0.5) pts.push([c + sx * yachtHalf(z) * 0.95, z]);
+    foam(sx > 0 ? pts : pts.reverse(), 0.8);
+  }
+  for (const c of [-CX, CX]) foam([[c + HALF * 0.95, STERN - 0.1], [c - HALF * 0.95, STERN - 0.1]], 1.2);
+  const bx = CX - HALF; foam([[-bx, GATE_BOAT[0] - 0.05], [bx, GATE_BOAT[0] - 0.05]], 0.5); foam([[bx, GATE_BOAT[1] + 0.05], [-bx, GATE_BOAT[1] + 0.05]], 0.5);
+  // boje dookoła (czerwone i białe) – daleko od pokładów, kule ich nie widzą
+  const buoys = [];
+  for (const [x, z, col] of [[-30, -34, '#e2343c'], [30, -34, '#f4f4f0'], [-32, 34, '#f4f4f0'], [32, 34, '#e2343c'], [0, -40, '#ff8a3d'], [0, 40, '#ff8a3d']]) {
+    const b = new THREE.Group(), bk = new Kit();
+    bk.add(new THREE.CylinderGeometry(0.5, 0.75, 1.1, 8), col, M4(0, 0.2, 0)); bk.add(new THREE.CylinderGeometry(0.06, 0.06, 1.4, 6), '#333a44', M4(0, 1.3, 0));
+    bk.add(new THREE.ConeGeometry(0.28, 0.45, 6), col, M4(0, 2.1, 0)); bk.meshes(true).forEach((m) => b.add(m));
+    b.position.set(x, WL, z); b.userData = { ph: rand() * 6.28 }; root.add(b); buoys.push(b);
+  }
+  // ---- wysepki z palmami i plażą (daleko, za mgiełką) ----
+  const PC = { trunk: '#8a6a4c', trunk2: '#7a5a40', leaf: '#2f9a52', leaf2: '#24804a', nut: '#5a3a24' };
+  for (const [x, z, r] of [[-150, 120, 26], [-210, -60, 18], [170, 160, 34], [230, -140, 22], [60, 260, 40], [-90, -230, 28]]) {
+    const sand = jitter(new THREE.IcosahedronGeometry(1, 2), 0.18, rand); sand.scale(r, r * 0.16, r * 0.8);
+    K.add(sand, '#f1dfb0', M4(x, WL - 0.6, z));
+    const hill = jitter(new THREE.IcosahedronGeometry(1, 1), 0.25, rand); hill.scale(r * 0.6, r * 0.32, r * 0.45);
+    K.add(hill, '#4fa45a', M4(x + r * 0.1, WL + 0.6, z));
+    const n = Math.round(r / 4);
+    for (let i = 0; i < n; i++) { const a = rand() * 6.28, d = r * (0.25 + rand() * 0.5); addPalm(K, x + Math.cos(a) * d, WL + r * 0.12, z + Math.sin(a) * d * 0.8, 6 + rand() * 6, rand, PC); }
+  }
+  // latarnia morska na jednej z wysp
+  K.add(new THREE.CylinderGeometry(1.4, 2.0, 16, 10), '#f6f2ea', M4(-150, WL + 10, 120)); K.add(new THREE.CylinderGeometry(1.45, 1.45, 3, 10), '#e2343c', M4(-150, WL + 6, 120));
+  K.add(new THREE.CylinderGeometry(1.45, 1.45, 3, 10), '#e2343c', M4(-150, WL + 12, 120)); K.add(new THREE.CylinderGeometry(1.1, 1.1, 1.6, 10), '#ffe8a0', M4(-150, WL + 18.8, 120), 'glow');
+  K.add(new THREE.ConeGeometry(1.6, 1.8, 10), '#e2343c', M4(-150, WL + 20.5, 120));
+  // ---- miasto na horyzoncie (pastelowe wieżowce, jak Vice City z daleka) ----
+  const TOW = ['#f3e3cf', '#d9ecf2', '#f6d2dc', '#cfe5e0', '#e8e2f4', '#fdf2df', '#bcd6ea'];
+  for (let i = 0; i < 46; i++) {
+    const a = -0.55 + (i / 45) * 1.1 + (rand() - 0.5) * 0.02, d = 420 + rand() * 60, w = 10 + rand() * 18, h = 20 + rand() * 70 * (1 - Math.abs(a) * 0.9);
+    K.box(w, h, w, TOW[Math.floor(rand() * TOW.length)], M4(Math.sin(a) * d, WL + h / 2, Math.cos(a) * d, a));
+    if (rand() < 0.3) K.box(w * 0.5, h * 0.25, w * 0.5, TOW[Math.floor(rand() * TOW.length)], M4(Math.sin(a) * d, WL + h + h * 0.12, Math.cos(a) * d, a));
+  }
+  K.meshes(false).forEach((m) => root.add(m));
+  // ---- przepływający w oddali jacht i skuter z kilwaterem ----
+  const far = new THREE.Group(); {
+    const fk = new Kit();
+    fk.box(4, 1.6, 18, '#f4f6f8', M4(0, 0.6, 0)); fk.box(3.2, 1.4, 9, '#f4f6f8', M4(0, 2.1, -1)); fk.box(3.25, 0.6, 7, '#0e1622', M4(0, 2.2, -0.5));
+    fk.box(2.6, 1.0, 4, '#f4f6f8', M4(0, 3.3, -2)); fk.add(new THREE.ConeGeometry(2, 5, 4), '#f4f6f8', M4(0, 0.6, 11, Math.PI / 4, Math.PI / 2, 0, 1, 1, 0.55));
+    fk.tris([V3(-2, 0.05, -9), V3(2, 0.05, -9), V3(9, 0.03, -45), V3(-2, 0.05, -9), V3(9, 0.03, -45), V3(-9, 0.03, -45)], '#e4f2fb');
+    fk.meshes(false).forEach((m) => far.add(m));
+  }
+  root.add(far);
+  const ski = new THREE.Group(); {
+    const sk = new Kit(); sk.box(0.9, 0.5, 2.6, '#ff2e93', M4(0, 0.25, 0)); sk.box(0.5, 0.5, 0.8, '#1b1f26', M4(0, 0.7, -0.3));
+    sk.tris([V3(-0.4, 0.04, -1.3), V3(0.4, 0.04, -1.3), V3(2.2, 0.02, -12), V3(-0.4, 0.04, -1.3), V3(2.2, 0.02, -12), V3(-2.2, 0.02, -12)], '#eef7fd');
+    sk.meshes(false).forEach((m) => ski.add(m));
+  }
+  root.add(ski);
+  const flock = birds(10, rand, '#f2f4f6'); flock.forEach((b) => root.add(b));
+  return {
+    sky, fog: FOG, near: 90, far: 560,
+    hemi: ['#e6f3ff', '#9cbdd6', 1.35], sun: ['#fff6e6', 3.2], sunOff, env: sky, envI: 0.75,
+    update(t) {
+      water.tick(t);
+      buoys.forEach((b) => { const p = b.userData.ph; b.position.y = WL + Math.sin(t * 1.3 + p) * 0.15; b.rotation.set(Math.sin(t * 1.1 + p) * 0.12, 0, Math.cos(t * 0.9 + p) * 0.12); });
+      const fa = t * 0.012; far.position.set(Math.cos(fa) * 190, WL + Math.sin(t * 0.8) * 0.1, Math.sin(fa) * 190); far.rotation.y = -fa + Math.PI;
+      const sa = t * 0.09; ski.position.set(Math.cos(sa) * 60, WL + 0.1 + Math.sin(t * 3) * 0.06, 4 + Math.sin(sa) * 46); ski.rotation.set(0, -sa + Math.PI, Math.sin(t * 2) * 0.08);
+      flock.forEach((b) => { const u = b.userData, a = u.a + t * 0.22 * u.s; b.position.set(Math.cos(a) * 38 * u.r, 20 + u.h, Math.sin(a) * 34 * u.r); b.rotation.y = -a; b.scale.set(1, Math.sin(t * 8 + u.ph), 1); });
+    },
+  };
+}
+const THEMES = { Baza: themeBay, Oaza: themeSwamp, Magazyn: themeYachts };
 
 // ======================================================================================================
 //   createClimates: dekorowanie map po wczytaniu + przełączanie nieba, mgły i świateł przy zmianie mapy

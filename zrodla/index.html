@@ -1631,7 +1631,7 @@ function stepRemote(e,dt){
   _gl.copy(e.rifle.gripLTP);e.rifle.group.localToWorld(_gl);ud.torso.worldToLocal(_gl);
   poseArmsTo(ud,_gr,_gl);
 }
-// ================= mapy 1v1 w rotacji (Oaza, Magazyn, Baza) =================
+// ================= mapy 1v1 w rotacji (Oaza = Bagno, Magazyn = Jachty, Baza = Zatoka) =================
 const arenaBoxes=boxes.slice(),arenaMeshes=boxMeshes.slice(),arenaGround=window.__ground;
 const MAPS=[{name:'Oaza',src:'./oaza-data.js'},{name:'Magazyn',src:'./magazyn-data.js'},{name:'Baza',src:'./baza-data.js'}];
 // Strzelnica: mapa treningowa trybu solo (nie wchodzi do rotacji 1v1). Cele, tablica ustawień i statystyki: range.js
@@ -1711,11 +1711,12 @@ const loadMaps=(async()=>{                         // mapy ładują się w tle, 
   await Promise.all(ALLMAPS.map(async M=>{
     try{
       const mod=await import(M.src),D=mod.MAP||mod.OAZA,B=mod.GLB||mod.OAZA_GLB;
-      const g=mod.build?{scene:mod.build()}:await new Promise((res,rej)=>ld.parse(Uint8Array.from(atob(B),c=>c.charCodeAt(0)).buffer,'',res,rej));   // mapa z kodu (bunkier) albo z GLB
+      const g=mod.build?{scene:mod.build(THREE)}:await new Promise((res,rej)=>ld.parse(Uint8Array.from(atob(B),c=>c.charCodeAt(0)).buffer,'',res,rej));   // mapa z kodu (Jachty, bunkier) albo z GLB
       if(!M.range)try{stripSpawnDecor(g.scene,D.spawns)}catch(e){console.warn('Podesty:',e)}
       M.meshes=[];let roof=null;g.scene.traverse(o=>{if(o.name==='Dach')roof=o});M.roof=roof;
       g.scene.traverse(o=>{if(!o.isMesh)return;const c=o.material&&o.material.color;
         if(c&&c.r>.99&&c.g<.01&&c.b>.99){o.visible=false;return}     // siatka kolizji z eksportu – niewidoczna
+        if(o.userData.noHit)return;                                   // ozdoby (relingi, kadłub pod pokładem) nie zatrzymują kul – jak na serwerze
         let inRoof=false;for(let p=o;p;p=p.parent)if(p===roof)inRoof=true;
         o.castShadow=!inRoof;o.receiveShadow=true;M.meshes.push(o)});   // dach nie rzuca cienia – w hali jest jasno
       M.ground=M.meshes.find(o=>/floor|ground|teren/i.test(o.name))||M.meshes[0];
@@ -1723,7 +1724,7 @@ const loadMaps=(async()=>{                         // mapy ładują się w tle, 
       g.scene.visible=false;scene.add(g.scene);M.group=g.scene;M.spawns=D.spawns;
       const cols=stripPadColliders(D,D.colliders),clips=stripPadColliders(D,D.clips);
       M.boxes=cols.concat(clips).map(([x0,y0,z0,x1,y1,z1])=>({minX:x0,maxX:x1,minZ:z0,maxZ:z1,top:y1,bottom:y0}));   // clips: blokady ruchu gracza (kule i tak lecą po siatce mapy)
-      M.targets=D.targets||[];M.panel=D.panel||null;
+      M.targets=D.targets||[];M.panel=D.panel||null;M.view=D.view||null;
       M.ladders=(D.ladders||[]).map(([x0,y0,z0,x1,y1,z1,nx,nz])=>({x0,y0,z0,x1,y1,z1,nx,nz}));
       M.bx=Math.max(...D.colliders.map(c=>Math.max(-c[0],c[3])))-.6;M.bz=Math.max(...D.colliders.map(c=>Math.max(-c[2],c[5])))-.6;   // granice areny z pełnej listy kolizji
       M.ready=true;if(!M.range)thumbQ.push(M);          // miniatury tylko dla map z rotacji 1v1
