@@ -5,6 +5,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildVillage } from './village.js';
 import { buildBattlefield } from './battlefield.js';
 import { buildHangar } from './hangar.js';
+import { buildVice } from './vice.js';
 import { initLobbyUI, t as tr, skinName } from './lobby-ui.js';
 import CUSTOM_SKINS from './skins-data.js';
 
@@ -563,6 +564,122 @@ const CSS = `
 @media (max-width:520px){#lb-ui .lb-binds{grid-template-columns:minmax(0,1fr)}}
 `;
 
+// ---------- motyw GTA / Vice City: nakładka na style powyżej (neonowy róż i turkus, skośne przyciski, ciężkie kursywne nagłówki) ----------
+const GTA_CSS = `
+#lb-ui{--bg:rgba(34,10,60,.78);--bg2:rgba(26,8,46,.97);--line:rgba(255,120,200,.2);--line2:rgba(255,140,210,.45);--tx:#fff6fc;--mut:#d0a8dc;
+  --acc:#ff4fa3;--acc2:#ff8a3d;--ok:#3de8c3;--err:#ff5d7a;--r:5px;--gtaGrad:linear-gradient(100deg,#ff2d95 0%,#ff6a5a 55%,#ffb13d 100%);--gtaShadow:#2a0a4e}
+#lb-ui .lb-shade{background:
+  linear-gradient(180deg,rgba(40,8,70,.5) 0%,rgba(40,8,70,0) 18%),
+  linear-gradient(0deg,rgba(30,6,56,.6) 0%,rgba(30,6,56,0) 34%),
+  linear-gradient(270deg,rgba(30,6,56,.32) 0%,rgba(30,6,56,0) 32%)}
+/* napisy: ciężki, kursywny krój z twardym cieniem, jak w grach GTA */
+#lb-ui .lb-logo{font-style:italic;transform:skewX(-8deg);text-shadow:3px 3px 0 var(--gtaShadow),0 8px 26px rgba(255,79,163,.45)}
+#lb-ui .lb-logo b{background:linear-gradient(180deg,#ffd23a 10%,#ff4fa3 90%);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(3px 3px 0 var(--gtaShadow))}
+#lb-ui .lb-beta{color:#fff;border-color:var(--acc);background:rgba(255,79,163,.25)}
+#lb-ui .lb-h,#lb-ui .lb-mtxt span,#lb-ui .lb-dh h3,#lb-ui .lb-skins h2,#lb-ui .lb-picker h2{font-family:Anton,Oswald,Impact,sans-serif;font-weight:400;font-style:italic;letter-spacing:.05em}
+#lb-ui .lb-dh h3,#lb-ui .lb-skins h2,#lb-ui .lb-picker h2{color:#fff;text-shadow:3px 3px 0 #ff2d95}
+#lb-ui .lb-mtxt span{font-size:24px;text-shadow:2px 2px 0 var(--gtaShadow)}
+/* pasek górny */
+#lb-ui .lb-chip,#lb-ui .lb-burger{border:2px solid var(--line2);border-radius:5px;background:var(--bg);
+  clip-path:polygon(0 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%)}
+#lb-ui .lb-chip:hover,#lb-ui .lb-burger:hover{border-color:var(--acc);background:rgba(60,16,96,.85)}
+#lb-ui .lb-plus{color:#fff;background:var(--gtaGrad);border-radius:4px}
+#lb-ui .lb-av{background:var(--gtaGrad);color:#fff;border-radius:5px;text-shadow:1px 1px 0 var(--gtaShadow)}
+#lb-ui .lb-wbal b{font-family:Anton,Oswald,sans-serif;font-weight:400;letter-spacing:.04em;font-size:18px}
+#lb-ui .lb-menu,#lb-ui .lb-langmenu{border:2px solid var(--line2);border-radius:5px;background:var(--bg2);box-shadow:0 0 0 1px #000,0 24px 60px rgba(10,0,30,.6),0 0 30px rgba(255,79,163,.2)}
+#lb-ui .lb-menu button:hover,#lb-ui .lb-menu button:focus-visible,#lb-ui .lb-langmenu button:hover{background:rgba(255,79,163,.16)}
+#lb-ui .lb-langmenu button.on{background:rgba(255,79,163,.18)}
+/* tabliczka z nickiem */
+#lb-ui .lb-plate>span{font-family:Anton,Oswald,Impact,sans-serif;font-weight:400;font-style:italic;font-size:24px;letter-spacing:.06em;text-transform:uppercase;text-shadow:2px 2px 0 var(--gtaShadow),0 0 18px rgba(255,79,163,.55)}
+#lb-ui .lb-plate small{color:#04221c;background:var(--ok);border-radius:2px;transform:skewX(-10deg)}
+#lb-ui .lb-plate em{color:#fff;background:var(--gtaGrad);border-radius:2px}
+/* panel gry */
+#lb-ui .lb-card{border:2px solid var(--line2);border-top:4px solid var(--acc);border-radius:4px;
+  background:linear-gradient(180deg,rgba(46,14,80,.84),rgba(24,8,46,.86));
+  box-shadow:0 0 0 1px rgba(0,0,0,.55),0 18px 50px rgba(20,0,40,.55),0 0 40px rgba(255,79,163,.2)}
+#lb-ui .lb-mode{border-radius:3px;background:rgba(255,255,255,.06)}
+#lb-ui .lb-mode:hover{border-color:var(--acc);background:rgba(255,79,163,.14)}
+#lb-ui .lb-thumb{border-radius:3px;box-shadow:0 0 0 2px var(--acc)}
+#lb-ui .lb-chev{color:var(--acc)}
+#lb-ui .lb-stake button{border-radius:3px;border:2px solid rgba(255,140,210,.28);background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.02));clip-path:polygon(0 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%)}
+#lb-ui .lb-stake button:hover{border-color:var(--acc);background:linear-gradient(180deg,rgba(255,79,163,.22),rgba(255,79,163,.06))}
+#lb-ui .lb-stake button b{font-family:Anton,Oswald,sans-serif;font-weight:400;font-size:23px;letter-spacing:.03em}
+#lb-ui .lb-stake button.on{border-color:var(--acc);background:linear-gradient(180deg,rgba(255,79,163,.5),rgba(255,138,61,.22));box-shadow:0 0 22px rgba(255,79,163,.4)}
+#lb-ui .lb-stake button.on b{color:#fff;text-shadow:2px 2px 0 var(--gtaShadow)}
+#lb-ui .lb-stake button.on small{color:#ffe4f2}
+#lb-ui .lb-slip{border-radius:3px;background:rgba(10,2,24,.45);border:1px solid var(--line)}
+#lb-ui .lb-win b,#lb-ui .lb-slip .lb-win:not(.lb-fee) b{font-family:Anton,Oswald,sans-serif;font-weight:400;letter-spacing:.04em}
+#lb-ui .lb-custom{border-radius:3px}
+#lb-ui .lb-custom:focus-within{border-color:var(--acc)}
+/* przycisk GRAJ: skośny, różowo-pomarańczowy, z białym kursywnym napisem */
+#lb-ui .lb-playwrap{filter:drop-shadow(0 10px 22px rgba(255,45,149,.5))}
+#lb-ui .lb-play,#lb-ui .lb-play:hover,#lb-ui .lb-play:active{border-radius:0;color:#fff;background:var(--gtaGrad);box-shadow:none;
+  clip-path:polygon(20px 0,100% 0,calc(100% - 20px) 100%,0 100%)}
+#lb-ui .lb-play:hover{filter:brightness(1.1) saturate(1.1)}
+#lb-ui .lb-play .lb-pl{font-style:italic;color:#fff;letter-spacing:.1em;text-shadow:3px 3px 0 #7a0c4a}
+#lb-ui .lb-play small{color:rgba(255,240,250,.92)}
+#lb-ui .lb-play:focus-visible{outline:3px solid #fff;outline-offset:2px}
+/* okna */
+#lb-ui .lb-modal,#lb-ui .lb-picker{background:rgba(18,4,36,.74)}
+#lb-ui .lb-dlg{background:linear-gradient(180deg,rgba(42,12,74,.98),rgba(22,6,42,.98));border:2px solid var(--acc);border-radius:6px;
+  box-shadow:0 0 0 1px #000,0 30px 90px rgba(10,0,30,.7),0 0 50px rgba(255,79,163,.28)}
+#lb-ui .lb-x{border-radius:4px;border:2px solid var(--line2)}
+#lb-ui .lb-x:hover{background:var(--acc);border-color:var(--acc);color:#fff}
+#lb-ui .lb-tabs{border-radius:4px;background:rgba(10,2,24,.45)}
+#lb-ui .lb-tabs button{border-radius:3px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;font-size:12px}
+#lb-ui .lb-tabs button.on{background:rgba(255,79,163,.25);color:#fff;box-shadow:inset 0 0 0 1px var(--acc)}
+#lb-ui .lb-field input:not([type=range]),#lb-ui .lb-aiw input{border-radius:3px;border:2px solid var(--line2)}
+#lb-ui .lb-field input:focus,#lb-ui .lb-aiw input:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(255,79,163,.2)}
+#lb-ui .lb-btn,#lb-ui .lb-bizbtn,#lb-ui .lb-bizback{border-radius:3px;border:2px solid var(--line2);text-transform:uppercase;letter-spacing:.05em}
+#lb-ui .lb-btn.pri,#lb-ui .lb-bizbtn.pri{border:0;color:#fff;background:var(--gtaGrad);box-shadow:0 8px 22px rgba(255,45,149,.35);text-shadow:2px 2px 0 #7a0c4a;font-style:italic}
+#lb-ui .lb-quick button{border-radius:3px}
+#lb-ui .lb-quick button:hover{border-color:var(--acc);background:rgba(255,79,163,.14)}
+#lb-ui .lb-seg{border-radius:3px}
+#lb-ui .lb-seg.on{border-color:var(--acc);background:rgba(255,79,163,.16)}
+#lb-ui .lb-seg.on b{background:var(--acc);color:#fff}
+#lb-ui .lb-bind{border-radius:3px}
+#lb-ui .lb-bind.wait{border-color:var(--acc);background:rgba(255,79,163,.12)}
+#lb-ui .c-move{--c:#ff4fa3}#lb-ui .c-fight{--c:#ffb13d}#lb-ui .c-sys{--c:#3de8ff}
+#lb-ui .lb-deck::after{background:linear-gradient(90deg,transparent,#ff4fa3 25%,#ffb13d 50%,#3de8ff 75%,transparent)}
+#lb-ui .lb-balcard{border-radius:4px}
+#lb-ui .lb-vrow,#lb-ui .lb-srow,#lb-ui .lb-fovcard,#lb-ui .lb-me{border-radius:4px}
+#lb-ui .lb-docbtn{border-radius:4px}#lb-ui .lb-docbtn.t:hover{border-color:var(--acc)}#lb-ui .lb-docbtn.t>i{background:rgba(255,79,163,.16)}
+#lb-ui .lb-bizcard{border-color:rgba(255,79,163,.4);background:linear-gradient(180deg,rgba(255,79,163,.12),rgba(255,255,255,.02) 55%),#1c0a34;border-radius:5px}
+#lb-ui .lb-bizic{background:var(--gtaGrad);color:#fff;border-radius:6px}
+#lb-ui .lb-bizglow{background:radial-gradient(closest-side,rgba(255,79,163,.3),transparent)}
+#lb-ui .lb-doc a,#lb-ui .lb-terms a{color:#ff9fd2}
+#lb-ui .lb-doc .lg-todo{background:rgba(255,79,163,.18);color:#ff9fd2}
+/* logowanie */
+#lb-ui .lb-dlg.lb-authdlg{border-radius:6px}
+#lb-ui .lb-alogo{font-style:italic;text-shadow:3px 3px 0 var(--gtaShadow)}
+#lb-ui .lb-alogo b{background:linear-gradient(180deg,#ffd23a 10%,#ff4fa3 90%);-webkit-background-clip:text;background-clip:text;color:transparent}
+#lb-ui .lb-ashade{background:linear-gradient(180deg,rgba(30,6,60,.85) 0%,rgba(60,10,90,.25) 24%,rgba(0,0,0,0) 46%,rgba(50,10,80,.3) 64%,rgba(24,4,48,.92) 100%),repeating-linear-gradient(115deg,rgba(255,255,255,.035) 0 2px,transparent 2px 14px)}
+#lb-ui .lb-aform{background:linear-gradient(180deg,#26093f,#16052a)}
+#lb-ui .lb-ah{font-family:Anton,Oswald,Impact,sans-serif;font-weight:400;font-style:italic;letter-spacing:.04em;text-shadow:3px 3px 0 #ff2d95}
+#lb-ui .lb-abtn{border-radius:3px;color:#fff;background:var(--gtaGrad);box-shadow:0 10px 26px rgba(255,45,149,.35);text-shadow:2px 2px 0 #7a0c4a;font-style:italic;text-transform:uppercase;letter-spacing:.06em}
+#lb-ui .lb-aswap button{color:#ff9fd2}
+#lb-ui .lb-terms input:checked+i{background:var(--acc);border-color:var(--acc)}
+#lb-ui .lb-terms input:checked+i::after{border-color:#fff}
+/* wybór trybu, skiny, losowanie mapy, powiadomienia */
+#lb-ui .lb-tile{border-radius:4px;box-shadow:0 0 0 2px rgba(255,140,210,.35),0 12px 28px rgba(10,0,30,.5)}
+#lb-ui .lb-tile:hover{box-shadow:0 0 0 2px var(--acc),0 18px 34px rgba(10,0,30,.55),0 0 30px rgba(255,79,163,.35)}
+#lb-ui .lb-tile.sel{box-shadow:0 0 0 3px var(--acc),0 0 44px rgba(255,79,163,.5),0 18px 34px rgba(10,0,30,.6)}
+#lb-ui .lb-tile .tag,#lb-ui .lb-tile .check,#lb-ui .lb-mcard span i{background:var(--gtaGrad);color:#fff;border-radius:2px;text-shadow:1px 1px 0 #7a0c4a}
+#lb-ui .lb-tile .check{border-radius:50%}
+#lb-ui .lb-skins{border:2px solid var(--line2);border-top:4px solid var(--acc);border-radius:4px;background:linear-gradient(180deg,rgba(46,14,80,.88),rgba(24,8,46,.9))}
+#lb-ui .lb-skin{border-radius:3px;border:2px solid var(--line)}
+#lb-ui .lb-skin.sel{border-color:var(--acc);box-shadow:0 0 18px rgba(255,79,163,.4);background:rgba(255,79,163,.16)}
+#lb-ui .lb-skin small{color:var(--acc)}
+#lb-ui .lb-draw{background:radial-gradient(80% 70% at 50% 50%,rgba(40,8,70,.8),rgba(10,2,24,.95))}
+#lb-ui .lb-dtitle{font-style:italic;text-shadow:3px 3px 0 var(--gtaShadow)}
+#lb-ui .lb-dres{text-shadow:3px 3px 0 var(--gtaShadow),0 0 28px rgba(255,79,163,.6)}
+#lb-ui .lb-mcard{border-radius:4px}
+#lb-ui .lb-draw.done .lb-mcard.win{box-shadow:0 0 0 3px var(--acc),0 0 60px rgba(255,79,163,.55),0 18px 40px rgba(10,0,30,.6)}
+#lb-ui .lb-reelwin::before{box-shadow:0 0 14px var(--acc),0 0 30px rgba(255,79,163,.6)}
+#lb-ui .lb-toast{border-radius:3px;border:2px solid var(--line2);border-left:5px solid var(--acc)}
+#lb-ui .lb-flag{border-radius:2px}
+`;
+
 const IC = {
   gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   wallet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7V5a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-4a2 2 0 0 0 0 4h4v2a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2V6"/><circle cx="17" cy="15" r=".5" fill="currentColor"/></svg>',
@@ -826,6 +943,7 @@ const ART = {
   },
 };
 export const LOBBY_MAPS = [
+  { id: 'vice-beach', name: 'Vice Beach', desc: 'Plaża o zachodzie słońca, neony, palmy i miasto na horyzoncie' },
   { id: 'pole-bitwy', name: 'Pole bitwy', desc: 'Zachód słońca, okopy, czołgi i wioska' },
   { id: 'las', name: 'Las', desc: 'Dzień, gęsty las i wioska, bez czołgów' },
   { id: 'hangar', name: 'Hangar', desc: 'Jasny hangar z autami i arsenałem' },
@@ -937,7 +1055,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
     l.href = 'https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&family=Rajdhani:wght@500;600;700&family=Oswald:wght@500;600;700&display=swap';
     document.head.appendChild(l);
   }
-  const style = document.createElement('style'); style.textContent = CSS; document.head.appendChild(style);
+  const style = document.createElement('style'); style.textContent = CSS + GTA_CSS; document.head.appendChild(style);
   const ui = document.createElement('div'); ui.id = 'lb-ui'; ui.innerHTML = HTML; document.body.appendChild(ui);
   const $ = id => ui.querySelector('#' + id);
   const store = {
@@ -1309,6 +1427,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.1, 1200);
   let envUpdate;
   if (LOBBY_MAP === 'hangar') { const h = buildHangar(scene, renderer); envUpdate = (t, dt) => h.update(t, dt); }
+  else if (LOBBY_MAP === 'vice-beach') envUpdate = buildVice(scene);
   else envUpdate = buildForest(LOBBY_MAP === 'pole-bitwy');
 
   // cień kontaktowy pod fasolką
@@ -1378,13 +1497,15 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
 
   // ---------- kamera i sterowanie ----------
   const lookAt = new THREE.Vector3();
-  let camZ = 5.4;
+  let camZ = 5.4, camY = .8;
   function frameCamera() {
     camera.aspect = innerWidth / innerHeight;
     const portrait = camera.aspect < 0.8;
-    camera.fov = LOBBY_MAP === 'hangar' ? (portrait ? 44 : 36) : (portrait ? 42 : 30);
+    const vice = LOBBY_MAP === 'vice-beach';
+    camera.fov = LOBBY_MAP === 'hangar' ? (portrait ? 44 : 36) : vice ? (portrait ? 50 : 38) : (portrait ? 42 : 30);
     camZ = LOBBY_MAP === 'hangar' ? (portrait ? 6.0 : 5.3) : (portrait ? 6.2 : 6);
-    lookAt.set(0, portrait ? 1.2 : 1.0, 0);
+    lookAt.set(0, vice ? (portrait ? 1.45 : 1.2) : portrait ? 1.2 : 1.0, 0);
+    camY = vice ? 1.4 : .8;
     camera.updateProjectionMatrix();
   }
   addEventListener('resize', frameCamera); frameCamera();
@@ -1437,7 +1558,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
     if (hopT >= 0) { hopT += dt * 2.8; const k = Math.min(hopT, 1); holder.position.y = Math.sin(k * Math.PI) * .35; if (hopT >= 1) { hopT = -1; holder.position.y = 0; } }
 
     cmx = THREE.MathUtils.damp(cmx, mx, 2.5, dt); cmy = THREE.MathUtils.damp(cmy, my, 2.5, dt);
-    camera.position.set(cmx * .35, .8 - cmy * .1, camZ);
+    camera.position.set(cmx * .35, camY - cmy * .1, camZ);
     camera.lookAt(lookAt);
 
     envUpdate(t, dt);

@@ -88,7 +88,7 @@
 </script>
 <style>
   /* Layout: pełny ekran 3D, celownik na środku, amunicja w prawym dolnym rogu, licznik w prawym górnym, nakładka startowa */
-  :root{--bg:#171a21;--fg:#eef1f6;--dim:#a8b0bf;--panel:rgba(14,16,22,.72);--line:rgba(255,255,255,.16);--accent:#f2b84b;--hit:#ff5a4d}
+  :root{--bg:#171a21;--fg:#eef1f6;--dim:#a8b0bf;--panel:rgba(14,16,22,.72);--line:rgba(255,255,255,.16);--accent:#ff4fa3;--hit:#ff5a4d}
   html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:dark}
   canvas{display:block;width:100%;height:100%;outline:none;cursor:none}
   .hud{position:fixed;pointer-events:none;font-variant-numeric:tabular-nums}
@@ -109,9 +109,9 @@
   .mobile-gate #ld{display:none}
   #ld .ld-in{display:flex;flex-direction:column;align-items:center;gap:26px}
   #ld .ld-logo{font-size:clamp(34px,4.6vw,56px);line-height:1;letter-spacing:.04em;transform:skewX(-6deg)}
-  #ld .ld-logo b{font-weight:400;color:#ffc629}
+  #ld .ld-logo b{font-weight:400;color:#ff4fa3}
   #ld .ld-bar{position:relative;width:min(280px,60vw);height:3px;background:rgba(255,255,255,.1);overflow:hidden}
-  #ld .ld-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:#ffc629}
+  #ld .ld-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,#ff2d95,#ffb13d)}
   #ld.boot .ld-fill{animation:ld-creep 7s cubic-bezier(.2,.7,.3,1) forwards}
   @keyframes ld-creep{from{width:2%}to{width:86%}}
   #ld-bg,#ld .ld-title,#ld .ld-sub,#ld .ld-row,#ld .ld-tipbox{display:none}   /* elementy używane przez loader.js – w tym wyglądzie ukryte */
@@ -131,8 +131,8 @@
   #dmg{inset:0;box-shadow:inset 0 0 120px rgba(255,0,0,0);transition:box-shadow .2s}
   body.mt-on #score{display:none}body.mt-on #vlabel{top:78px}
   /* HUD w stylu gry: granatowe szkło ze skośnymi krawędziami i złoty akcent jak tablica wyniku meczu; liczby krojem Anton */
-  :root{--hud-glass:rgba(10,22,48,.8);--hud-glass2:rgba(6,14,32,.86);--hud-ink:#f4f7ff;--hud-dim:rgba(207,224,255,.62);--hud-line:rgba(207,224,255,.28);
-    --hud-gold:linear-gradient(180deg,#fff7a8,#ffd400 60%,#f5ad00);--hud-goldc:#ffd400;--hud-red:#ff5a48;--hud-redg:linear-gradient(180deg,#ff9a88,#e5432f);
+  :root{--hud-glass:rgba(38,10,66,.8);--hud-glass2:rgba(24,6,46,.86);--hud-ink:#fff6fc;--hud-dim:rgba(255,205,235,.64);--hud-line:rgba(255,160,215,.32);
+    --hud-gold:linear-gradient(180deg,#ffb0dc,#ff4fa3 60%,#e02a86);--hud-goldc:#ff4fa3;--hud-red:#ff5a48;--hud-redg:linear-gradient(180deg,#ff9a88,#e5432f);
     --hud-num:Anton,Oswald,Impact,"Arial Narrow",sans-serif;--hud-lbl:Rajdhani,Oswald,"Arial Narrow",sans-serif}
   #hp,#ammo,#slots{color:var(--hud-ink);text-shadow:0 2px 6px rgba(0,0,0,.45)}
   /* zdrowie: złoty blok z krzyżem + szklany panel z liczbą i segmentowym paskiem (biały „ślad” pokazuje świeże obrażenia) */
