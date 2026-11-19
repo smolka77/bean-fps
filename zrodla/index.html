@@ -941,11 +941,29 @@ function spawnSparks(p,n,color){
 
 // ================= wejście =================
 const keys={};let playing=false;
+// Pełny ekran z blokadą klawiszy na czas gry (Chrome/Edge: Keyboard Lock działa tylko w pełnym ekranie): Ctrl+W, Ctrl+T, Ctrl+N, Ctrl+R, F5, Alt…
+// trafiają do gry zamiast zamykać, odświeżać albo przełączać kartę (np. kucanie Ctrl + ruch W). Esc NIE jest blokowany: jak dotąd pauzuje grę
+// (zwalnia mysz) i wychodzi z pełnego ekranu; kliknięcie w grę wraca do pełnego ekranu. Na telefonach i tabletach nic nie robimy.
+const KB_LOCK=[...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].map(c=>'Key'+c).concat([...'0123456789'].map(d=>'Digit'+d),Array.from({length:12},(_,i)=>'F'+(i+1)),
+  ['Tab','Space','Enter','Backspace','AltLeft','AltRight','ControlLeft','ControlRight','MetaLeft','MetaRight','ShiftLeft','ShiftRight','ArrowUp','ArrowDown','ArrowLeft','ArrowRight',
+   'Minus','Equal','BracketLeft','BracketRight','Backslash','Semicolon','Quote','Backquote','Comma','Period','Slash','BrowserBack','BrowserForward','BrowserRefresh']);
+function gameFullscreen(){
+  if(matchMedia('(pointer:coarse)').matches||!document.documentElement.requestFullscreen)return;
+  const keys=()=>{try{const k=navigator.keyboard;if(k&&k.lock){const r=k.lock(KB_LOCK);if(r&&r.catch)r.catch(()=>{})}}catch(e){}};
+  if(document.fullscreenElement){keys();return}
+  try{const r=document.documentElement.requestFullscreen({navigationUI:'hide'});if(r&&r.then)r.then(keys,()=>{})}catch(e){}
+}
+function lockGame(){gameFullscreen();return renderer.domElement.requestPointerLock()}
+// w trakcie gry skróty przeglądarki z Ctrl/Cmd/Alt i F1–F12 nic nie robią (bez pełnego ekranu przeglądarka i tak przepuści Ctrl+W/T/N)
+addEventListener('keydown',e=>{if(!playing||!document.pointerLockElement)return;
+  if(((e.ctrlKey||e.metaKey||e.altKey)&&!/^(Control|Meta|Alt|Shift)/.test(e.code))||/^F([1-9]|1[0-2])$/.test(e.code)||e.code==='Tab')e.preventDefault()},true);
+// pauza (Esc, ekran śmierci, powrót do lobby): klawiatura znowu normalna – formularze i skróty w lobby działają jak zwykle
+document.addEventListener('pointerlockchange',()=>{if(!document.pointerLockElement){try{navigator.keyboard&&navigator.keyboard.unlock&&navigator.keyboard.unlock()}catch(e){}}});
 function startPlay(){
   initAudio();if(AC&&AC.state==='suspended')AC.resume();
   if(DMX&&DMX.overlay){$('overlay').style.display='none';return}   // Deathmatch: ekran śmierci – kursor zostaje wolny (Spacja / Esc)
   playing=true;$('overlay').style.display='none';
-  try{const r=renderer.domElement.requestPointerLock();if(r&&r.catch)r.catch(()=>{})}catch(e){}
+  try{const r=lockGame();if(r&&r.catch)r.catch(()=>{})}catch(e){}
   renderer.domElement.focus({preventScroll:true});
 }
 $('overlay').addEventListener('click',()=>{if(duel.mapBanner){const d={ok:true};dispatchEvent(new CustomEvent('fasolka:rematch',{detail:d}));if(!d.ok){duel.mapBanner=false;leaveToLobby();return}}startPlay()});
@@ -1024,7 +1042,7 @@ renderer.domElement.addEventListener('mousedown',e=>{
   // mecz 1v1 trwa, a gracz nie kliknął na planszy intro (online plansze lecą dalej bez niego): klik w grę wznawia sterowanie,
   // inaczej do końca meczu nie mógł strzelać ani się rozglądać
   if(!playing&&match.on&&match.phase!=='final'&&$('overlay').style.display==='none'&&!document.body.classList.contains('in-lobby')&&!(DMX&&DMX.active)){startPlay();e.preventDefault();return}
-  if(!playing)return;if(!document.pointerLockElement){try{const r=renderer.domElement.requestPointerLock();if(r&&r.catch)r.catch(()=>{})}catch(er){}e.preventDefault();return}if(range.active&&e.button===0&&range.press()){e.preventDefault();return}   // strzelnica: celownik na tablicy ustawień = klik w przycisk, nie strzał
+  if(!playing)return;if(!document.pointerLockElement){try{const r=lockGame();if(r&&r.catch)r.catch(()=>{})}catch(er){}e.preventDefault();return}if(range.active&&e.button===0&&range.press()){e.preventDefault();return}   // strzelnica: celownik na tablicy ustawień = klik w przycisk, nie strzał
   if(e.button===0){gun.firing=true;gun.trigger=true}if(e.button===2)adsHeld=true;e.preventDefault()});
 addEventListener('mouseup',e=>{if(e.button===0)gun.firing=false;if(e.button===2)adsHeld=false});
 addEventListener('contextmenu',e=>e.preventDefault());
@@ -1905,7 +1923,7 @@ const SFX={tick:()=>sndClick(2400,.03,.12),found:()=>tone([[660,0,.12],[990,.1,.
   win:()=>tone([[523,0,.14],[659,.12,.14],[784,.24,.14],[1046,.36,.55]]),lose:()=>tone([[392,0,.22],[330,.2,.22],[262,.4,.6]],'sawtooth',.05)};
 function matchLock(){                                   // wołane w obsłudze kliknięcia: kursor i dźwięk od razu, zanim zacznie się szukanie
   initAudio();if(AC&&AC.state==='suspended')AC.resume();
-  try{const r=renderer.domElement.requestPointerLock();if(r&&r.catch)r.catch(()=>{})}catch(e){}
+  try{const r=lockGame();if(r&&r.catch)r.catch(()=>{})}catch(e){}
 }
 function toLobbyBg(){playing=false;gun.firing=false;player.dead=false;document.body.classList.remove('mt-dead');document.body.classList.add('in-lobby')}
 const match=createMatch({
@@ -2021,7 +2039,7 @@ DMX=createDM({THREE,scene,camera,renderer,player,me,net:DMNET,
     wasted:()=>tone([[196,0,.5],[147,.35,.9]],'sawtooth',.07),spawn:()=>tone([[523,0,.1],[784,.08,.2]],'triangle',.1),go:()=>SFX.go(),end:()=>SFX.win(),podium:()=>SFX.win(),
     hurt:()=>sndClick(300,.08,.25),hurtHead:()=>sndClick(220,.12,.35)};if(F[n])try{F[n]()}catch(e){}},
   filter:f=>{renderer.domElement.style.transition='filter .8s ease';renderer.domElement.style.filter=f||''},
-  lock:()=>{initAudio();if(AC&&AC.state==='suspended')AC.resume();playing=true;$('overlay').style.display='none';try{const r=renderer.domElement.requestPointerLock();if(r&&r.catch)r.catch(()=>{(pmI18n(),$('lockHint').hidden=false)})}catch(e){}renderer.domElement.focus({preventScroll:true})},
+  lock:()=>{initAudio();if(AC&&AC.state==='suspended')AC.resume();playing=true;$('overlay').style.display='none';try{const r=lockGame();if(r&&r.catch)r.catch(()=>{(pmI18n(),$('lockHint').hidden=false)})}catch(e){}renderer.domElement.focus({preventScroll:true})},
   unlock:()=>{playing=false;gun.firing=false;adsHeld=false;$('lockHint').hidden=true;if(document.pointerLockElement)document.exitPointerLock()},
   pause:()=>{$('overlay').style.display='flex'},
   onAccount:a=>dispatchEvent(new CustomEvent('fasolka:account',{detail:a})),
