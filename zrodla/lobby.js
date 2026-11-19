@@ -1040,7 +1040,9 @@ const DEFAULT_MODES = [
 function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
 
 export function createLobby({ renderer, bean, animate = () => {}, onPlay = () => {}, onSkin = () => {}, modes = DEFAULT_MODES, skins: skinsIn = SKINS }) {
-  let skins = skinsIn.slice();
+  const BASIC_IDS = new Set(BUILTIN_SKINS.map(k => k.id));   // podstawowe skiny to tylko zapas: w wyborze skinów są same skiny z kreatora
+  const noBasic = l => { const c = l.filter(k => !BASIC_IDS.has(k.id)); return c.length ? c : l; };
+  let skins = noBasic(skinsIn.slice());
   const rnd = rng(7);
   const R = (a, b) => a + (b - a) * rnd();
 
@@ -1479,7 +1481,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   const BUILTIN_IDS = new Set(BUILTIN_SKINS.map(k => k.id));
   // podmienia skiny z kreatora (z skins.json albo z panelu admina) i od razu przebudowuje kafelki
   const setCustomSkins = list => {
-    skins = [...BUILTIN_SKINS, ...list.filter(k => k && k.id && !BUILTIN_IDS.has(k.id))];
+    skins = noBasic([...BUILTIN_SKINS, ...list.filter(k => k && k.id && !BUILTIN_IDS.has(k.id))]);
     const want = skins.find(k => k.id === store.get('fasolka-skin'));
     if (want && want !== skin) setSkin(want, true);
     else if (!skins.some(k => k.id === skin.id)) setSkin(skins[0], true);
