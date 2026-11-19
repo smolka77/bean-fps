@@ -570,6 +570,16 @@ export function buildBay(scene, renderer) {
         float v=smoothstep(1.05,.35,length((vUv-.5)*vec2(1.15,1.)));c*=mix(.8,1.,v);
         gl_FragColor=vec4(clamp(c,0.,1.),1.);}`,
   };
+  // bufor half-float: bardzo ostry refleks (np. na fasolce) potrafi dać Inf/NaN, a rozmycie bloomu rozlewa go w migający czarny kwadrat.
+  // Ten krok przed bloomem zeruje NaN i przycina zbyt jasne piksele (na ekranie i tak są białe), więc nic się nie rozlewa.
+  const SANITIZE = {
+    uniforms: { tDiffuse: { value: null } },
+    vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    fragmentShader: `uniform sampler2D tDiffuse;varying vec2 vUv;
+      void main(){vec4 c=texture2D(tDiffuse,vUv);
+        if(any(isnan(c))||any(isinf(c))||any(notEqual(c,c)))c=vec4(0.,0.,0.,1.);
+        gl_FragColor=vec4(clamp(c.rgb,0.,64.),clamp(c.a,0.,1.));}`,
+  };
   function ensureComposer(camera) {
     renderer.getSize(size);
     const pr = Math.min(renderer.getPixelRatio(), 1.5);
@@ -578,6 +588,7 @@ export function buildBay(scene, renderer) {
       composer = new EffectComposer(renderer, rt);
       renderPass = new RenderPass(scene, camera);
       composer.addPass(renderPass);
+      composer.addPass(new ShaderPass(SANITIZE));
       composer.addPass(new UnrealBloomPass(new THREE.Vector2(size.x, size.y), .22, .5, .92));
       composer.addPass(new OutputPass());
       composer.addPass(new ShaderPass(GRADE));
