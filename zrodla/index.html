@@ -339,7 +339,7 @@ import {createLobby,applySkin,SKINS} from './lobby.js';
 import {payout,t as i18n,getLang,mapName} from './lobby-ui.js';
 import {srvText} from './wallet.js';   // komunikaty serwera w języku gry   // i18n: słownik lobby (PL/EN/RU/ES) – menu pauzy
 import {loader} from './loader.js';
-import {createClimates} from './klimaty.js';   // wygląd map 1v1: Baza = neonowa zatoka o zachodzie słońca, Oaza = bagno
+import {createClimates} from './klimaty.js';   // wygląd map 1v1: Baza = salon luksusowych aut wieczorem, Oaza = bagno
 import {createMatch} from './match.js';
 import {createNet} from './net.js';
 import {createRange} from './range.js';
@@ -1631,7 +1631,7 @@ function stepRemote(e,dt){
   _gl.copy(e.rifle.gripLTP);e.rifle.group.localToWorld(_gl);ud.torso.worldToLocal(_gl);
   poseArmsTo(ud,_gr,_gl);
 }
-// ================= mapy 1v1 w rotacji (Oaza = Bagno, Magazyn = Jachty, Baza = Zatoka) =================
+// ================= mapy 1v1 w rotacji (Oaza = Bagno, Magazyn = Jachty, Baza = Salon) =================
 const arenaBoxes=boxes.slice(),arenaMeshes=boxMeshes.slice(),arenaGround=window.__ground;
 const MAPS=[{name:'Oaza',src:'./oaza-data.js'},{name:'Magazyn',src:'./magazyn-data.js'},{name:'Baza',src:'./baza-data.js'}];
 // Strzelnica: mapa treningowa trybu solo (nie wchodzi do rotacji 1v1). Cele, tablica ustawień i statystyki: range.js

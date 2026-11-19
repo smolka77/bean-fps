@@ -1,10 +1,11 @@
 // Klimaty map 1v1 – tylko grafika. Kolizje, spawny, drabiny i wszystko, co liczy serwer meczów, zostają bez zmian.
-//  • Baza → „Zatoka”: neonowy port o zachodzie słońca (różowo-fioletowe niebo, ocean, panorama wieżowców, palmy, neony, diabelski młyn)
+//  • Baza → „Salon”: salon luksusowych aut wieczorem (zachód słońca, ulica z ruchem, kamienice z neonami, palmy, reflektory na niebie)
 //  • Oaza → „Bagno”: mokradła w upale (mętna woda z wysepkami, cyprysy z mchem, trzciny, lilie wodne, aligatory, łódź ślizgowa)
 // Styl fasolki: low poly, płaskie kolory, cieniowanie płaskie. Dekoracje leżą poza polem gry (albo płasko na ziemi), kule ich nie widzą.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { YACHT, halfAt as yachtHalf } from './magazyn-data.js';   // wymiary jachtów (piana przy burtach)
+import { HALL } from './baza-data.js';                              // wymiary hali salonu (ulica i zabudowa wokół)
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const UP = V3(0, 1, 0);
@@ -387,77 +388,104 @@ function towerBox(w, h, d, x, y, z, ry, rand) {
 }
 
 // ======================================================================================================
-//                              BAZA → ZATOKA (neonowy port o zachodzie słońca)
+//                    BAZA → SALON (salon luksusowych aut, wieczór w Vice City)
 // ======================================================================================================
-function themeBay(M, root, meshes, ground) {
-  const rand = rng(20261119), WL = -0.35;
-  const sunOff = V3(-9, 12.5, -38);                       // słońce nisko nad horyzontem za panoramą miasta (strona -Z)
-  const sunDir = sunOff.clone().normalize(); sunDir.y *= 0.42; sunDir.normalize();
+// Hala, parking z autami, flagi i szyldy są w baza-data.js. Tu otoczenie widoczne przez witrynę i na miniaturze:
+// zachód słońca nad ulicą, ruch aut, pastelowe kamienice art déco z neonami, palmy i latarnie, panorama wieżowców,
+// dwa reflektory omiatające niebo (jak przy otwarciu salonu) i helikopter. Wszystko poza halą – kule tego nie widzą.
+function themeDealer(M, root) {
+  const rand = rng(20261121), { X1, Z: ZE } = HALL;
+  const sunOff = V3(26, 30, 9);                            // światło: z boku witryny, wpada do salonu przez szybę
+  const sunDir = V3(1, 0.07, 0.2).normalize();             // tarcza słońca nisko nad ulicą (widać ją przez witrynę)
   const FOG = '#c46a94';
   const sky = skyTexture({
     stops: [[90, '#140d36'], [55, '#2b1960'], [32, '#5a2584'], [17, '#a03a8e'], [8, '#e0588c'], [3, '#ff8a72'], [0.6, '#ffb070'], [0, '#e8829a'], [-2, FOG], [-12, '#6a3070'], [-90, '#1d1030']],
     sun: { dir: sunDir, r: 34, disc: '#fff0b8', glow: [[520, 'rgba(255,150,90,.55)'], [230, 'rgba(255,190,110,.7)'], [80, 'rgba(255,236,170,.95)']] },
-    paint: (x, W, H, px, wrap) => {
+    paint: (x, W, H) => {
       const r = rng(77);
-      for (let i = 0; i < 46; i++) {                        // smugi chmur: niżej różowo-pomarańczowe, wyżej fioletowe
+      for (let i = 0; i < 46; i++) {
         const el = 3 + r() * 26, y = elevY(H, el), cx = r() * W, w = 140 + r() * 520, h = 4 + r() * 12;
-        const warm = el < 13; x.fillStyle = warm ? `rgba(255,${150 + r() * 60 | 0},${150 + r() * 40 | 0},${0.25 + r() * 0.3})` : `rgba(${120 + r() * 60 | 0},${50 + r() * 30 | 0},${120 + r() * 40 | 0},${0.3 + r() * 0.3})`;
-        wrap((o) => { x.beginPath(); x.ellipse(cx + o, y, w / 2, h / 2, 0, 0, Math.PI * 2); x.fill(); });
+        x.fillStyle = el < 13 ? `rgba(255,${150 + r() * 60 | 0},${150 + r() * 40 | 0},${0.25 + r() * 0.3})` : `rgba(${120 + r() * 60 | 0},${50 + r() * 30 | 0},${120 + r() * 40 | 0},${0.3 + r() * 0.3})`;
+        for (const o of [-W, 0, W]) { x.beginPath(); x.ellipse(cx + o, y, w / 2, h / 2, 0, 0, Math.PI * 2); x.fill(); }
       }
       x.fillStyle = 'rgba(255,255,255,.75)';
-      for (let i = 0; i < 70; i++) { const y = elevY(H, 40 + r() * 48); x.fillRect(r() * W, y, 2, 2); }   // pierwsze gwiazdy
+      for (let i = 0; i < 70; i++) x.fillRect(r() * W, elevY(H, 40 + r() * 48), 2, 2);
     },
   });
+  const K = new Kit();
+  const PAST = ['#f4b8c8', '#9fe0d0', '#ffcf9f', '#c9b6f2', '#9fd0f4', '#f6ecd2', '#ff9ec4', '#b8f0e0'];
+  const PC = { trunk: '#8a6a4c', trunk2: '#7a5a40', leaf: '#2f9a52', leaf2: '#24804a', nut: '#5a3a24' };
 
-  // ---- kolory: pastele art deco, neonowe barierki, zapalone okna i latarnie ----
-  recolor(meshes, {
-    M_asphalt: '#2c2733', M_asphalt2: '#24202c', M_asphaltL: '#3a3444', M_oil: '#1a1720',
-    M_concreteD: '#6f6a80', M_concrete2: '#8d879e', M_concrete: '#aaa3ba',
-    M_steel2: '#2e2a40', M_steel: '#1d1a28', M_metal: '#6c6884', M_rebar: '#5a2f3a',
-    M_railR: { c: '#ff3fb0', e: '#ff3fb0', ei: 1.0 },
-    M_yel: '#f2a0b0', M_yelD: '#c66f86', M_yelL: { c: '#7fe8d0', e: '#3fd8c0', ei: 0.6 },
-    M_white: '#f4efea', M_whiteD: '#cfc7d6',
-    M_cRed: '#e2546a', M_cRedD: '#a53a55', M_cBlue: '#1aa6a0', M_cBlueD: '#0f7076', M_cOrange: '#ffb347', M_cOrangeD: '#cf7f2d', M_cIn: '#191520',
-    M_sandO: '#ff7a4a',
-    M_carRed: { c: '#ff4f9e', r: 0.35, m: 0.25 }, M_carRedD: '#b5336f', M_glass: { c: '#1b1636', r: 0.08, m: 0.9 }, M_rim: '#d8d2e6',
-    M_lightW: { c: '#ffe6b0', e: '#ffd08a', ei: 1.6 }, M_winDark: { c: '#2a1a20', e: '#ffae5c', ei: 0.85 },
-    M_tent: '#8f4cff', M_tentD: '#5d2fb0',
-    M_whWall: '#f4b8a6', M_whWall2: '#8fd8c6', M_whRoof: '#4a3d68',
-    M_slab: '#9690a8', M_slabD: '#77708c', M_groundOut: '#2e2a38',
-  });
+  // ---- ziemia, ulica z pasami, chodniki ----
+  K.add(new THREE.PlaneGeometry(900, 900), '#2c2733', M4(0, -0.03, 0, -Math.PI / 2));
+  const SX0 = 39, SX1 = 53;                                // jezdnia za parkingiem
+  K.box(SX1 - SX0, 0.02, 800, '#24202c', M4((SX0 + SX1) / 2, -0.01, 0));
+  for (const dx of [-0.16, 0.16]) K.box(0.12, 0.02, 800, '#f2c33a', M4((SX0 + SX1) / 2 + dx, 0.005, 0));
+  for (const lx of [SX0 + 3.5, SX1 - 3.5]) for (let z = -390; z < 390; z += 9) K.box(0.14, 0.02, 4, '#e8e4ee', M4(lx, 0.006, z));
+  for (let x = SX0 + 0.6; x < SX1 - 0.4; x += 1.1) K.box(0.6, 0.02, 3.2, '#e8e4ee', M4(x, 0.007, -44));   // przejście dla pieszych
+  K.box(4, 0.15, 800, '#bdb6c9', M4(SX1 + 2, 0.075, 0));
+  K.box(0.15, 0.17, 800, '#f4f2f6', M4(SX1 + 0.08, 0.085, 0));
+  K.box(3, 0.15, 800, '#bdb6c9', M4(37.5, 0.075, 0));      // chodnik po stronie salonu poza parkingiem (pod parkingiem schowany)
 
-  // ---- teren: wyspa portowa, a dookoła ocean ----
-  const ISL = 63;
-  reshapeGround(ground, (x, z, y) => (Math.max(Math.abs(x), Math.abs(z)) <= ISL ? 0 : -3.2), (x, z, y) => (y > -0.1 ? '#2e2a38' : '#c9a080'));
-  const water = makeWater({ y: WL, color: '#3a2a62', rough: 0.14, metal: 0.55, env: sky, envI: 1.15, amp: 0.16, freq: 0.11 });
-  root.add(water.mesh);
-
-  const occ = occupancy(meshes, ground), K = new Kit();
-  const PC = { trunk: '#7a5a44', trunk2: '#6a4c38', leaf: '#2f8a4a', leaf2: '#23703e', nut: '#5a3a24' };
-
-  // ---- palmy: wzdłuż nabrzeża i między magazynami ----
-  let palms = 0;
-  for (let i = 0; i < 900 && palms < 46; i++) {
-    const edge = rand() < 0.55, a = rand() * 2 - 1;
-    let x, z;
-    if (edge) { const s = rand() < 0.5 ? -1 : 1, d = ISL - 2.5 - rand() * 2; if (rand() < 0.5) { x = s * d; z = a * (ISL - 3); } else { z = s * d; x = a * (ISL - 3); } }
-    else { x = a * 58; z = (rand() * 2 - 1) * 56; if (Math.abs(x) < 23.5 && Math.abs(z) < 32.5) continue; }
-    if (!occ.free(x, z, 2)) continue;
-    addPalm(K, x, 0, z, 7 + rand() * 5, rand, PC); palms++;
+  // ---- kamienice art déco po drugiej stronie ulicy: pastele, białe gzymsy, okna (część zapalona), neony ----
+  const signs = [], SIGNS = [['MOTEL', '#ff4fd8'], ['DINER', '#3ff0e0'], ['ARCADE', '#b06bff'], ['TACOS', '#ffd23f'], ['HOTEL', '#ff4fd8'], ['DISCO', '#3ff0e0'], ['SURF SHOP', '#ff7a5a'], ['BEAN CLUB', '#b06bff'], ['PAWN', '#ffd23f'], ['GYM', '#3ff0e0'], ['TATTOO', '#ff4fd8'], ['PIZZA', '#ff7a5a']];
+  const facade = (x0, z0, z1, h, d, col, face, si) => {      // face = -1: front w stronę -X (do ulicy), +1: w stronę +X
+    const fx = face < 0 ? x0 : x0 + d;
+    K.box(d, h, z1 - z0, col, M4(x0 + d / 2, h / 2, (z0 + z1) / 2));
+    const fxo = fx + face * 0.06;
+    for (let y = 3.6; y < h - 1; y += 3.2) K.box(0.12, 0.22, z1 - z0 + 0.2, '#fbf7f2', M4(fxo, y, (z0 + z1) / 2));
+    K.box(0.4, 0.5, z1 - z0 + 0.4, '#fbf7f2', M4(fx, h + 0.25, (z0 + z1) / 2));
+    K.box(0.14, 3.0, z1 - z0 - 1, '#1b1636', M4(fxo, 1.6, (z0 + z1) / 2));                       // witryna parteru
+    K.box(0.16, 0.5, z1 - z0 - 0.6, PAST[(si + 3) % PAST.length], M4(fxo + face * 0.05, 3.3, (z0 + z1) / 2));   // markiza
+    for (let y = 4.4; y < h - 1.6; y += 3.2) for (let z = z0 + 1.4; z < z1 - 1; z += 2.2) {
+      const lit = rand() < 0.45;
+      K.box(0.1, 1.3, 1.0, lit ? (rand() < 0.75 ? '#ffd48a' : '#7fffe0') : '#2a2340', M4(fxo, y + 0.7, z), lit ? 'glow' : 'solid');
+    }
+    if (h > 12 && rand() < 0.7) K.box(0.5, h * 0.35, 1.2, '#fbf7f2', M4(fxo + face * 0.1, h - h * 0.175 + 1.2, (z0 + z1) / 2));   // pionowa „płetwa” art déco
+    if (si >= 0) {
+      const [txt, c] = SIGNS[si % SIGNS.length], sg = neonSign(txt, c, { h: 1.3 + rand() * 0.5 });
+      sg.position.set(fx + face * 0.25, 5.2 + rand() * 1.5, (z0 + z1) / 2 + (rand() - 0.5) * 3); sg.rotation.y = face < 0 ? -Math.PI / 2 : Math.PI / 2; root.add(sg); signs.push(sg);
+    }
+  };
+  let si = 0;
+  for (let z = -160; z < 160;) {                           // pierzeja naprzeciwko witryny
+    const w = 14 + rand() * 12, h = 8 + rand() * 14, d = 12 + rand() * 8;
+    facade(SX1 + 4.2, z, z + w - 0.6, h, d, PAST[Math.floor(rand() * PAST.length)], -1, Math.abs(z + w / 2) < 90 ? si++ : -1);
+    z += w;
+  }
+  for (const s of [-1, 1]) for (let x = -60; x < 34;) {     // zabudowa za końcami hali (od strony serwisów)
+    const w = 12 + rand() * 10, h = 7 + rand() * 9, d = 14;
+    const z0 = s * (ZE + 12), col = PAST[Math.floor(rand() * PAST.length)];
+    K.box(w - 0.6, h, d, col, M4(x + w / 2, h / 2, z0 + s * d / 2)); K.box(w - 0.4, 0.4, d + 0.4, '#fbf7f2', M4(x + w / 2, h + 0.2, z0 + s * d / 2));
+    for (let y = 2.4; y < h - 1; y += 3.2) for (let xx = x + 1.2; xx < x + w - 1.2; xx += 2.2) { const lit = rand() < 0.4; K.box(1.0, 1.2, 0.1, lit ? '#ffd48a' : '#2a2340', M4(xx, y + 0.6, z0 - s * 0.05), lit ? 'glow' : 'solid'); }
+    x += w;
+  }
+  for (let z = -70; z < 70;) {                             // magazyny za halą (zachód)
+    const w = 16 + rand() * 14, h = 9 + rand() * 6;
+    K.box(18, h, w - 0.8, PAST[Math.floor(rand() * PAST.length)], M4(-40, h / 2, z + w / 2)); K.box(18.4, 0.4, w - 0.4, '#fbf7f2', M4(-40, h + 0.2, z + w / 2));
+    z += w;
   }
 
-  // ---- panorama miasta za wodą: wieżowce z oknami, neonowe korony ----
-  const city = [], wt = windowsTexture(rng(5));
-  const NEON = ['#3ff0e0', '#ff4fd8', '#b06bff', '#fff0f8', '#ff7a5a'];
-  for (let i = 0; i < 64; i++) {
-    const main = i < 40, az = main ? -Math.PI / 2 + (rand() - 0.5) * 2.3 : rand() * Math.PI * 2;
-    const dist = (main ? 140 : 160) + rand() * 60, x = Math.cos(az) * dist, z = Math.sin(az) * dist;
-    if (!main && z < -60 && Math.abs(x) < 120) continue;
-    const w = 10 + rand() * 14, d = 10 + rand() * 14, h = (main ? 30 : 18) + rand() * (main ? 70 : 34), ry = rand() * 0.5;
+  // ---- palmy i latarnie ----
+  for (let z = -150; z < 150; z += 12 + rand() * 4) addPalm(K, SX1 + 2.6, 0.15, z, 8 + rand() * 4, rand, PC);
+  for (const z of [-56, -44, 40, 52, 64, -68]) addPalm(K, 37.6, 0.15, z, 8 + rand() * 4, rand, PC);
+  for (const [x, z] of [[-26, -36], [-26, 36], [-27, -10], [-27, 14], [30, -38], [30, 38], [-10, -37], [12, 37]]) addPalm(K, x, 0, z, 7 + rand() * 4, rand, PC);
+  for (let z = -150; z < 150; z += 24) for (const [x, dir] of [[37.7, 1], [SX1 + 0.6, -1]]) {
+    K.add(new THREE.CylinderGeometry(0.09, 0.13, 7, 6), '#2e2a40', M4(x, 3.5, z));
+    K.box(2.4, 0.12, 0.12, '#2e2a40', M4(x + dir * 1.1, 7, z));
+    K.box(0.7, 0.14, 0.34, '#ffe9c0', M4(x + dir * 2.2, 6.9, z), 'glow');
+  }
+
+  // ---- panorama miasta: wieżowce z oknami i neonowymi koronami ----
+  const city = [], wt = windowsTexture(rng(5)), NEON = ['#3ff0e0', '#ff4fd8', '#b06bff', '#fff0f8', '#ff7a5a'];
+  for (let i = 0; i < 70; i++) {
+    const main = i < 44, az = main ? (rand() - 0.5) * 2.4 : rand() * Math.PI * 2;
+    const dist = (main ? 150 : 175) + rand() * 70, x = Math.cos(az) * dist, z = Math.sin(az) * dist;
+    const w = 10 + rand() * 14, d = 10 + rand() * 14, h = (main ? 34 : 20) + rand() * (main ? 80 : 36), ry = rand() * 0.5;
     city.push(towerBox(w, h, d, x, -1, z, ry, rand));
     let top = h - 1;
     if (rand() < 0.6) { const h2 = h * (0.15 + rand() * 0.25); city.push(towerBox(w * 0.7, h2, d * 0.7, x, top, z, ry, rand)); top += h2; }
-    if (rand() < 0.5) {                                        // neonowa obwódka na dachu
+    if (rand() < 0.5) {
       const c = NEON[Math.floor(rand() * NEON.length)], ww = w * (top > h ? 0.7 : 1), dd = d * (top > h ? 0.7 : 1);
       for (const [lx, lz, bw, bd] of [[0, dd / 2, ww, 0.4], [0, -dd / 2, ww, 0.4], [ww / 2, 0, 0.4, dd], [-ww / 2, 0, 0.4, dd]]) {
         const cx = Math.cos(ry), sx = Math.sin(ry);
@@ -466,72 +494,51 @@ function themeBay(M, root, meshes, ground) {
     }
     if (rand() < 0.35) { K.box(0.5, 8 + rand() * 8, 0.5, '#3a2f4a', M4(x, top + 5, z)); K.box(0.8, 0.8, 0.8, '#ff3a3a', M4(x, top + 10, z), 'glow'); }
   }
-  const cityMesh = new THREE.Mesh(mergeGeometries(city, false), new THREE.MeshStandardMaterial({ color: '#3a2c56', roughness: 0.75, metalness: 0.1, emissive: '#ffffff', emissiveMap: wt, emissiveIntensity: 1 }));
-  root.add(cityMesh);
-
-  // ---- diabelski młyn na molo ----
-  const wheel = new THREE.Group(), WK = new Kit(), wz = -112, wx = 70, R = 16;
-  WK.add(new THREE.TorusGeometry(R, 0.35, 4, 40), '#ff4fd8', null, 'glow');
-  WK.add(new THREE.TorusGeometry(R - 1.6, 0.2, 4, 40), '#3ff0e0', null, 'glow');
-  for (let k = 0; k < 16; k++) { const a = (k / 16) * Math.PI * 2; WK.box(0.18, R, 0.18, k % 2 ? '#fff0f8' : '#b06bff', M4(Math.cos(a) * R / 2, Math.sin(a) * R / 2, 0, 0, 0, a - Math.PI / 2), 'glow'); WK.box(1.4, 1.4, 1.4, k % 2 ? '#ffd48a' : '#3ff0e0', M4(Math.cos(a) * R, Math.sin(a) * R, 0), 'glow'); }
-  WK.meshes(false).forEach((m) => wheel.add(m));
-  wheel.position.set(wx, R + 3, wz); wheel.rotation.y = Math.atan2(-wx, -wz); root.add(wheel);
-  K.box(24, 1, 10, '#3a3048', M4(wx, 0.2, wz, 0, wheel.rotation.y));
-  for (const s of [-1, 1]) {
-    const f = V3(Math.cos(wheel.rotation.y) * s * 4, 0, -Math.sin(wheel.rotation.y) * s * 4);
-    K.add(new THREE.CylinderGeometry(0.35, 0.5, R + 4, 5), '#2a2238', between(V3(wx + f.x * 1.8, 0.5, wz + f.z * 1.8), V3(wx, R + 3, wz))[0]);
-  }
-
-  // ---- kontenerowiec i jachty ----
-  const ship = (x, z, yaw) => {
-    const c = Math.cos(yaw), s = Math.sin(yaw), P = (lx, ly, lz, w, h, d, col) => K.box(w, h, d, col, M4(x + lx * c + lz * s, ly, z - lx * s + lz * c, 0, yaw));
-    P(0, 0.6, 0, 10, 4, 58, '#24303a'); P(0, -0.4, 0, 10.2, 1.2, 58.2, '#8a2a3a'); P(0, 2.6, -24, 9, 6, 7, '#efe8e0'); P(0, 6.2, -24, 7, 1.5, 5, '#1b1636');
-    const CC = ['#1aa6a0', '#e2546a', '#ffb347', '#2f5aa8', '#8fd8c6', '#f2a0b0'];
-    for (let r = 0; r < 7; r++) for (let l = 0; l < 2 + Math.floor(rand() * 3); l++) for (const side of [-2.5, 2.5]) P(side, 3.8 + l * 2.6, -14 + r * 6.4, 4.8, 2.5, 6.0, CC[Math.floor(rand() * CC.length)]);
-  };
-  ship(-96, 30, 0.08);
-  const yachts = [];
-  for (let i = 0; i < 4; i++) {
-    const yk = new Kit(); yk.box(2.6, 1.1, 8, '#f6f2ee', M4(0, 0.2, 0)); yk.box(2.2, 0.8, 3.6, '#f6f2ee', M4(0, 1.1, -0.6)); yk.box(2.25, 0.35, 3.0, '#1b1636', M4(0, 1.2, -0.4)); yk.box(1.4, 0.9, 2.2, '#f6f2ee', M4(0, 1.4, 4.2, 0.9));
-    const g = new THREE.Group(); yk.meshes(false).forEach((m) => g.add(m));
-    const a = rand() * Math.PI * 2, r = 78 + rand() * 22; g.userData = { a, r, sp: (rand() < 0.5 ? -1 : 1) * (0.006 + rand() * 0.006), ph: rand() * 6 };
-    root.add(g); yachts.push(g);
-  }
-
-  // ---- neony na ścianach magazynów (od strony placu) ----
-  const tlo = meshes.filter((o) => o.parent && o.parent.name === 'Tlo');
-  const rc = new THREE.Raycaster(), SIGNS = [['MOTEL', '#ff4fd8'], ['OPEN 24H', '#3ff0e0'], ['BEAN CLUB', '#b06bff'], ['SUNSET', '#ff7a5a'], ['ARCADE', '#3ff0e0'], ['TACOS', '#ffd23f'], ['HOTEL', '#ff4fd8'], ['★ 77 ★', '#fff0f8'], ['DISCO', '#b06bff'], ['SURF', '#3ff0e0']];
-  const signs = []; let si = 0;
-  const tryWall = (o, d) => {
-    rc.set(o, d); rc.far = 45; const hit = rc.intersectObjects(tlo, false)[0]; if (!hit || hit.distance < 4) return;
-    const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld); if (Math.abs(n.y) > 0.3 || n.dot(d) > -0.5) return;
-    const [txt, col] = SIGNS[si++ % SIGNS.length], sg = neonSign(txt, col, { h: 1.5 + rand() * 0.6 });
-    sg.position.copy(hit.point).addScaledVector(n, 0.12); sg.lookAt(sg.position.clone().add(n)); root.add(sg); signs.push(sg);
-  };
-  for (const s of [-1, 1]) {
-    for (const z of [-22, -9, 5, 19]) tryWall(V3(s * 18, 6.6 + rand() * 1.4, z), V3(s, 0, 0));
-    for (const x of [-12, 2, 14]) tryWall(V3(x, 6.6 + rand() * 1.4, s * 27), V3(0, 0, s));
-  }
-
+  root.add(new THREE.Mesh(mergeGeometries(city, false), new THREE.MeshStandardMaterial({ color: '#3a2c56', roughness: 0.75, metalness: 0.1, emissive: '#ffffff', emissiveMap: wt, emissiveIntensity: 1 })));
   K.meshes(true).forEach((m) => root.add(m));
 
-  // ---- ruch: helikopter, samolot, jachty, młyn, migające neony ----
+  // ---- reflektory na parkingu: snopy światła omiatają niebo ----
+  const fade = (() => {                                    // snop jasny przy lampie i zanikający ku górze
+    const cv = document.createElement('canvas'); cv.width = 4; cv.height = 128; const x = cv.getContext('2d');
+    const g = x.createLinearGradient(0, 0, 0, 128); g.addColorStop(0, '#ffffff'); g.addColorStop(0.35, '#7a7a7a'); g.addColorStop(1, '#000000');
+    x.fillStyle = g; x.fillRect(0, 0, 4, 128); return new THREE.CanvasTexture(cv);
+  })();
+  const beams = [], beamMat = new THREE.MeshBasicMaterial({ color: '#fff0d8', alphaMap: fade, transparent: true, opacity: 0.11, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+  for (const [x, z, ph] of [[31.5, -31.5, 0], [31.5, 31.5, 2.2]]) {
+    const bk = new Kit(); bk.box(1.6, 0.6, 1.2, '#2e2a40', M4(x, 0.5, z)); for (const dz of [-0.5, 0.5]) bk.add(new THREE.CylinderGeometry(0.3, 0.3, 0.2, 10), '#16141c', M4(x - 0.5, 0.3, z + dz, Math.PI / 2));
+    bk.add(new THREE.CylinderGeometry(0.45, 0.4, 0.7, 12), '#c9c6d4', M4(x, 1.2, z)); bk.add(new THREE.CircleGeometry(0.4, 12), '#fff6e0', M4(x, 1.56, z, -Math.PI / 2), 'glow');
+    bk.meshes(true).forEach((m) => root.add(m));
+    const g = new THREE.Group(); g.position.set(x, 1.55, z); g.rotation.order = 'YXZ';
+    const geo = new THREE.ConeGeometry(5, 150, 20, 1, true); geo.rotateX(Math.PI); geo.translate(0, 75, 0);
+    const beam = new THREE.Mesh(geo, beamMat); beam.renderOrder = 3; g.add(beam); root.add(g); beams.push({ g, beam, ph });
+  }
+
+  // ---- ruch na ulicy, helikopter ----
+  const traffic = [], TC = ['#ff3f9a', '#19c3d6', '#f4f2f6', '#ffc82e', '#7a3cff', '#e3233a'];
+  for (let i = 0; i < 6; i++) {
+    const g = new THREE.Group(), tk = new Kit(), col = TC[i % TC.length];
+    car(tk, 0, 0, 0, 0, col, '#2a2340', { muddy: '#2a2633' });
+    for (const sx of [-0.6, 0.6]) { tk.box(0.36, 0.16, 0.06, '#fff6e0', M4(sx, 0.72, 2.32), 'glow'); tk.box(0.36, 0.14, 0.06, '#ff2a3a', M4(sx, 0.78, -2.32), 'glow'); }
+    tk.meshes(false).forEach((m) => g.add(m));
+    const dir = i % 2 ? 1 : -1; g.userData = { lane: dir > 0 ? SX0 + 3.5 / 2 + 0.2 : SX1 - 3.5 / 2 - 0.2, dir, sp: 9 + rand() * 6, off: rand() * 600 };
+    g.rotation.y = dir > 0 ? 0 : Math.PI; root.add(g); traffic.push(g);
+  }
   const heli = helicopter('#f4efea', '#ff3f7a'); heli.g.scale.setScalar(1.3); root.add(heli.g);
-  const plane = new THREE.Group(); { const pk = new Kit(); pk.box(1.2, 1.2, 9, '#d8d2e6', M4(0, 0, 0)); pk.box(12, 0.2, 1.8, '#d8d2e6', M4(0, 0, 0.5)); pk.box(4, 0.2, 1, '#d8d2e6', M4(0, 0, -4)); pk.box(0.2, 2, 1.4, '#d8d2e6', M4(0, 1, -4)); pk.box(0.5, 0.5, 0.5, '#ff3a3a', M4(6, 0, 0.5), 'glow'); pk.box(0.5, 0.5, 0.5, '#3aff6a', M4(-6, 0, 0.5), 'glow'); pk.meshes(false).forEach((m) => plane.add(m)); }
-  root.add(plane);
-  const flock = birds(9, rand, '#2a1a3a'); flock.forEach((b) => root.add(b));
+  const flock = birds(8, rand, '#2a1a3a'); flock.forEach((b) => root.add(b));
+  // neony w hali, które migoczą (oznaczone w baza-data.js)
+  const flick = []; (root.parent || root).traverse((o) => { if (o.userData && o.userData.flicker && o.material) flick.push(o); });
+
   return {
-    sky, fog: FOG, near: 45, far: 300,
-    hemi: ['#ff9fd2', '#45305f', 1.0], sun: ['#ff9a66', 2.8], sunOff, env: sky, envI: 0.55,
-    update(t, dt) {
-      water.tick(t);
-      wheel.children.forEach((m) => { m.rotation.z = t * 0.06; });
-      for (const y of yachts) { const u = y.userData; u.a += u.sp * dt * 6; y.position.set(Math.cos(u.a) * u.r, WL + 0.1 + Math.sin(t * 1.3 + u.ph) * 0.08, Math.sin(u.a) * u.r); y.rotation.y = -u.a + (u.sp > 0 ? Math.PI : 0); y.rotation.z = Math.sin(t * 1.1 + u.ph) * 0.03; }
-      const ha = t * 0.09; heli.g.position.set(Math.cos(ha) * 72, 34 + Math.sin(t * 0.4) * 3, Math.sin(ha) * 72); heli.g.rotation.set(0.08, -ha - Math.PI, 0.12);
+    sky, fog: FOG, near: 80, far: 430,
+    hemi: ['#ffd9ec', '#6a4a7a', 1.35], sun: ['#ffbf8f', 2.5], sunOff, env: sky, envI: 0.6,
+    update(t) {
+      for (const b of beams) { const a = t * 0.35 + b.ph; b.g.rotation.x = 0.42 + Math.sin(t * 0.5 + b.ph) * 0.12; b.g.rotation.y = Math.sin(a) * 1.1 + Math.PI * 0.3; }
+      for (const g of traffic) { const u = g.userData, p = ((t * u.sp + u.off) % 600) - 300; g.position.set(u.lane, 0, u.dir * p); }
+      const ha = t * 0.08; heli.g.position.set(70 + Math.cos(ha) * 70, 36 + Math.sin(t * 0.4) * 3, Math.sin(ha) * 80); heli.g.rotation.set(0.08, -ha - Math.PI, 0.12);
       heli.rotor.rotation.y = t * 28; heli.tail.rotation.x = t * 40; heli.light.visible = Math.sin(t * 6) > 0.6;
-      const pp = ((t * 9) % 520) - 260; plane.position.set(pp, 95, -150 + pp * 0.2); plane.rotation.y = Math.PI / 2 - 0.2; plane.children.forEach((m, i) => { if (i === 1) m.visible = Math.sin(t * 7) > 0; });
-      flock.forEach((b, i) => { const u = b.userData, a = u.a + t * 0.18 * u.s; b.position.set(30 + Math.cos(a) * 26 * u.r, 26 + u.h, 60 + Math.sin(a) * 18 * u.r); b.rotation.y = -a; b.scale.set(1, Math.sin(t * 9 + u.ph), 1); });
+      flock.forEach((b) => { const u = b.userData, a = u.a + t * 0.18 * u.s; b.position.set(80 + Math.cos(a) * 30 * u.r, 26 + u.h, Math.sin(a) * 40 * u.r); b.rotation.y = -a; b.scale.set(1, Math.sin(t * 9 + u.ph), 1); });
       signs.forEach((s, i) => { if (i % 4 === 1) s.material.opacity = Math.sin(t * 23 + i) > -0.92 && (t % 7 > 0.35) ? 1 : 0.25; });
+      flick.forEach((s, i) => { s.material.opacity = (t + i * 2.3) % 9 < 0.5 && Math.sin(t * 31) > 0 ? 0.3 : 1; });
     },
   };
 }
@@ -796,7 +803,7 @@ function themeYachts(M, root) {
     },
   };
 }
-const THEMES = { Baza: themeBay, Oaza: themeSwamp, Magazyn: themeYachts };
+const THEMES = { Baza: themeDealer, Oaza: themeSwamp, Magazyn: themeYachts };
 
 // ======================================================================================================
 //   createClimates: dekorowanie map po wczytaniu + przełączanie nieba, mgły i świateł przy zmianie mapy

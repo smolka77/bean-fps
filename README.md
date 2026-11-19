@@ -12,9 +12,11 @@ Pobierz go i otwórz dwuklikiem w Chrome, Edge albo Firefoksie. Działa bez serw
   - **Strzelnica:** trening solo w podziemnym bunkrze (tunel w skale, tory, świetlówki), tarcze-fasolki na stojakach i tablica ustawień.
   - **Z botem:** mecz 1v1 z botem do 3 wygranych rund, bez serwera i stawki.
   - **1v1:** mecz z prawdziwym graczem o stawkę do 3 wygranych rund (serwer meczów), na jednej z trzech map.
-- **Mapy:** Bagno (dawna Oaza), Magazyn, Zatoka (dawna Baza), Strzelnica.
-  Bagno to miasteczko z drewnianych chat na mokradłach (cyprysy z mchem, trzciny, aligatory), Zatoka to neonowy port o zachodzie słońca
-  (ocean, panorama wieżowców, palmy, diabelski młyn). Wygląd tych dwóch map ustawia `zrodla/klimaty.js`: tylko grafika, kolizje i spawny są te same.
+- **Mapy:** Bagno (dawna Oaza), Magazyn, Salon (dawna Baza), Strzelnica.
+  Bagno to miasteczko z drewnianych chat na mokradłach (cyprysy z mchem, trzciny, aligatory); wygląd ustawia `zrodla/klimaty.js` (tylko grafika).
+  Salon to wielka hala salonu luksusowych aut w klimacie Vice City: auta sportowe na wystawie, obrotowa platforma, witryna na wieczorną ulicę,
+  serwisy na obu końcach (tu startują gracze) i pokoje (szatnia z szafkami, biuro, poczekalnia, gabinet). Hala i kolizje są budowane w kodzie
+  w `zrodla/baza-data.js` (serwer czyta tę samą mapę, w kodzie nadal „Baza”), ulica i miasto wokół są w `zrodla/klimaty.js`.
 - **Bronie:** AK-47, M4A1-S, Glock-18, USP-S (z oglądaniem broni pod klawiszem F).
 
 Sterowanie: WASD ruch, Shift bieg, Spacja skok, C kucanie/slide, LPM strzał, PPM celowanie, R przeładowanie,
