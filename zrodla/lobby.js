@@ -1504,8 +1504,8 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
     const vice = LOBBY_MAP === 'vice-beach';
     camera.fov = LOBBY_MAP === 'hangar' ? (portrait ? 44 : 36) : vice ? (portrait ? 50 : 38) : (portrait ? 42 : 30);
     camZ = LOBBY_MAP === 'hangar' ? (portrait ? 6.0 : 5.3) : (portrait ? 6.2 : 6);
-    lookAt.set(0, vice ? (portrait ? 1.45 : 1.2) : portrait ? 1.2 : 1.0, 0);
-    camY = vice ? 1.4 : .8;
+    lookAt.set(0, vice ? (portrait ? 1.5 : 1.35) : portrait ? 1.2 : 1.0, 0);
+    camY = vice ? 1.75 : .8;
     camera.updateProjectionMatrix();
   }
   addEventListener('resize', frameCamera); frameCamera();
