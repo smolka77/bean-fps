@@ -671,7 +671,7 @@ const X_BTN = `<button class="lb-x" type="button" aria-label="Zamknij">${IC.x}</
 const HTML = `
 <div class="lb-shade"></div>
 <header class="lb-top">
-  <div class="lb-logo">BEAN<b>GTA</b></div>
+  <div class="lb-logo"><b>GTA</b>ssault</div>
   <div class="lb-sp"></div>
   <div class="lb-lang"><button class="lb-chip lb-lchip" id="lb-langbtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Language"><i class="lb-flag" id="lb-langflag"></i><b id="lb-langcode">EN</b><svg class="lb-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4.5 6 8.5 10 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
     <div class="lb-langmenu" id="lb-langmenu" role="menu" hidden></div></div>
