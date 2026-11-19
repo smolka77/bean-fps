@@ -5,11 +5,25 @@
 // Moduł nie zna WebSocketu ani bazy: serwer.mjs woła createBot / botMessage / botStep.
 import * as MECZ from './mecz.mjs';
 import * as DM from './dm.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const NICKS = ['Rico', 'Vercetti', 'Sonny', 'Lance', 'Kenji', 'Cortez', 'Diaz', 'Mercedes', 'Phil', 'Umberto', 'Candy', 'Avery', 'Hilary', 'Kent', 'Maude',
   'Tito', 'Marco', 'Benny', 'Zero', 'Kowal', 'Szczur', 'Bandzior', 'Mrozik', 'Kaktus', 'Rambo', 'Szeryf', 'Lis', 'Wilk', 'Grizzly', 'Joker', 'Cobra', 'Viper',
   'Ghost', 'Bullet', 'Razor', 'Tank', 'Sniper', 'Hitman', 'Bandit', 'Outlaw', 'Maverick', 'Ace', 'Dex', 'Nitro', 'Turbo', 'Blaze', 'Rocky', 'Shadow'];
-const SKINS = ['klasyk', 'kamuflaz', 'pustynia', 'arbuz', 'truskawka', 'jagoda', 'mieta', 'wegiel', 'lawa', 'zlota', 'teczowa', 'arktyka'];
+// skiny botów: tylko postacie GTA z kreatora skinów (skins.json obok gry, ten sam plik, który czyta lobby) – w pliku są też memy (Pepe, Trump…),
+// których boty nie biorą. Nową postać GTA dla botów dopisuje się do GTA_SKINS (id z kreatora). Plik czytany najwyżej raz na minutę.
+const SKINS_FILE = path.join(process.env.GAME_DIR || path.join(path.dirname(fileURLToPath(import.meta.url)), '..'), 'skins.json');
+const GTA_SKINS = ['nowy-skin-8', 'jason-duval', 'lucia', 'michael-de-santa', 'tommy', 'niko-bellic', 'b-i-g-s-m-o-k-e', 'trevor'];   // CJ, Jason, Lucia, Michael, Tommy, Niko, Big Smoke, Trevor
+const GTA = new Set(GTA_SKINS), FALLBACK = GTA_SKINS;
+let gta = null, gtaT = 0;
+function gtaSkins() {
+  const now = Date.now(); if (gta && now - gtaT < 60000) return gta; gtaT = now;
+  try { const ids = JSON.parse(fs.readFileSync(SKINS_FILE, 'utf8')).filter((s) => s && s.id && s.tex && GTA.has(s.id)).map((s) => s.id); gta = ids.length ? ids : FALLBACK; }
+  catch { gta = gta || FALLBACK; }
+  return gta;
+}
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const wrap = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
@@ -24,7 +38,12 @@ export function botNick(taken) {
   }
   return 'Gracz' + ((Math.random() * 9000 + 1000) | 0);
 }
-export const botSkin = () => SKINS[(Math.random() * SKINS.length) | 0];
+// skin dla nowego bota: najrzadziej używana w pokoju postać GTA (różne postacie zamiast kilku takich samych)
+export function botSkin(used = []) {
+  const list = gtaSkins(), n = new Map(list.map((id) => [id, 0])); for (const u of used) if (n.has(u)) n.set(u, n.get(u) + 1);
+  const min = Math.min(...n.values()), pool = list.filter((id) => n.get(id) === min);
+  return pool[(Math.random() * pool.length) | 0];
+}
 
 // skill 0–1 (z ustawień): czas reakcji, celność, szybkość obrotu, częstość strzałów w głowę
 export function createBot(pid, skill) {

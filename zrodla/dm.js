@@ -240,10 +240,30 @@ export function createDM(ctx) {
     ui.setIcons(ctx.icons());
     const md = ctx.enter(m.map);                               // tryb 'dm' w grze, mapa, widok z 3. osoby
     if (md) ui.mapBase(md.boxes, md.bx, md.bz);
+    warmUp();
     ui.show(true); ui.setWantedMe(false); mySkull.visible = false;
     ui.setBoard(m.players.map((p) => [p.id, 0, 0, 0, 0]), S.pid, 0, nameOf);
     ui.notify(S.mapLabel, 'pink', true);
     ctx.lock(); ctx.sfx('go');
+  }
+  // Rozgrzewka: pierwsze narysowanie modelu broni (albo postaci ze skinem) kompiluje shadery i wgrywa model na kartę graficzną – to trwa
+  // kilkaset ms i w Deathmatch wypadało w środku walki (każde zabójstwo daje komuś nową broń z drabinki). Tu rysujemy raz, poza ekranem
+  // (do małej tekstury), całą scenę z wszystkimi broniami trybu i obecnymi graczami przed kamerą – potem w grze nic już się nie kompiluje.
+  function warmUp() {
+    const { THREE, renderer, camera } = ctx; if (!THREE || !renderer || !camera) return;
+    const g = new THREE.Group(), saved = [];
+    try {
+      const pos = camera.getWorldPosition(new THREE.Vector3()), fwd = camera.getWorldDirection(new THREE.Vector3());
+      g.position.copy(pos).addScaledVector(fwd, 3); g.lookAt(pos);
+      (S.cfg.guns || []).forEach((id, i) => { const w = ctx.createWeapon(id, { fx: false }); ctx.placeTP(w); w.group.position.x += (i - 2.5) * 0.45; g.add(w.group); });
+      scene.add(g);
+      let i = 0; for (const p of S.players.values()) { saved.push([p.root, p.root.visible, p.root.position.clone()]); p.root.visible = true; p.root.position.copy(g.position).addScaledVector(fwd, 1 + (i++ % 4) * 0.5); }
+      scene.updateMatrixWorld(true);
+      const rt = new THREE.WebGLRenderTarget(64, 64), prev = renderer.getRenderTarget();
+      renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.setRenderTarget(prev); rt.dispose();
+    } catch (e) { console.warn('[dm] rozgrzewka', e); }
+    scene.remove(g);
+    for (const [r, v, p] of saved) { r.visible = v; r.position.copy(p); }
   }
   function onSpawn(m) {
     S.me.life = m.life; Object.assign(S.me, { money: m.money, owned: m.owned, armor: m.armor, helmet: m.helmet, hp: 100, protUntil: now() + (m.prot || 0) });
