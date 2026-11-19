@@ -138,6 +138,12 @@ purgeSessions(); setInterval(purgeSessions, 3600e3).unref();
 // Panel admina ma własne konta (tabela admins: login, hasło, 2FA), niezależne od kont graczy. Zakłada się je na serwerze:
 // bash beanladen-admin.sh dodaj NAZWA (albo node admin.mjs dodaj NAZWA). Dawne ADMIN_USERS / ADMIN_IDS nie są już używane.
 const cfgPut = (k, v) => q('INSERT INTO config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(k, v);
+// napis „150 players online” na górze lobby – liczbę i tekst ustawia panel admina (klucz 'online' w config); {n} = liczba
+const onlineSanitize = (s = {}) => {
+  const text = String(s.text ?? '{n} players online').replace(/[<>]/g, '').trim().slice(0, 60) || '{n} players online';
+  return { enabled: s.enabled === undefined ? true : !!s.enabled, count: Math.max(0, Math.min(1e6, Math.round(+(s.count ?? 150) || 0))), text: text.includes('{n}') ? text : '{n} ' + text };
+};
+let onlineCfg = (() => { try { const r = q("SELECT value FROM config WHERE key='online'").get(); return onlineSanitize(r ? JSON.parse(r.value) : {}); } catch { return onlineSanitize({}); } })();
 { const a = q('SELECT username, totp FROM admins ORDER BY id').all();
   console.log(a.length ? `[admin] konta panelu: ${a.map(x => x.username + (x.totp ? ' (2FA)' : ' (2FA przy pierwszym logowaniu)')).join(', ')}` : '[admin] brak konta panelu admina – dodaj je: bash beanladen-admin.sh dodaj NAZWA');
   if (env.ADMIN_USERS || env.ADMIN_IDS) console.log('[admin] ADMIN_USERS / ADMIN_IDS w .env nie są już używane (panel ma własne konta)'); }
@@ -654,6 +660,16 @@ const routes = {
     cfgPut('dm', JSON.stringify(next)); dmCfg = next;
     audit(adm.username, ip, 'dm_config', body && body.reset ? 'reset' : Object.keys(body.config || {}).join(','));
     return { config: dmCfg };
+  },
+  // ---- napis „N players online” na górze lobby (bez logowania) ----
+  'GET /api/online': async () => ({ enabled: onlineCfg.enabled, count: onlineCfg.count, text: onlineCfg.text }),
+  'GET /api/admin/online': async ({ req }) => { adminGate(req); return { config: onlineCfg, defaults: onlineSanitize({}) }; },
+  'POST /api/admin/online': async ({ body, req, ip }) => {
+    const adm = adminGate(req);
+    const next = onlineSanitize(body && body.reset ? {} : (body.config || {}));
+    cfgPut('online', JSON.stringify(next)); onlineCfg = next;
+    audit(adm.username, ip, 'online_config', `${next.enabled ? 'wł.' : 'wył.'} ${next.count}`);
+    return { config: onlineCfg };
   },
   // ---- Udostępnienie na X (wejście do Deathmatch) ----
   // lobby: kod gracza, gotowy tekst posta, link do okna X i czy post jest już zweryfikowany

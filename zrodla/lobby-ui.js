@@ -524,6 +524,20 @@ export function initLobbyUI(ctx) {
   // serwer portfeli (serwer/ w repo): gdy ustawiony, konta, saldo, wpłaty, wypłaty i stawki idą przez niego (prawdziwe SOL w sieci Solana)
   const API = walletApi();
   const W = API ? createWallet({ api: API, root: ui, getLang: () => LANG, toast, onChange: a => { acct = a; acctId = a ? a.username.toLowerCase() : null; renderAll(); } }) : null;
+  // ---- napis „150 PLAYERS ONLINE” na górze lobby: liczba i tekst z panelu admina (GET /api/online), odświeżane co minutę ----
+  async function loadOnline() {
+    const box = $('lb-online'); if (!box || !API) return;
+    try {
+      const r = await fetch(API.replace(/\/+$/, '') + '/api/online', { cache: 'no-store' }); if (!r.ok) return;
+      const j = await r.json(), t = $('lb-online-t');
+      if (!j.enabled) { box.hidden = true; return; }
+      const [a, ...rest] = String(j.text || '{n} players online').split('{n}'), n = document.createElement('b');
+      n.textContent = (+j.count || 0).toLocaleString('en-US');
+      t.replaceChildren(document.createTextNode(a), n, document.createTextNode(rest.join('{n}')));
+      box.hidden = false;
+    } catch {}
+  }
+  loadOnline(); setInterval(() => { if (!ui.hidden) loadOnline(); }, 60000);
   let activeMatch = null;
   // bez serwera: ten sam nowy portfel, ale na koncie lokalnym (tryb testowy)
   const WL = W ? null : createWallet({ api: '', root: ui, getLang: () => LANG, toast, onChange: () => {}, local: { acct: () => acct, addTx: (a, type, note) => addTx(a, type, note) } });
@@ -686,7 +700,8 @@ export function initLobbyUI(ctx) {
   $('lb-walletchip').addEventListener('click', () => openWallet());
 
   // ---- stawka ----
-  let stakeSel = ls.get('fasolka-stake-sel') || '5', stakeCustom = +(ls.get('fasolka-stake-custom') || 50);
+  let stakeSel = ['1', '5', '10', 'custom'].includes(ls.get('fasolka-stake-sel')) ? ls.get('fasolka-stake-sel') : '1',   // stara zapamiętana stawka (np. 20) → $1
+  stakeCustom = +(ls.get('fasolka-stake-custom') || 50);
   const stakeBox = $('lb-stake'), customIn = $('lb-stake-in');
   stakeBox.querySelectorAll('[data-stake]').forEach(b => b.addEventListener('click', () => { stakeSel = b.dataset.stake; ls.set('fasolka-stake-sel', stakeSel); renderStake(); if (stakeSel === 'custom') customIn.focus(); }));
   customIn.addEventListener('input', () => { stakeCustom = Math.floor(+customIn.value); ls.set('fasolka-stake-custom', String(stakeCustom)); renderStake(true); });

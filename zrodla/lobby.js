@@ -29,6 +29,19 @@ const CSS = `
 #lb-ui .lb-logo{font:400 clamp(28px,3.4vw,40px)/1 Anton,Oswald,Impact,sans-serif;letter-spacing:.04em;transform:skewX(-6deg);
   text-shadow:0 2px 0 rgba(0,0,0,.35),0 8px 26px rgba(0,0,0,.35)}
 #lb-ui .lb-logo b{color:var(--acc);font-weight:400}
+/* „150 PLAYERS ONLINE” – na środku górnej belki (liczba i tekst z panelu admina) */
+#lb-ui .lb-online{position:absolute;left:50%;top:max(20px,calc(env(safe-area-inset-top) + 6px));transform:translateX(-50%);display:flex;align-items:center;gap:10px;
+  padding:8px 18px 8px 14px;background:rgba(10,4,16,.62);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);
+  font:700 15px/1 'Barlow Condensed',Oswald,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#fff;white-space:nowrap;pointer-events:none;
+  box-shadow:0 10px 30px rgba(0,0,0,.35);animation:lbOnFloat 6s ease-in-out infinite}
+#lb-ui .lb-online[hidden]{display:none}
+/* delikatne unoszenie: kilka pikseli góra–dół i na boki (właściwość translate, żeby nie ruszać centrowania przez transform) */
+@keyframes lbOnFloat{0%,100%{translate:0 0}20%{translate:2.5px -4px}45%{translate:-1.5px -1.5px}70%{translate:-3px 3px}85%{translate:1.5px 2px}}
+#lb-ui .lb-online b{font:400 20px/1 Anton,Impact,sans-serif;letter-spacing:.03em;color:var(--cash,#3ce38a);margin-right:2px}
+#lb-ui .lb-online i{width:9px;height:9px;border-radius:50%;background:var(--cash,#3ce38a);box-shadow:0 0 0 0 rgba(60,227,138,.6);animation:lbOnPulse 1.8s ease-out infinite}
+@keyframes lbOnPulse{0%{box-shadow:0 0 0 0 rgba(60,227,138,.6)}70%{box-shadow:0 0 0 9px rgba(60,227,138,0)}100%{box-shadow:0 0 0 0 rgba(60,227,138,0)}}
+@media (prefers-reduced-motion:reduce){#lb-ui .lb-online,#lb-ui .lb-online i{animation:none}}
+@media (max-width:900px){#lb-ui .lb-online{top:calc(max(14px,env(safe-area-inset-top)) + 54px);font-size:13px;padding:6px 14px 6px 12px}#lb-ui .lb-online b{font-size:17px}}
 #lb-ui .lb-beta{font:700 10px/1 Barlow,sans-serif;font-style:normal;letter-spacing:.14em;color:var(--acc);border:1px solid rgba(255,46,147,.45);
   border-radius:0;padding:4px 6px;margin-left:2px;align-self:center;background:rgba(12,6,18,.4)}
 #lb-ui .lb-sp{flex:1}
@@ -672,6 +685,7 @@ const HTML = `
 <div class="lb-shade"></div>
 <header class="lb-top">
   <div class="lb-logo"><b>GTASSAULT</b></div>
+  <div class="lb-online" id="lb-online" hidden><i></i><span id="lb-online-t"></span></div>
   <div class="lb-sp"></div>
   <div class="lb-lang"><button class="lb-chip lb-lchip" id="lb-langbtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Language"><i class="lb-flag" id="lb-langflag"></i><b id="lb-langcode">EN</b><svg class="lb-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4.5 6 8.5 10 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
     <div class="lb-langmenu" id="lb-langmenu" role="menu" hidden></div></div>
@@ -695,8 +709,8 @@ const HTML = `
     <div class="lb-stakewrap" id="lb-stake-wrap">
       <div class="lb-lbl"><span data-i18n="stake.label"></span><span class="lb-solq" id="lb-stake-sol"></span></div>
       <div class="lb-stake" id="lb-stake">
-        <button type="button" data-stake="5"><b><i>$</i>5</b><small data-sol="5">SOL</small></button><button type="button" data-stake="10"><b><i>$</i>10</b><small data-sol="10">SOL</small></button>
-        <button type="button" data-stake="20"><b><i>$</i>20</b><small data-sol="20">SOL</small></button><button type="button" data-stake="custom"><b data-i18n="stake.custom"></b><small>$1–1000</small></button>
+        <button type="button" data-stake="1"><b><i>$</i>1</b><small data-sol="1">SOL</small></button><button type="button" data-stake="5"><b><i>$</i>5</b><small data-sol="5">SOL</small></button>
+        <button type="button" data-stake="10"><b><i>$</i>10</b><small data-sol="10">SOL</small></button><button type="button" data-stake="custom"><b data-i18n="stake.custom"></b><small>$1–1000</small></button>
       </div>
       <div class="lb-custom" id="lb-stake-custom" hidden><input id="lb-stake-in" type="number" min="1" max="1000" step="1" inputmode="numeric" data-i18n-ph="stake.range" aria-label="USD"><span>USD</span></div>
       <div class="lb-free" id="lb-stake-free" hidden>${IC.info}<span data-i18n="stake.free"></span></div>

@@ -346,6 +346,34 @@ function mountArsenal($) {
   });
 }
 // Udostępnienie na X: włączenie, tekst posta, CA, link do gry, co ile sprawdzać post (serwer: serwer/xshare.mjs)
+// napis „N players online” na górze lobby: włączony, liczba, tekst (serwer: klucz 'online' w config)
+function mountOnline($) {
+  const box = $('fa-on'), msg = $('fa-on-msg'); let cfg = null;
+  const prev = () => esc(cfg.text).replace('{n}', `<b style="color:#3ce38a">${(+cfg.count || 0).toLocaleString('en-US')}</b>`);
+  function render() {
+    box.innerHTML = `<div class="fa-row" style="gap:14px;margin:0 0 10px"><label class="fa-chk"><input type="checkbox" id="fa-on-on" ${cfg.enabled ? 'checked' : ''}> Pokazuj napis</label></div>
+      <div class="fa-dmg">
+        <label class="fa-dmf"><span>Liczba graczy</span><input class="fa-q" type="number" min="0" max="1000000" step="1" id="fa-on-n" value="${cfg.count}"></label>
+        <label class="fa-dmf" style="grid-column:span 2"><span>Tekst ({n} = liczba)</span><input class="fa-q" id="fa-on-t" maxlength="60" value="${esc(cfg.text)}" spellcheck="false"></label>
+      </div>
+      <h4>Podgląd</h4><p class="fa-msg" id="fa-on-prev" style="margin:0;text-transform:uppercase;letter-spacing:.12em">${prev()}</p>`;
+    $('fa-on-sum').textContent = cfg.enabled ? `widoczny · ${(+cfg.count || 0).toLocaleString('en-US')}` : 'ukryty';
+    const live = () => { collect(); $('fa-on-prev').innerHTML = prev(); };
+    $('fa-on-n').addEventListener('input', live); $('fa-on-t').addEventListener('input', live);
+  }
+  function collect() { cfg.enabled = $('fa-on-on').checked; cfg.count = +$('fa-on-n').value; cfg.text = $('fa-on-t').value; }
+  const load = async () => { const j = await srvGet('/api/admin/online'); cfg = JSON.parse(JSON.stringify(j.config)); render(); };
+  load().catch((e) => { if (e.code === 'admin2fa') return relockAdmin(); box.innerHTML = `<p class="fa-empty">${esc(e.message)}</p>`; });
+  $('fa-on-save').addEventListener('click', async () => {
+    if (!cfg) return; collect(); msg.textContent = 'Zapisywanie…';
+    try { const j = await srvPost('/api/admin/online', { config: cfg }); cfg = JSON.parse(JSON.stringify(j.config)); render(); msg.textContent = 'Zapisano.'; }
+    catch (e) { msg.textContent = e.message; }
+  });
+  $('fa-on-reset').addEventListener('click', async () => {
+    if (!confirm('Przywrócić domyślny napis (150 players online)?')) return;
+    try { const j = await srvPost('/api/admin/online', { reset: true }); cfg = JSON.parse(JSON.stringify(j.config)); render(); msg.textContent = 'Przywrócono domyślne.'; } catch (e) { msg.textContent = e.message; }
+  });
+}
 function mountXShare($) {
   const box = $('fa-xs'), msg = $('fa-xs-msg'); let cfg = null, info = null;
   function render() {
@@ -572,6 +600,10 @@ function buildDashboard(db, close) {
         (stawka zamrożona na mecz też się liczy) albo token na adresie depozytu. Nic się nie pobiera. Bronie serwer ustala na starcie meczu. Z botem i Strzelnica – bez zmian.</p>
       <div id="fa-ars"><p class="fa-empty">Ładowanie…</p></div>
       <div class="fa-row"><button class="fa-btn pri" type="button" id="fa-ars-save">Zapisz Ekwipunek</button><button class="fa-btn" type="button" id="fa-ars-reset">Przywróć domyślne</button><span class="fa-msg" id="fa-ars-msg"></span></div></section>
+    <section class="fa-card" id="fa-on-card"><div class="fa-ch"><h3>Napis „players online” na górze lobby</h3><small id="fa-on-sum"></small></div>
+      <p class="fa-msg" style="margin:0 0 12px">Liczba i tekst na środku górnej belki lobby. <code>{n}</code> w tekście = liczba. Gracze widzą zmianę najpóźniej po minucie (albo po odświeżeniu strony).</p>
+      <div id="fa-on"><p class="fa-empty">Ładowanie…</p></div>
+      <div class="fa-row"><button class="fa-btn pri" type="button" id="fa-on-save">Zapisz</button><button class="fa-btn" type="button" id="fa-on-reset">Przywróć domyślne</button><span class="fa-msg" id="fa-on-msg"></span></div></section>
     <section class="fa-card" id="fa-xs-card"><div class="fa-ch"><h3>Udostępnienie na X – wejście do Deathmatch</h3><small id="fa-xs-sum"></small></div>
       <p class="fa-msg" style="margin:0 0 12px">Włączone: przed Deathmatch gracz publikuje na X gotowy post (przycisk otwiera X z tekstem) i wkleja link. Serwer czyta post (publiczny podgląd X, bez klucza API)
         i sprawdza unikalny kod gracza – <code>{code}</code> musi zostać w tekście – oraz CA. W tekście: <code>{ca}</code> = adres CA, <code>{url}</code> = link do gry, <code>{code}</code> = kod gracza.</p>
@@ -664,6 +696,7 @@ function buildDashboard(db, close) {
     mountAnticheat($);
     mountDeathmatch($);
     mountArsenal($);
+    mountOnline($);
     mountXShare($);
   } else if (db) {
     const timer = setTimeout(() => { if (!gotA) { note.hidden = false; note.textContent = 'Baza danych jeszcze nie odpowiada – dane mogą być niepełne.'; } }, 10000);
