@@ -45,7 +45,7 @@ const DICT = {
     'tx.deposit': 'Wpłata (test)', 'tx.withdraw': 'Wypłata (test)', 'tx.stake': 'Stawka 1v1', 'tx.win': 'Wygrana 1v1', 'tx.loss': 'Przegrana 1v1',
     'err.loginToPlay': 'Zaloguj się, aby grać o stawkę', 'err.funds': 'Za mało środków na stawkę – doładuj portfel', 'err.needServer': '1v1 wymaga połączenia z serwerem gry.', 'err.rematchFunds': 'Za mało środków na kolejny mecz',
     'draw.title': 'Losowanie mapy', 'draw.map': 'Mapa',
-    'stake.fee': 'Prowizja (10%)', 'set.vMaster': 'Głośność ogólna', 'set.vMasterD': 'Wszystkie dźwięki', 'set.vMenu': 'Dźwięki w menu', 'set.vMenuD': 'Kliknięcia, okna, losowanie mapy', 'set.vGame': 'Dźwięki w grze', 'set.vGameD': 'Strzały, trafienia, przeładowanie', 'set.preview': 'Odsłuchaj', 'set.secView': 'Widok', 'set.secKeys': 'Klawisze', 'set.fovD': 'Szerszy kąt = więcej widać, mniejsze obiekty', 'tx.fee': 'prowizja {a}', 'set.reserved': 'Ten klawisz jest zarezerwowany (bronie 1–4 i Esc)', 'kb.move': 'Ruch', 'kb.fight': 'Walka', 'kb.sys': 'Inne', 'kb.lmb': 'LPM', 'kb.rmb': 'PPM', 'kb.mmb': 'Kółko', 'kb.fire': 'Strzał', 'kb.aim': 'Celowanie', 'kb.wheel': 'Zmiana broni', 'kb.weapons': 'Broń 1–4', 'kb.pause': 'Pauza', 'kb.alt': 'zapasowy',
+    'stake.fee': 'Prowizja (10%)', 'set.vMaster': 'Głośność ogólna', 'set.vMasterD': 'Wszystkie dźwięki', 'set.vMenu': 'Dźwięki w menu', 'set.vMenuD': 'Kliknięcia, okna, losowanie mapy', 'set.vMusic': 'Muzyka', 'set.vMusicD': 'Hymn GTASSAULT w lobby', 'set.vGame': 'Dźwięki w grze', 'set.vGameD': 'Strzały, trafienia, przeładowanie', 'set.preview': 'Odsłuchaj', 'set.secView': 'Widok', 'set.secKeys': 'Klawisze', 'set.fovD': 'Szerszy kąt = więcej widać, mniejsze obiekty', 'tx.fee': 'prowizja {a}', 'set.reserved': 'Ten klawisz jest zarezerwowany (bronie 1–4 i Esc)', 'kb.move': 'Ruch', 'kb.fight': 'Walka', 'kb.sys': 'Inne', 'kb.lmb': 'LPM', 'kb.rmb': 'PPM', 'kb.mmb': 'Kółko', 'kb.fire': 'Strzał', 'kb.aim': 'Celowanie', 'kb.wheel': 'Zmiana broni', 'kb.weapons': 'Broń 1–4', 'kb.pause': 'Pauza', 'kb.alt': 'zapasowy',
   },
   en: {
     'menu.settings': 'Settings', 'menu.wallet': 'Wallet', 'menu.login': 'Log in', 'menu.account': 'Account', 'menu.logout': 'Log out', 'menu.admin': 'Admin panel',
@@ -77,7 +77,7 @@ const DICT = {
     'tx.deposit': 'Deposit (test)', 'tx.withdraw': 'Withdrawal (test)', 'tx.stake': '1v1 stake', 'tx.win': '1v1 win', 'tx.loss': '1v1 loss',
     'err.loginToPlay': 'Log in to play for a stake', 'err.funds': 'Not enough funds for this stake – top up your wallet', 'err.needServer': '1v1 needs a connection to the game server.', 'err.rematchFunds': 'Not enough funds for another match',
     'draw.title': 'Map draw', 'draw.map': 'Map',
-    'stake.fee': 'House fee (10%)', 'set.vMaster': 'Master volume', 'set.vMasterD': 'All sounds', 'set.vMenu': 'Menu sounds', 'set.vMenuD': 'Clicks, windows, map draw', 'set.vGame': 'Game sounds', 'set.vGameD': 'Shots, hits, reloads', 'set.preview': 'Preview', 'set.secView': 'View', 'set.secKeys': 'Keys', 'set.fovD': 'Wider angle = see more, smaller objects', 'tx.fee': 'fee {a}', 'set.reserved': 'This key is reserved (weapons 1–4 and Esc)', 'kb.move': 'Movement', 'kb.fight': 'Combat', 'kb.sys': 'Other', 'kb.lmb': 'LMB', 'kb.rmb': 'RMB', 'kb.mmb': 'Wheel', 'kb.fire': 'Fire', 'kb.aim': 'Aim', 'kb.wheel': 'Switch weapon', 'kb.weapons': 'Weapon 1–4', 'kb.pause': 'Pause', 'kb.alt': 'alternate',
+    'stake.fee': 'House fee (10%)', 'set.vMaster': 'Master volume', 'set.vMasterD': 'All sounds', 'set.vMenu': 'Menu sounds', 'set.vMenuD': 'Clicks, windows, map draw', 'set.vMusic': 'Music', 'set.vMusicD': 'GTASSAULT anthem in the lobby', 'set.vGame': 'Game sounds', 'set.vGameD': 'Shots, hits, reloads', 'set.preview': 'Preview', 'set.secView': 'View', 'set.secKeys': 'Keys', 'set.fovD': 'Wider angle = see more, smaller objects', 'tx.fee': 'fee {a}', 'set.reserved': 'This key is reserved (weapons 1–4 and Esc)', 'kb.move': 'Movement', 'kb.fight': 'Combat', 'kb.sys': 'Other', 'kb.lmb': 'LMB', 'kb.rmb': 'RMB', 'kb.mmb': 'Wheel', 'kb.fire': 'Fire', 'kb.aim': 'Aim', 'kb.wheel': 'Switch weapon', 'kb.weapons': 'Weapon 1–4', 'kb.pause': 'Pause', 'kb.alt': 'alternate',
   },
   ru: {
     'menu.settings': 'Настройки', 'menu.wallet': 'Кошелёк', 'menu.login': 'Войти', 'menu.account': 'Аккаунт', 'menu.logout': 'Выйти', 'menu.admin': 'Админ-панель',
@@ -109,7 +109,7 @@ const DICT = {
     'tx.deposit': 'Пополнение (тест)', 'tx.withdraw': 'Вывод (тест)', 'tx.stake': 'Ставка 1v1', 'tx.win': 'Победа 1v1', 'tx.loss': 'Поражение 1v1',
     'err.loginToPlay': 'Войди, чтобы играть на ставку', 'err.funds': 'Недостаточно средств для ставки – пополни кошелёк', 'err.needServer': 'Для 1v1 нужно подключение к игровому серверу.', 'err.rematchFunds': 'Недостаточно средств для следующего матча',
     'draw.title': 'Выбор карты', 'draw.map': 'Карта',
-    'stake.fee': 'Комиссия (10%)', 'set.vMaster': 'Общая громкость', 'set.vMasterD': 'Все звуки', 'set.vMenu': 'Звуки меню', 'set.vMenuD': 'Клики, окна, выбор карты', 'set.vGame': 'Звуки в игре', 'set.vGameD': 'Выстрелы, попадания, перезарядка', 'set.preview': 'Прослушать', 'set.secView': 'Обзор', 'set.secKeys': 'Клавиши', 'set.fovD': 'Шире угол – больше видно, объекты меньше', 'tx.fee': 'комиссия {a}', 'set.reserved': 'Эта клавиша зарезервирована (оружие 1–4 и Esc)', 'kb.move': 'Движение', 'kb.fight': 'Бой', 'kb.sys': 'Прочее', 'kb.lmb': 'ЛКМ', 'kb.rmb': 'ПКМ', 'kb.mmb': 'Колесо', 'kb.fire': 'Выстрел', 'kb.aim': 'Прицел', 'kb.wheel': 'Смена оружия', 'kb.weapons': 'Оружие 1–4', 'kb.pause': 'Пауза', 'kb.alt': 'запасная',
+    'stake.fee': 'Комиссия (10%)', 'set.vMaster': 'Общая громкость', 'set.vMasterD': 'Все звуки', 'set.vMenu': 'Звуки меню', 'set.vMenuD': 'Клики, окна, выбор карты', 'set.vMusic': 'Музыка', 'set.vMusicD': 'Гимн GTASSAULT в лобби', 'set.vGame': 'Звуки в игре', 'set.vGameD': 'Выстрелы, попадания, перезарядка', 'set.preview': 'Прослушать', 'set.secView': 'Обзор', 'set.secKeys': 'Клавиши', 'set.fovD': 'Шире угол – больше видно, объекты меньше', 'tx.fee': 'комиссия {a}', 'set.reserved': 'Эта клавиша зарезервирована (оружие 1–4 и Esc)', 'kb.move': 'Движение', 'kb.fight': 'Бой', 'kb.sys': 'Прочее', 'kb.lmb': 'ЛКМ', 'kb.rmb': 'ПКМ', 'kb.mmb': 'Колесо', 'kb.fire': 'Выстрел', 'kb.aim': 'Прицел', 'kb.wheel': 'Смена оружия', 'kb.weapons': 'Оружие 1–4', 'kb.pause': 'Пауза', 'kb.alt': 'запасная',
   },
   es: {
     'menu.settings': 'Ajustes', 'menu.wallet': 'Cartera', 'menu.login': 'Iniciar sesión', 'menu.account': 'Cuenta', 'menu.logout': 'Cerrar sesión', 'menu.admin': 'Panel de admin',
@@ -141,7 +141,7 @@ const DICT = {
     'tx.deposit': 'Depósito (prueba)', 'tx.withdraw': 'Retiro (prueba)', 'tx.stake': 'Apuesta 1v1', 'tx.win': 'Victoria 1v1', 'tx.loss': 'Derrota 1v1',
     'err.loginToPlay': 'Inicia sesión para jugar con apuesta', 'err.funds': 'Fondos insuficientes para la apuesta – recarga la cartera', 'err.needServer': 'El 1v1 necesita conexión con el servidor del juego.', 'err.rematchFunds': 'Fondos insuficientes para otra partida',
     'draw.title': 'Sorteo del mapa', 'draw.map': 'Mapa',
-    'stake.fee': 'Comisión (10%)', 'set.vMaster': 'Volumen general', 'set.vMasterD': 'Todos los sonidos', 'set.vMenu': 'Sonidos del menú', 'set.vMenuD': 'Clics, ventanas, sorteo del mapa', 'set.vGame': 'Sonidos del juego', 'set.vGameD': 'Disparos, impactos, recargas', 'set.preview': 'Escuchar', 'set.secView': 'Vista', 'set.secKeys': 'Teclas', 'set.fovD': 'Más ángulo = ves más, objetos más pequeños', 'tx.fee': 'comisión {a}', 'set.reserved': 'Esta tecla está reservada (armas 1–4 y Esc)', 'kb.move': 'Movimiento', 'kb.fight': 'Combate', 'kb.sys': 'Otros', 'kb.lmb': 'Clic izq.', 'kb.rmb': 'Clic der.', 'kb.mmb': 'Rueda', 'kb.fire': 'Disparo', 'kb.aim': 'Apuntar', 'kb.wheel': 'Cambiar arma', 'kb.weapons': 'Arma 1–4', 'kb.pause': 'Pausa', 'kb.alt': 'alternativa',
+    'stake.fee': 'Comisión (10%)', 'set.vMaster': 'Volumen general', 'set.vMasterD': 'Todos los sonidos', 'set.vMenu': 'Sonidos del menú', 'set.vMenuD': 'Clics, ventanas, sorteo del mapa', 'set.vMusic': 'Música', 'set.vMusicD': 'Himno de GTASSAULT en el lobby', 'set.vGame': 'Sonidos del juego', 'set.vGameD': 'Disparos, impactos, recargas', 'set.preview': 'Escuchar', 'set.secView': 'Vista', 'set.secKeys': 'Teclas', 'set.fovD': 'Más ángulo = ves más, objetos más pequeños', 'tx.fee': 'comisión {a}', 'set.reserved': 'Esta tecla está reservada (armas 1–4 y Esc)', 'kb.move': 'Movimiento', 'kb.fight': 'Combate', 'kb.sys': 'Otros', 'kb.lmb': 'Clic izq.', 'kb.rmb': 'Clic der.', 'kb.mmb': 'Rueda', 'kb.fire': 'Disparo', 'kb.aim': 'Apuntar', 'kb.wheel': 'Cambiar arma', 'kb.weapons': 'Arma 1–4', 'kb.pause': 'Pausa', 'kb.alt': 'alternativa',
   },
 };
 const SKIN_NAMES = {
@@ -304,19 +304,46 @@ export function initLobbyUI(ctx) {
 
   // ---- ustawienia ----
   const defBinds = Object.fromEntries(ACTIONS);
-  let S = { lang: 'en', volume: 80, vMenu: 70, vGame: 100, fov: 78, sens: 1, sensAds: 1, binds: { ...defBinds } };
+  let S = { lang: 'en', volume: 80, vMenu: 70, vGame: 100, vMusic: 60, fov: 78, sens: 1, sensAds: 1, binds: { ...defBinds } };
   try { const v = JSON.parse(ls.get('fasolka-settings') || 'null'); if (v) S = { ...S, ...v, binds: { ...defBinds, ...(v.binds || {}) } }; } catch {}
   if (!S.langPicked || !DICT[S.lang]) S.lang = 'en';
   S.fov = 78;   // pole widzenia stałe – takie samo dla wszystkich graczy (bez ustawienia)   // domyślnie angielski, dopóki gracz sam nie wybierze języka
   LANG = S.lang;
   let pushT = 0;
   const pushSettings = () => { ls.set('fasolka-settings', JSON.stringify(S)); clearTimeout(pushT);
-    pushT = setTimeout(sendSettings, 30); applyUiVol(); };
+    pushT = setTimeout(sendSettings, 30); applyUiVol(); MUSIC.apply(); };
   // gra dostaje głośność = ogólna × dźwięki w grze; dźwięki menu gra lobby (ogólna × menu)
   const sendSettings = () => dispatchEvent(new CustomEvent('fasolka:settings', { detail: { volume: (S.volume / 100) * (S.vGame / 100), fov: S.fov, sens: +S.sens || 1, sensAds: +S.sensAds || 1 } }));
   setTimeout(sendSettings, 0);
   // zmiany z menu pauzy w grze trafiają do tego samego stanu (lobby nie nadpisze ich starą wartością)
   addEventListener('fasolka:settings-set', e => { S = { ...S, ...(e.detail || {}) }; pushSettings(); try { renderSettings(); } catch {} });
+
+  // ---- muzyka w lobby: hymn GTASSAULT w pętli ----
+  // Gra, gdy body ma klasę 'in-lobby' (lobby, szukanie przeciwnika, losowanie mapy); w meczu i w schowanej karcie płynnie cichnie.
+  // Przeglądarki nie pozwalają grać przed pierwszym kliknięciem / klawiszem, więc start po pierwszym geście gracza.
+  // Głośność = ogólna × „Muzyka” z ustawień. Plik pobiera się dopiero przy starcie (preload none) i dalej strumieniowo.
+  const MUSIC = (() => {
+    const SRC = new URL('./muzyka/gtassault-anthem.mp3', import.meta.url).href;
+    let el = null, unlocked = false, timer = 0;
+    const target = () => (unlocked && document.body.classList.contains('in-lobby') && !document.hidden ? (S.volume / 100) * ((S.vMusic ?? 60) / 100) * 0.6 : 0);
+    function ensure() { if (!el && SRC) { el = new Audio(SRC); el.loop = true; el.preload = 'none'; el.volume = 0; } return el; }
+    function apply() {
+      const t = target(); if (!t && (!el || el.paused)) return;
+      const a = ensure(); if (!a) return;
+      if (t > 0 && a.paused) a.play().catch(() => {});
+      clearInterval(timer);
+      timer = setInterval(() => {                               // płynne wejście / wyciszenie (ok. 1,2 s)
+        const goal = target(), v = a.volume, step = 0.04;
+        a.volume = Math.abs(goal - v) <= step ? goal : v + Math.sign(goal - v) * step;
+        if (a.volume === goal) { clearInterval(timer); if (!goal) a.pause(); }
+      }, 50);
+    }
+    const unlock = () => { if (unlocked) return; unlocked = true; removeEventListener('pointerdown', unlock, true); removeEventListener('keydown', unlock, true); apply(); };
+    addEventListener('pointerdown', unlock, true); addEventListener('keydown', unlock, true);
+    new MutationObserver(apply).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    document.addEventListener('visibilitychange', apply);
+    return { apply };
+  })();
 
   // ---- dźwięki menu (WebAudio, bez plików) ----
   let AC = null, uiGain = null, gestured = false;
@@ -430,7 +457,7 @@ export function initLobbyUI(ctx) {
   document.addEventListener('pointerdown', e => { if (!langMenu.hidden && !e.target.closest('.lb-lang')) openLang(false); });
   addEventListener('keydown', e => { if (e.key === 'Escape' && !langMenu.hidden) { openLang(false); e.stopPropagation(); } }, true);
   const fillRange = r => r.style.setProperty('--p', ((r.value - r.min) / (r.max - r.min) * 100) + '%');
-  const preview = k => k === 'vGame' ? gamePreview((S.volume / 100) * (S.vGame / 100)) : k === 'vMenu' ? SFX.reveal() : (tone({ f: 660, d: .12, g: .5, type: 'triangle', out: masterOut() }));
+  const preview = k => k === 'vMusic' ? MUSIC.apply() : k === 'vGame' ? gamePreview((S.volume / 100) * (S.vGame / 100)) : k === 'vMenu' ? SFX.reveal() : (tone({ f: 660, d: .12, g: .5, type: 'triangle', out: masterOut() }));
   const masterOut = () => { const ac = audio(); if (!ac) return null; const g = ac.createGain(); g.gain.value = S.volume / 100 * .3; g.connect(ac.destination); return g; };
   ui.querySelectorAll('.lb-vrow').forEach(row => { const k = row.dataset.k, r = row.querySelector('input'), last = { v: S[k] || 80 };
     r.addEventListener('input', () => { S[k] = +r.value; if (S[k]) last.v = S[k]; renderVol(); pushSettings(); });

@@ -381,6 +381,7 @@ const CSS = `
 #lb-ui .c-move{--c:#ff2e93}
 #lb-ui .c-fight{--c:#ff6b57}
 #lb-ui .c-sys{--c:#9d8cff}
+.c-music{--c:#22e0d6}
 #lb-ui .lb-dlg.lb-wide{width:min(740px,100%)}
 #lb-ui .lb-binds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 #lb-ui .lb-bind{display:flex;align-items:center;gap:9px;height:42px;padding:0 6px 0 11px;border-radius:0;border:1px solid var(--line);
@@ -667,6 +668,7 @@ const IC = {
   shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>',
   logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>',
   vol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>',
+  music: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
   menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M12 12l5 9 1.5-3.5L22 16z" fill="currentColor"/></svg>',
   cross: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>',
   mute: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M16 9l5 6M21 9l-5 6"/></svg>',
@@ -735,6 +737,7 @@ const HTML = `
   <div class="lb-tabs"><button type="button" data-tab="controls" class="on" data-i18n="set.controls"></button><button type="button" data-tab="audio" data-i18n="set.audio"></button><button type="button" data-tab="lang" data-i18n="set.lang"></button><button type="button" data-tab="biz" data-i18n="set.biz"></button></div>
   <div data-pane="audio" hidden>
     ${VROW('volume', 'c-move', 'vol', 'set.vMaster', 'set.vMasterD')}
+    ${VROW('vMusic', 'c-music', 'music', 'set.vMusic', 'set.vMusicD')}
     ${VROW('vMenu', 'c-sys', 'menu', 'set.vMenu', 'set.vMenuD')}
     ${VROW('vGame', 'c-fight', 'cross', 'set.vGame', 'set.vGameD')}
   </div>

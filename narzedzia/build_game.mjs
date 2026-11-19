@@ -69,7 +69,11 @@ let ui = rd('lobby-ui.js');
 const imports = imgs.map((f, i) => `import __IMG${i} from './maps/${f}';`).join('\n');
 imgs.forEach((f, i) => { ui = ui.split(`new URL('./maps/${f}', import.meta.url)`).join(OFFLINE ? `new URL(__IMG${i})` : `new URL(__IMG${i}, import.meta.url)`); });
 if (ui.includes("new URL('./maps/")) throw new Error('lobby-ui.js nadal używa import.meta.url');
-wr('lobby-ui.js', imports + '\n' + ui);
+// 4b) muzyka w lobby: new URL('./muzyka/x.mp3', import.meta.url) -> plik w gra/ (zwykły build); offline – bez muzyki (6 MB w jednym pliku to za dużo)
+const MUS = "new URL('./muzyka/gtassault-anthem.mp3', import.meta.url).href";
+if (!ui.includes(MUS)) throw new Error('lobby-ui.js: nie ma adresu muzyki');
+ui = OFFLINE ? ui.replace(MUS, "''") : ui.replace(MUS, 'new URL(__MUSIC, import.meta.url).href');
+wr('lobby-ui.js', imports + (OFFLINE ? '' : "\nimport __MUSIC from './muzyka/gtassault-anthem.mp3';") + '\n' + ui);
 
 // 5) bundel
 const common = {
@@ -88,7 +92,7 @@ if (OFFLINE) {
   const res = await build({
     ...common, splitting: true, outdir: outDir, write: true, metafile: true,
     entryNames: 'gra-[hash]', chunkNames: 'c-[hash]', assetNames: '[name]-[hash]',
-    loader: { '.jpg': 'file', '.glb': 'file' },
+    loader: { '.jpg': 'file', '.glb': 'file', '.mp3': 'file' },
   });
   const outs = res.metafile.outputs, rel = (p) => path.relative(path.dirname(path.resolve(outFile)), path.resolve(p)).split(path.sep).join('/');
   const entry = Object.keys(outs).find((p) => /(^|[\\/])gra-[A-Z0-9]+\.js$/.test(p));   // główny plik (pozostałe części mają przedrostek c-)
