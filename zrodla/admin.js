@@ -352,23 +352,26 @@ function mountOnline($) {
   const fmt = (v) => (+v || 0).toLocaleString('en-US');
   const prev = () => esc(cfg.text).replace('{n}', `<b style="color:#3ce38a">${fmt(now || cfg.count)}</b>`);
   // ile będzie po czasie (ta sama formuła co serwer): start × (1 + wzrost%)^minuty, najwyżej limit
-  const at = (min) => Math.min(Math.max(cfg.cap, cfg.count), Math.round(cfg.count * Math.pow(1 + (+cfg.growth || 0) / 100, min)));
-  const curve = () => [[10, '10 min'], [60, '1 h'], [180, '3 h'], [360, '6 h'], [720, '12 h'], [1440, '24 h']].map(([m, l]) => `${l}: <b>${fmt(at(m))}</b>`).join(' · ');
+  const at = (min) => { const c = cfg, a = Math.log(1 + (+c.growth || 0) / 100), t1 = c.count >= c.slowAt ? 0 : a > 0 ? Math.log(c.slowAt / Math.max(1, c.count)) / a : Infinity;
+    const v = min <= t1 ? c.count * Math.exp(a * min) : Math.max(c.count, c.slowAt) * Math.pow(1 + (+c.slowGrowth || 0) / 100, min - t1); return Math.min(Math.max(c.cap, c.count), Math.round(v)); };
+  const curve = () => [[10, '10 min'], [30, '30 min'], [60, '1 h'], [120, '2 h'], [180, '3 h'], [360, '6 h'], [720, '12 h'], [1440, '24 h']].map(([m, l]) => `${l}: <b>${fmt(at(m))}</b>`).join(' · ');
   function render() {
     box.innerHTML = `<div class="fa-row" style="gap:14px;margin:0 0 10px"><label class="fa-chk"><input type="checkbox" id="fa-on-on" ${cfg.enabled ? 'checked' : ''}> Pokazuj napis</label></div>
       <div class="fa-dmg">
         <label class="fa-dmf"><span>Liczba startowa</span><input class="fa-q" type="number" min="0" max="1000000" step="1" id="fa-on-n" value="${cfg.count}"></label>
-        <label class="fa-dmf"><span>Wzrost co minutę (%)</span><input class="fa-q" type="number" min="0" max="10" step="0.05" id="fa-on-g" value="${cfg.growth}"></label>
+        <label class="fa-dmf"><span>Szybki wzrost co minutę (%)</span><input class="fa-q" type="number" min="0" max="10" step="0.05" id="fa-on-g" value="${cfg.growth}"></label>
+        <label class="fa-dmf"><span>Zwolnij od (graczy)</span><input class="fa-q" type="number" min="0" max="1000000" step="1" id="fa-on-slow" value="${cfg.slowAt}"></label>
+        <label class="fa-dmf"><span>Potem wzrost co minutę (%)</span><input class="fa-q" type="number" min="0" max="10" step="0.01" id="fa-on-g2" value="${cfg.slowGrowth}"></label>
         <label class="fa-dmf"><span>Limit (najwyżej tyle)</span><input class="fa-q" type="number" min="0" max="1000000" step="1" id="fa-on-cap" value="${cfg.cap}"></label>
         <label class="fa-dmf" style="grid-column:span 2"><span>Tekst ({n} = liczba)</span><input class="fa-q" id="fa-on-t" maxlength="60" value="${esc(cfg.text)}" spellcheck="false"></label>
       </div>
       <p class="fa-msg" id="fa-on-curve" style="margin:8px 0 0">Po zapisie liczba rośnie od liczby startowej: ${curve()}</p>
       <h4>Teraz w lobby</h4><p class="fa-msg" id="fa-on-prev" style="margin:0;text-transform:uppercase;letter-spacing:.12em">${prev()}</p>`;
-    $('fa-on-sum').textContent = cfg.enabled ? `widoczny · teraz ${fmt(now)} · +${cfg.growth}%/min do ${fmt(cfg.cap)}` : 'ukryty';
+    $('fa-on-sum').textContent = cfg.enabled ? `widoczny · teraz ${fmt(now)} · +${cfg.growth}%/min do ${fmt(cfg.slowAt)}, potem +${cfg.slowGrowth}%/min do ${fmt(cfg.cap)}` : 'ukryty';
     const live = () => { collect(); $('fa-on-curve').innerHTML = 'Po zapisie liczba rośnie od liczby startowej: ' + curve(); };
-    ['fa-on-n', 'fa-on-g', 'fa-on-cap', 'fa-on-t'].forEach((id) => $(id).addEventListener('input', live));
+    ['fa-on-n', 'fa-on-g', 'fa-on-slow', 'fa-on-g2', 'fa-on-cap', 'fa-on-t'].forEach((id) => $(id).addEventListener('input', live));
   }
-  function collect() { cfg.enabled = $('fa-on-on').checked; cfg.count = +$('fa-on-n').value; cfg.growth = +$('fa-on-g').value; cfg.cap = +$('fa-on-cap').value; cfg.text = $('fa-on-t').value; }
+  function collect() { cfg.enabled = $('fa-on-on').checked; cfg.count = +$('fa-on-n').value; cfg.growth = +$('fa-on-g').value; cfg.slowAt = +$('fa-on-slow').value; cfg.slowGrowth = +$('fa-on-g2').value; cfg.cap = +$('fa-on-cap').value; cfg.text = $('fa-on-t').value; }
   const load = async () => { const j = await srvGet('/api/admin/online'); cfg = JSON.parse(JSON.stringify(j.config)); now = j.now; render(); };
   load().catch((e) => { if (e.code === 'admin2fa') return relockAdmin(); box.innerHTML = `<p class="fa-empty">${esc(e.message)}</p>`; });
   $('fa-on-save').addEventListener('click', async () => {
@@ -663,7 +666,7 @@ function buildDashboard(db, close) {
       <div id="fa-ars"><p class="fa-empty">Ładowanie…</p></div>
       <div class="fa-row"><button class="fa-btn pri" type="button" id="fa-ars-save">Zapisz Ekwipunek</button><button class="fa-btn" type="button" id="fa-ars-reset">Przywróć domyślne</button><span class="fa-msg" id="fa-ars-msg"></span></div></section>
     <section class="fa-card" id="fa-on-card"><div class="fa-ch"><h3>Napis „players online” na górze lobby</h3><small id="fa-on-sum"></small></div>
-      <p class="fa-msg" style="margin:0 0 12px">Liczba na środku górnej belki lobby. Rośnie wykładniczo: co minutę o podany procent (z każdą minutą przybywa więcej), aż do limitu. Zapis = start od nowa od liczby startowej. <code>{n}</code> w tekście = liczba.</p>
+      <p class="fa-msg" style="margin:0 0 12px">Liczba na środku górnej belki lobby. Rośnie wykładniczo: najpierw szybko (co minutę o podany procent – z każdą minutą przybywa więcej), od progu „zwolnij od” wolniej, aż do limitu. Zapis = start od nowa od liczby startowej. <code>{n}</code> w tekście = liczba.</p>
       <div id="fa-on"><p class="fa-empty">Ładowanie…</p></div>
       <div class="fa-row"><button class="fa-btn pri" type="button" id="fa-on-save">Zapisz</button><button class="fa-btn" type="button" id="fa-on-reset">Przywróć domyślne</button><span class="fa-msg" id="fa-on-msg"></span></div></section>
     <section class="fa-card" id="fa-xs-card"><div class="fa-ch"><h3>Udostępnienie na X – wejście do Deathmatch</h3><small id="fa-xs-sum"></small></div>
