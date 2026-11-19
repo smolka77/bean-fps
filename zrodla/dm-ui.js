@@ -7,7 +7,7 @@ import { getLang } from './lobby-ui.js';
 
 // ---------------- teksty (PL / EN / RU / ES) ----------------
 const TX = {
-  pl: { kills: 'ZABÓJSTWA', rank: 'MIEJSCE', wanted: 'POSZUKIWANY', youWanted: 'JESTEŚ POSZUKIWANY', youWantedSub: 'Za twoją głowę płacą ×{m}', wantedNow: '{n} jest POSZUKIWANY',
+  pl: { nextGun: 'NASTĘPNA BROŃ: {n}/{m} KILL', topGun: 'NAJLEPSZA BROŃ', lockedGuns: 'ODBLOKUJ BRONIE W EKWIPUNKU', kills: 'ZABÓJSTWA', rank: 'MIEJSCE', wanted: 'POSZUKIWANY', youWanted: 'JESTEŚ POSZUKIWANY', youWantedSub: 'Za twoją głowę płacą ×{m}', wantedNow: '{n} jest POSZUKIWANY',
     wantedKill: 'ZABÓJSTWO POSZUKIWANEGO ×{m}', head: 'STRZAŁ W GŁOWĘ', kill: 'ZABÓJSTWO', protect: 'OCHRONA', killedBy: 'Zabity przez', weapon: 'Broń', dist: 'Odległość',
     headshot: 'w głowę', killerLeft: 'Zabójcy zostało', yourStats: 'Twój mecz', deaths: 'ŚMIERCI', damage: 'OBRAŻENIA', cash: 'KASA', toShop: 'Sklep za chwilę…',
     shopName: 'VICE BEACH ARMORY', sidearms: 'PISTOLETY', longarms: 'BROŃ DŁUGA', equipment: 'PANCERZ', pistols: 'Pistolety', shotguns: 'Strzelby', assault: 'Karabiny szturmowe',
@@ -20,7 +20,7 @@ const TX = {
     entry: 'Wpisowe', prize: 'Pula dla top 3', countdown: 'MECZ ZA', fight: 'WALCZ!', timeUp: 'KONIEC CZASU', results: 'WYNIKI MECZU', you: 'Ty', toLobby: 'Wróć do lobby', backIn: 'Lobby za {s} s',
     place1: '1. MIEJSCE', place2: '2. MIEJSCE', place3: '3. MIEJSCE', reward: 'Nagroda', player: 'GRACZ', board: 'TABELA', left: 'wyszedł', joined: 'w meczu', tabHint: 'TAB – tabela',
     spawnProt: 'Ochrona po odrodzeniu', armorUp: 'PANCERZ', mapLbl: 'Mapa', bought: 'Kupiono: {n}', yourPlace: 'Twoje miejsce: {p}', leaveTitle: 'Wyjść z meczu?', deadHint: 'SPACJA – odrodzenie · ESC – wyjście do lobby', deadWait: 'Odrodzenie za chwilę…', upgrade: 'NOWA BROŃ', maxGun: 'NAJLEPSZA BROŃ', online: 'W LOBBY', lost: 'Utracono połączenie z serwerem meczu.' },
-  en: { kills: 'KILLS', rank: 'RANK', wanted: 'WANTED', youWanted: 'YOU ARE WANTED', youWantedSub: 'Your head is worth ×{m}', wantedNow: '{n} is WANTED',
+  en: { nextGun: 'NEXT GUN: {n}/{m} KILLS', topGun: 'TOP GUN', lockedGuns: 'UNLOCK GUNS IN INVENTORY', kills: 'KILLS', rank: 'RANK', wanted: 'WANTED', youWanted: 'YOU ARE WANTED', youWantedSub: 'Your head is worth ×{m}', wantedNow: '{n} is WANTED',
     wantedKill: 'WANTED KILL ×{m}', head: 'HEADSHOT', kill: 'KILL', protect: 'PROTECTED', killedBy: 'Killed by', weapon: 'Weapon', dist: 'Distance',
     headshot: 'headshot', killerLeft: 'Killer left with', yourStats: 'Your match', deaths: 'DEATHS', damage: 'DAMAGE', cash: 'CASH', toShop: 'Opening the shop…',
     shopName: 'VICE BEACH ARMORY', sidearms: 'SIDEARMS', longarms: 'LONGARMS', equipment: 'AMMO & EQUIPMENT', pistols: 'Pistols', shotguns: 'Shotguns', assault: 'Assault Rifles',
@@ -33,7 +33,7 @@ const TX = {
     entry: 'Entry', prize: 'Top 3 prize pool', countdown: 'MATCH IN', fight: 'FIGHT!', timeUp: 'TIME UP', results: 'MATCH RESULTS', you: 'You', toLobby: 'Back to lobby', backIn: 'Lobby in {s}s',
     place1: '1ST PLACE', place2: '2ND PLACE', place3: '3RD PLACE', reward: 'Reward', player: 'PLAYER', board: 'SCOREBOARD', left: 'left', joined: 'in match', tabHint: 'TAB – scoreboard',
     spawnProt: 'Spawn protection', armorUp: 'ARMOR', mapLbl: 'Map', bought: 'Bought: {n}', yourPlace: 'Your place: {p}', leaveTitle: 'Leave the match?', deadHint: 'SPACE – respawn · ESC – back to lobby', deadWait: 'Respawn in a moment…', upgrade: 'NEW WEAPON', maxGun: 'TOP WEAPON', online: 'IN LOBBY', lost: 'Lost connection to the match server.' },
-  ru: { kills: 'УБИЙСТВА', rank: 'МЕСТО', wanted: 'В РОЗЫСКЕ', youWanted: 'ТЫ В РОЗЫСКЕ', youWantedSub: 'За твою голову платят ×{m}', wantedNow: '{n} В РОЗЫСКЕ',
+  ru: { nextGun: 'СЛЕД. ОРУЖИЕ: {n}/{m}', topGun: 'ЛУЧШЕЕ ОРУЖИЕ', lockedGuns: 'ОТКРОЙ ОРУЖИЕ В ИНВЕНТАРЕ', kills: 'УБИЙСТВА', rank: 'МЕСТО', wanted: 'В РОЗЫСКЕ', youWanted: 'ТЫ В РОЗЫСКЕ', youWantedSub: 'За твою голову платят ×{m}', wantedNow: '{n} В РОЗЫСКЕ',
     wantedKill: 'УБИЙСТВО РАЗЫСКИВАЕМОГО ×{m}', head: 'В ГОЛОВУ', kill: 'УБИЙСТВО', protect: 'ЗАЩИТА', killedBy: 'Убит игроком', weapon: 'Оружие', dist: 'Дистанция',
     headshot: 'в голову', killerLeft: 'У убийцы осталось', yourStats: 'Твой матч', deaths: 'СМЕРТИ', damage: 'УРОН', cash: 'ДЕНЬГИ', toShop: 'Открываем магазин…',
     shopName: 'VICE BEACH ARMORY', sidearms: 'ПИСТОЛЕТЫ', longarms: 'ДЛИННОСТВОЛЬНОЕ', equipment: 'СНАРЯЖЕНИЕ', pistols: 'Пистолеты', shotguns: 'Дробовики', assault: 'Штурмовые винтовки',
@@ -46,7 +46,7 @@ const TX = {
     entry: 'Взнос', prize: 'Призовой фонд топ-3', countdown: 'МАТЧ ЧЕРЕЗ', fight: 'В БОЙ!', timeUp: 'ВРЕМЯ ВЫШЛО', results: 'ИТОГИ МАТЧА', you: 'Ты', toLobby: 'В лобби', backIn: 'Лобби через {s} с',
     place1: '1 МЕСТО', place2: '2 МЕСТО', place3: '3 МЕСТО', reward: 'Награда', player: 'ИГРОК', board: 'ТАБЛИЦА', left: 'вышел', joined: 'в матче', tabHint: 'TAB – таблица',
     spawnProt: 'Защита после возрождения', armorUp: 'БРОНЯ', mapLbl: 'Карта', bought: 'Куплено: {n}', yourPlace: 'Твоё место: {p}', leaveTitle: 'Выйти из матча?', deadHint: 'ПРОБЕЛ – возрождение · ESC – в лобби', deadWait: 'Возрождение через мгновение…', upgrade: 'НОВОЕ ОРУЖИЕ', maxGun: 'ЛУЧШЕЕ ОРУЖИЕ', online: 'В ЛОББИ', lost: 'Соединение с сервером матча потеряно.' },
-  es: { kills: 'BAJAS', rank: 'PUESTO', wanted: 'BUSCADO', youWanted: 'ESTÁS BUSCADO', youWantedSub: 'Tu cabeza vale ×{m}', wantedNow: '{n} está BUSCADO',
+  es: { nextGun: 'SIGUIENTE ARMA: {n}/{m} BAJAS', topGun: 'MEJOR ARMA', lockedGuns: 'DESBLOQUEA ARMAS EN EL INVENTARIO', kills: 'BAJAS', rank: 'PUESTO', wanted: 'BUSCADO', youWanted: 'ESTÁS BUSCADO', youWantedSub: 'Tu cabeza vale ×{m}', wantedNow: '{n} está BUSCADO',
     wantedKill: 'BAJA DEL BUSCADO ×{m}', head: 'TIRO A LA CABEZA', kill: 'BAJA', protect: 'PROTEGIDO', killedBy: 'Te mató', weapon: 'Arma', dist: 'Distancia',
     headshot: 'a la cabeza', killerLeft: 'Al asesino le quedó', yourStats: 'Tu partida', deaths: 'MUERTES', damage: 'DAÑO', cash: 'DINERO', toShop: 'Abriendo la tienda…',
     shopName: 'VICE BEACH ARMORY', sidearms: 'PISTOLAS', longarms: 'ARMAS LARGAS', equipment: 'EQUIPO', pistols: 'Pistolas', shotguns: 'Escopetas', assault: 'Rifles de asalto',
@@ -105,6 +105,9 @@ body.dm-shop #dmh,body.dm-shop .hud,body.dm-shop #dm-scope,body.dm-dead #dmh,bod
 #dmh .gun{height:46px;display:flex;align-items:center;justify-content:flex-end;margin-top:2px}
 #dmh .gun img{height:38px;max-width:150px;object-fit:contain;filter:brightness(.78) drop-shadow(0 0 1px #000) drop-shadow(0 1px 0 #000) drop-shadow(0 2px 4px rgba(0,0,0,.6));opacity:.95}
 #dmh .gun span{font:700 20px var(--head);letter-spacing:.08em;text-transform:uppercase;text-shadow:var(--stroke)}
+#dmh .nx{margin-top:4px;font:700 12px/14px var(--head);letter-spacing:.16em;text-transform:uppercase;color:#5ff0e2;text-shadow:var(--stroke)}
+#dmh .nx i{display:inline-block;width:7px;height:7px;margin:0 2px;background:rgba(255,255,255,.25);vertical-align:1px}
+#dmh .nx i.on{background:#5ff0e2;box-shadow:0 0 6px #5ff0e2}
 #dmh .st{min-height:14px;font:700 13px/14px var(--head);letter-spacing:.18em;text-transform:uppercase;color:#ffe08a;text-shadow:var(--stroke)}
 #dmh .cash{margin-top:6px;font:700 30px/1 var(--num);letter-spacing:.02em;text-shadow:var(--stroke);font-variant-numeric:tabular-nums;position:relative}
 #dmh .cash .plus{position:absolute;right:0;top:100%;margin-top:3px;font-size:24px;color:#7dffb0;opacity:0;white-space:nowrap}
@@ -275,7 +278,7 @@ export function createDmUi(opts = {}) {
 
   // ===== HUD =====
   const hud = el(`<div id="dmh" hidden>
-    <div class="tr"><div class="ammo"><b class="mag">0</b><b class="res">0</b></div><div class="gun"></div><div class="st"></div>
+    <div class="tr"><div class="ammo"><b class="mag">0</b><b class="res">0</b></div><div class="gun"></div><div class="nx"></div><div class="st"></div>
       <div class="cash"><span class="v">$0</span><span class="plus"></span></div><div class="feed"></div></div>
     <div class="tc"><div class="timer"><div><small data-t="kills"></small><b class="kk">0</b></div><div class="clk"><small data-t="online"></small><b class="tt">1/20</b></div><div><small data-t="rank"></small><b class="rk">-</b></div></div>
       <div class="wantedme" hidden>${IC.skull}<span data-t="youWanted"></span>${IC.skull}</div></div>
@@ -290,7 +293,7 @@ export function createDmUi(opts = {}) {
   </div>`);
   document.body.appendChild(hud);
   const q = (s) => hud.querySelector(s);
-  const H = { mag: q('.mag'), res: q('.res'), ammo: q('.ammo'), gun: q('.gun'), st: q('.st'), cash: q('.cash .v'), plus: q('.cash .plus'), feed: q('.feed'), kk: q('.kk'), tt: q('.tt'), rk: q('.rk'), timer: q('.timer'),
+  const H = { mag: q('.mag'), res: q('.res'), ammo: q('.ammo'), gun: q('.gun'), nx: q('.nx'), st: q('.st'), cash: q('.cash .v'), plus: q('.cash .plus'), feed: q('.feed'), kk: q('.kk'), tt: q('.tt'), rk: q('.rk'), timer: q('.timer'),
     wme: q('.wantedme'), lb: q('.lb'), mm: q('.mm canvas'), hpB: q('.vrow.hp .bar b'), hpS: q('.vrow.hp .bar s'), hpN: q('.vrow.hp .n'), hpRow: q('.vrow.hp'), enB: q('.vrow.en .bar b'),
     arB: q('.vrow.ar .bar b'), arN: q('.vrow.ar .n'), arRow: q('.vrow.ar'), arIc: q('.vrow.ar .ic'), note: q('.note'), prot: q('.prot'), ddir: q('.ddir'), vign: q('.vign') };
   const texts = () => document.querySelectorAll('[data-t]').forEach((n) => { n.textContent = tx(n.dataset.t); });
@@ -301,6 +304,12 @@ export function createDmUi(opts = {}) {
     H.ammo.classList.toggle('low', !!low); H.ammo.classList.toggle('rl', !!reloading);
     if (id !== lastGun) { lastGun = id; H.gun.innerHTML = gunImg(id) || `<span>${esc(opts.gunName ? opts.gunName(id) : id)}</span>`; }
     H.st.textContent = state || '';
+  }
+  // postęp drabinki broni: lk zabójstw z need do następnej broni (top = ma już najlepszą)
+  function setNext(lk, need, top, locked) {
+    if (top) { H.nx.textContent = tx(locked ? 'lockedGuns' : 'topGun'); return; }
+    const n = Math.max(0, lk | 0), m = Math.max(1, need | 0);
+    H.nx.innerHTML = esc(tx('nextGun', { n, m })) + (m <= 8 ? ' ' + Array.from({ length: m }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('') : '');
   }
   let shownMoney = 0;
   function setMoney(v, plus) {
@@ -455,7 +464,7 @@ export function createDmUi(opts = {}) {
   return {
     hud, setIcons(ic) { icons = ic || {}; lastGun = ''; }, texts,
     show(on) { hud.hidden = !on; document.body.classList.toggle('dm-on', !!on); if (on) texts(); },
-    setAmmo, setMoney, setVitals, setTimer, setWantedMe, setBoard, killFeed, notify, damageDir, setProt, mapBase, drawMinimap,
+    setAmmo, setNext, setMoney, setVitals, setTimer, setWantedMe, setBoard, killFeed, notify, damageDir, setProt, mapBase, drawMinimap,
     countdown, scope(on) { scope.hidden = !on; },
     showWasted, hideWasted, wastedReady,
     showPodium, podiumPlates, podiumCd, hidePodium, showBoard,

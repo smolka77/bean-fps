@@ -170,12 +170,16 @@ function newPlayer(pid, info, cfg) {
   return { pid, uid: info.uid, nick: info.nick, skin: info.skin || '', bot: !!info.bot,
     guns: Array.isArray(info.guns) ? new Set(info.guns) : null,     // Arsenał: bronie, które gracz może kupić (null = wszystkie)
     x: 0, y: 0, z: 0, yaw: 0, pitch: 0, cr: 0, sl: 0, ads: 0, w: WIDS.indexOf(PISTOL), run: 0, air: 0, legYaw: 0,
-    hp: 100, armor: 0, helmet: false, alive: false, dead: true, deadAt: -99, life: 0, protUntil: 0, level: 0,
+    hp: 100, armor: 0, helmet: false, alive: false, dead: true, deadAt: -99, life: 0, protUntil: 0, level: 0, lk: 0,
     money: cfg.startMoney, kills: 0, deaths: 0, damage: 0, heads: 0, shots: 0, hits: 0, streak: 0, best: 0, joinOrder: pid,
     owned: new Set([PISTOL]), ammo: {}, reloadW: -1, reloadAt: 0, bloom: 0, bloomT: 0, tokens: 1, tokT: 0, lastQ: 0,
     lastT: 0, lastGroundY: 0, airSince: 0, ground: true, hist: [], trail: [], viol: [], kicked: false, left: false,
     rtt: 0.1, lastStT: 0, lastFix: 0, speed01: 0, killer: null, lastSpawnAt: -99, spawnIdx: -1, sent: new Map() };
 }
+// drabinka: kolejna broń za coraz więcej zabójstw – 1. awans za 1 zabójstwo, 2. za kolejne 2, 3. za kolejne 3 itd. (lk = zabójstwa od ostatniego awansu)
+// Ekwipunek: drabinka pomija bronie, których gracz nie ma odblokowanych (p.guns; null = wszystkie)
+const nextLevel = (p) => { let nl = p.level + 1; while (nl < DM_GUNS.length && p.guns && !p.guns.has(DM_GUNS[nl])) nl++; return nl; };
+const killsNeed = (p) => p.level + 1;
 const ownedFor = (level) => new Set([PISTOL, DM_GUNS[Math.min(DM_GUNS.length - 1, Math.max(0, level))]]);
 function refillOwned(p, cfg) { p.ammo = {}; for (const id of p.owned) p.ammo[id] = { mag: cfg.weapons[id].mag, res: cfg.weapons[id].reserve }; p.reloadW = -1; p.bloom = 0; }
 
@@ -248,7 +252,9 @@ function spawnPlayer(room, p, now, out, initial = false) {
   const msg = { t: 'spawn', life: p.life, p: [s.x, s.y, s.z].map((v) => +v.toFixed(3)), yaw: +s.yaw.toFixed(3), prot: room.cfg.spawnProtect, ...invOf(p) };
   if (out) out(p.pid, msg); else p.pendingSpawn = msg;
 }
-const invOf = (p) => ({ money: p.money, owned: DM_GUNS.filter((g) => p.owned.has(g)), gun: DM_GUNS[p.level] || PISTOL, level: p.level, armor: p.armor, helmet: p.helmet, hp: p.hp });
+const invOf = (p) => ({ money: p.money, owned: DM_GUNS.filter((g) => p.owned.has(g)), gun: DM_GUNS[p.level] || PISTOL, level: p.level,
+  lk: p.lk || 0, need: killsNeed(p), top: nextLevel(p) >= DM_GUNS.length ? 1 : 0, locked: nextLevel(p) >= DM_GUNS.length && p.level < DM_GUNS.length - 1 ? 1 : 0,   // postęp do następnej broni (HUD); locked = dalsze bronie zablokowane Ekwipunkiem
+  armor: p.armor, helmet: p.helmet, hp: p.hp });
 
 // ---------------- ruch ----------------
 function accept(p, s, now) {
@@ -373,15 +379,15 @@ function onKill(room, k, v, wid, head, dist, now, out) {
   const cfg = room.cfg, wasWanted = room.wanted === v.pid;
   v.alive = false; v.dead = true; v.deadAt = now; v.deaths++; v.streak = 0; v.killer = k ? k.pid : null;
   // śmierć: drabinka broni od początku (Glock)
-  v.level = 0; v.owned = ownedFor(0); v.armor = 0; v.helmet = false; v.reloadW = -1;
+  v.level = 0; v.lk = 0; v.owned = ownedFor(0); v.armor = 0; v.helmet = false; v.reloadW = -1;
   let up = null;
   if (k && k !== v) {
     k.kills++; k.streak++; k.best = Math.max(k.best, k.streak);
-    // zabójstwo: od razu następna broń z drabinki (pełny magazynek), w rękach
-    // Ekwipunek: drabinka pomija bronie, których zabójca nie ma odblokowanych (k.guns; null = wszystkie)
-    let nl = k.level + 1; while (nl < DM_GUNS.length && k.guns && !k.guns.has(DM_GUNS[nl])) nl++;
-    if (nl < DM_GUNS.length) {
-      k.level = nl; const gun = DM_GUNS[k.level], W = cfg.weapons[gun];
+    // zabójstwo: po uzbieraniu killsNeed zabójstw następna broń z drabinki (pełny magazynek), od razu w rękach
+    const nl = nextLevel(k);
+    if (nl < DM_GUNS.length) k.lk = (k.lk || 0) + 1;
+    if (nl < DM_GUNS.length && k.lk >= killsNeed(k)) {
+      k.level = nl; k.lk = 0; const gun = DM_GUNS[k.level], W = cfg.weapons[gun];
       k.owned = ownedFor(k.level); k.ammo[gun] = { mag: W.mag, res: W.reserve }; k.w = WIDS.indexOf(gun); k.reloadW = -1; k.bloom = 0;
       up = gun;
     }

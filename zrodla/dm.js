@@ -192,9 +192,9 @@ export function createDM(ctx) {
     if (p) { p.alive = false; p.dying = 2.6; p.fall = 0; p.deadY = p.root.position.y; p.buf.length = 0; }
     if (m.k === S.pid) { S.me.kills++; if (m.h) ui.notify(tx('head'), 'gold', false, 'head'); else ui.notify(tx('kill') + ' · ' + esc(nameOf(m.v)), ''); ctx.sfx('kill'); }
   });
-  // zabójstwo: serwer od razu daje następną broń z drabinki (pełny magazynek) – w rękach bez animacji
+  // zabójstwo: po 1, potem 2, potem 3… zabójstwach serwer daje następną broń z drabinki (pełny magazynek) – w rękach bez animacji
   on('upgrade', (m) => {
-    S.me.owned = m.owned;
+    S.me.owned = m.owned; ui.setNext(m.lk, m.need, m.top, m.locked);
     if (m.up && !player.dead) { ctx.upgrade(m.up); ui.notify(`${esc(tx(m.level >= S.cfg.guns.length - 1 ? 'maxGun' : 'upgrade'))}<small>${esc(gunName(m.up))}</small>`, 'gold', true); ctx.sfx('buy'); }
     if (m.wanted) ui.notify(tx('wantedKill', { m: S.cfg.wantedMult }), 'red', true, 'skull');
   });
@@ -234,6 +234,7 @@ export function createDM(ctx) {
     S.me.guns = Array.isArray(m.guns) ? m.guns : null;          // Arsenał: bronie do kupienia (poniżej progu – tylko pistolet); null = wszystkie
     S.me.ars = m.ars || null;                                    // progi Arsenału do kłódek w sklepie ({unit, need})
     patchStats(m.cfg);
+    ui.setNext(m.lk, m.need, m.top, m.locked);
     clearRemotes();
     for (const p of m.players) if (p.id !== S.pid) S.players.set(p.id, makeRemote(p));
     ui.setIcons(ctx.icons());
@@ -247,6 +248,7 @@ export function createDM(ctx) {
   function onSpawn(m) {
     S.me.life = m.life; Object.assign(S.me, { money: m.money, owned: m.owned, armor: m.armor, helmet: m.helmet, hp: 100, protUntil: now() + (m.prot || 0) });
     if (m.armor > 0) S.me.armorMax = m.armor;
+    ui.setNext(m.lk, m.need, m.top, m.locked);
     ui.hideWasted(); ctx.filter('');
     document.body.classList.remove('dm-dead');
     ctx.respawn(m.p, m.yaw, m.owned);                          // pozycja, pełne HP, amunicja i broń w rękach (najlepsza z drabinki)
@@ -256,7 +258,7 @@ export function createDM(ctx) {
   }
   function die(m) {
     S.phase = 'dead'; S.deadT = now(); S.deathMsg = m; S.minDeath = m.minDeath || 2.4; S.deadReady = false; S.deploying = false; S.emote = null;
-    S.me.hp = 0; S.me.armor = 0; S.me.helmet = false; S.me.owned = [ctx.PISTOL_ID];
+    S.me.hp = 0; S.me.armor = 0; S.me.helmet = false; S.me.owned = [ctx.PISTOL_ID]; ui.setNext(0, 1, 0);
     ctx.setDead(true); ctx.setHp(0); document.body.classList.add('dm-dead'); ctx.me.userData.gear.set(false, false);
     ui.scope(false); S.boardOpen = false; ui.showBoard(false);
     ctx.unlock();                                              // kursor wolny: Esc trafia do gry (wyjście do lobby), a nie tylko zwalnia mysz
