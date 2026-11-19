@@ -98,6 +98,8 @@ body.dm-shop canvas{cursor:default}
 body.dm-shop #dmh,body.dm-shop .hud,body.dm-shop #dm-scope,body.dm-dead #dmh,body.dm-dead .hud,body.dm-dead #dm-scope{display:none!important}
 /* --- prawy górny róg: amunicja, broń, kasa, lista zabójstw --- */
 #dmh .tr{position:absolute;right:max(22px,env(safe-area-inset-right,0px));top:18px;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+/* amunicja, broń i napis pod nią – prawy dolny róg (lewy zajmuje minimapa i życie) */
+#dmh .br{position:absolute;right:max(22px,env(safe-area-inset-right,0px));bottom:max(18px,env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:flex-end;gap:2px}
 #dmh .ammo{display:flex;align-items:baseline;gap:14px;font:700 40px/1 var(--num);letter-spacing:.02em;text-shadow:var(--stroke);font-variant-numeric:tabular-nums}
 #dmh .ammo .res{font-size:40px;color:#e9e9ef}
 #dmh .ammo.low .mag{color:var(--red)}
@@ -113,7 +115,7 @@ body.dm-shop #dmh,body.dm-shop .hud,body.dm-shop #dm-scope,body.dm-dead #dmh,bod
 #dmh .cash .plus{position:absolute;right:0;top:100%;margin-top:3px;font-size:24px;color:#7dffb0;opacity:0;white-space:nowrap}
 #dmh .cash .plus.go{animation:dm-plus 1.6s ease-out forwards}
 @keyframes dm-plus{0%{opacity:0;transform:translateY(-6px)}12%{opacity:1;transform:none}75%{opacity:1}100%{opacity:0;transform:translateY(8px)}}
-#dmh .feed{margin-top:34px;display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:260px}
+#dmh .feed{margin-top:8px;display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:260px}
 #dmh .kf{display:flex;align-items:center;gap:8px;padding:5px 10px;background:rgba(10,10,14,.62);border-right:3px solid transparent;font:700 15px/1 var(--head);letter-spacing:.04em;
   text-transform:uppercase;white-space:nowrap;animation:dm-kf .25s ease-out}
 #dmh .kf.me{border-right-color:var(--pink);background:rgba(40,10,26,.72)}
@@ -278,7 +280,8 @@ export function createDmUi(opts = {}) {
 
   // ===== HUD =====
   const hud = el(`<div id="dmh" hidden>
-    <div class="tr"><div class="ammo"><b class="mag">0</b><b class="res">0</b></div><div class="gun"></div><div class="nx"></div><div class="st"></div>
+    <div class="br"><div class="ammo"><b class="mag">0</b><b class="res">0</b></div><div class="gun"></div><div class="nx"></div><div class="st"></div></div>
+    <div class="tr">
       <div class="cash"><span class="v">$0</span><span class="plus"></span></div><div class="feed"></div></div>
     <div class="tc"><div class="timer"><div><small data-t="kills"></small><b class="kk">0</b></div><div class="clk"><small data-t="online"></small><b class="tt">1/20</b></div><div><small data-t="rank"></small><b class="rk">-</b></div></div>
       <div class="wantedme" hidden>${IC.skull}<span data-t="youWanted"></span>${IC.skull}</div></div>

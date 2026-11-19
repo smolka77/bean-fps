@@ -455,7 +455,7 @@ export function initLobbyUI(ctx) {
   const langBox = $('lb-langs'), fovR = $('lb-fov'), bindBox = $('lb-binds');
   LANGS.forEach(l => { const b = document.createElement('button'); b.type = 'button'; b.className = 'lb-seg'; b.dataset.lang = l.id; b.innerHTML = `<i class="lb-flag">${FLAGS[l.id]}</i><span></span><b>${l.id.toUpperCase()}</b>`;
     b.querySelector('span').textContent = l.name; b.addEventListener('click', () => setLang(l.id)); langBox.appendChild(b); });
-  function setLang(id) { S.lang = id; S.langPicked = true; LANG = id; pushSettings(); applyI18n(); }
+  function setLang(id) { S.lang = id; S.langPicked = true; LANG = id; pushSettings(); applyI18n(); renderOnlineText(); }
   // ---- flaga języka w pasku ----
   const langBtn = $('lb-langbtn'), langMenu = $('lb-langmenu');
   const openLang = v => { langMenu.hidden = !v; langBtn.setAttribute('aria-expanded', String(v)); };
@@ -568,17 +568,25 @@ export function initLobbyUI(ctx) {
   const W = API ? createWallet({ api: API, root: ui, getLang: () => LANG, toast, onChange: a => { acct = a; acctId = a ? a.username.toLowerCase() : null; renderAll(); } }) : null;
   // ---- napis „150 PLAYERS ONLINE” na górze lobby: liczba i tekst z panelu admina (GET /api/online), odświeżane co minutę ----
   // Serwer podaje liczbę teraz i za minutę (rośnie wykładniczo) – między odświeżeniami lobby płynnie dolicza co sekundę.
-  let onA = 0, onB = 0, onT = 0, onEl = null, onShown = -1;
+  let onA = 0, onB = 0, onT = 0, onEl = null, onShown = -1, onText = '';
+  // domyślny tekst z panelu tłumaczymy na język gracza; własny tekst admina zostaje taki, jak go wpisał
+  const ONLINE_DEF = '{n} players online';
+  const ONLINE_TX = { pl: '{n} graczy online', en: ONLINE_DEF, ru: '{n} игроков онлайн', es: '{n} jugadores en línea' };
+  function renderOnlineText() {
+    const t = $('lb-online-t'); if (!t || !onText) return;
+    const txt = onText.trim().toLowerCase() === ONLINE_DEF ? (ONLINE_TX[LANG] || ONLINE_DEF) : onText;
+    const [a, ...rest] = txt.split('{n}');
+    if (!onEl || !t.contains(onEl)) { onEl = document.createElement('b'); onShown = -1; tickOnline(); }
+    t.replaceChildren(document.createTextNode(a), onEl, document.createTextNode(rest.join('{n}')));
+  }
   async function loadOnline() {
     const box = $('lb-online'); if (!box || !API) return;
     try {
       const r = await fetch(API.replace(/\/+$/, '') + '/api/online', { cache: 'no-store' }); if (!r.ok) return;
       const j = await r.json(), t = $('lb-online-t');
       if (!j.enabled) { box.hidden = true; onEl = null; return; }
-      const [a, ...rest] = String(j.text || '{n} players online').split('{n}');
-      if (!onEl || !t.contains(onEl)) { onEl = document.createElement('b'); onShown = -1; }
-      t.replaceChildren(document.createTextNode(a), onEl, document.createTextNode(rest.join('{n}')));
-      onA = Math.max(+j.count || 0, onShown > 0 ? Math.min(onShown, +j.next || 0) : 0); onB = Math.max(onA, +j.next || +j.count || 0); onT = performance.now();
+      onText = String(j.text || ONLINE_DEF); renderOnlineText();
+      onA =Math.max(+j.count || 0, onShown > 0 ? Math.min(onShown, +j.next || 0) : 0); onB = Math.max(onA, +j.next || +j.count || 0); onT = performance.now();
       tickOnline(); box.hidden = false;
     } catch {}
   }
