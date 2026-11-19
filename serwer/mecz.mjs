@@ -10,12 +10,12 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // ---------------- stałe zgodne z grą (zrodla/index.html, weaponry.js) ----------------
-export const WEAPON_IDS = ['ak47', 'm4a1s', 'glock', 'usps'];
+export const WEAPON_IDS = ['akm', 'm4a1', 'glock17', 'deagle'];          // 1v1: drużyna niebieska M4A1 + Desert Eagle, czerwona AKM + Glock-17
 export const WEAPONS = {
-  ak47: { rpm: 600, dmg: 36, head: 3, mag: 30, reserve: 90, reload: 2.45, spread: { hip: 0.0075, ads: 0.0016, move: 1.15, bloom: 0.14 } },
-  m4a1s: { rpm: 600, dmg: 33, head: 3, mag: 25, reserve: 75, reload: 2.3, spread: { hip: 0.0065, ads: 0.0012, move: 1.0, bloom: 0.11 } },
-  glock: { rpm: 400, dmg: 22, head: 2.5, mag: 20, reserve: 120, reload: 1.75, spread: { hip: 0.006, ads: 0.002, move: 0.7, bloom: 0.12 } },
-  usps: { rpm: 350, dmg: 35, head: 2.5, mag: 12, reserve: 24, reload: 1.95, spread: { hip: 0.005, ads: 0.0012, move: 0.7, bloom: 0.13 } },
+  akm: { rpm: 600, dmg: 36, head: 3, mag: 30, reserve: 90, reload: 2.45, spread: { hip: 0.0075, ads: 0.0016, move: 1.15, bloom: 0.14 } },
+  m4a1: { rpm: 700, dmg: 32, head: 3, mag: 30, reserve: 90, reload: 2.3, spread: { hip: 0.0065, ads: 0.0011, move: 1.0, bloom: 0.11 } },
+  glock17: { rpm: 400, dmg: 22, head: 2.5, mag: 17, reserve: 102, reload: 1.75, spread: { hip: 0.006, ads: 0.002, move: 0.7, bloom: 0.12 } },
+  deagle: { rpm: 267, dmg: 48, head: 2.6, mag: 7, reserve: 35, reload: 2.2, spread: { hip: 0.009, ads: 0.0016, move: 1.0, bloom: 0.32 } },
 };
 const R = 0.3;                         // promień gracza w fizyce gry
 const CROUCH_DROP = 0.25;              // o tyle opada tułów w przysiadzie
@@ -238,7 +238,7 @@ function violation(p, why, now) {
 
 // ---------------- strzał ----------------
 function shoot(room, seat, m, now, out) {
-  const me = room.p[seat], op = room.p[1 - seat], wid = WEAPON_IDS[me.w] || 'ak47', W = WEAPONS[wid];
+  const me = room.p[seat], op = room.p[1 - seat], wid = WEAPON_IDS[me.w] || 'akm', W = WEAPONS[wid];
   if (room.phase !== 'live' || !me.live || me.hp <= 0) return;
   const q = +m.q; if (!(q > me.lastQ)) return; me.lastQ = q;      // każdy strzał raz
   if (now - me.lastStT > LAG_SHOT) return;                         // lag switch: bez świeżych paczek ruchu nie ma strzałów
@@ -504,3 +504,5 @@ export function tick(room, now, out) {
   room.p.forEach((p) => { if (p.reloadW >= 0 && now >= p.reloadAt) finishReload(p); });
 }
 export { START_DELAY, ROUND_DELAY, acceptMove as __accept, canSee as __canSee };
+// wspólne z trybem Deathmatch (dm.mjs): trafienia w fasolkę, historia ruchu do kompensacji opóźnienia, podpory i drabiny
+export { rayBean, stateAt, pushHist, supportTop, inLadder, insideSolid, near, EYE, CROUCH_DROP, JUMP_H, SEVERE };

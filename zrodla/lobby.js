@@ -646,6 +646,7 @@ const CSS = `
 #lb-ui .lb-tile .check{border-radius:0;background:var(--acc);color:#fff}
 `;
 
+
 const IC = {
   gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   wallet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7V5a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-4a2 2 0 0 0 0 4h4v2a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2V6"/><circle cx="17" cy="15" r=".5" fill="currentColor"/></svg>',
@@ -670,7 +671,7 @@ const X_BTN = `<button class="lb-x" type="button" aria-label="Zamknij">${IC.x}</
 const HTML = `
 <div class="lb-shade"></div>
 <header class="lb-top">
-  <div class="lb-logo">BEAN<b>GTA</b></div>
+  <div class="lb-logo"><b>GTA</b>ssault</div>
   <div class="lb-sp"></div>
   <div class="lb-lang"><button class="lb-chip lb-lchip" id="lb-langbtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Language"><i class="lb-flag" id="lb-langflag"></i><b id="lb-langcode">EN</b><svg class="lb-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4.5 6 8.5 10 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
     <div class="lb-langmenu" id="lb-langmenu" role="menu" hidden></div></div>
@@ -867,6 +868,20 @@ function tear(u, x0, x1) {
   return { red: `0,0 ${pts(C)} 0,200`, blue: `320,0 ${pts(C)} 320,200`, paper: `${pts(Lp)} ${pts(Rp.slice().reverse())}` };
 }
 const ART = {
+  // Deathmatch: zachód słońca Vice (fiolet → róż → pomarańcz), słońce w pasy, czerwona czaszka WANTED, napis
+  dm() {
+    const u = ++artN, skull = 'M12 1.6C6.9 1.6 3.2 5.3 3.2 10c0 2.8 1.3 4.8 3.1 6v3.1c0 .6.5 1.1 1.1 1.1h1.5v-2.1h1.6v2.1h3v-2.1h1.6v2.1h1.5c.6 0 1.1-.5 1.1-1.1V16c1.8-1.2 3.1-3.2 3.1-6 0-4.7-3.7-8.4-8.8-8.4zM8.5 14.3a2.3 2.3 0 1 1 0-4.6 2.3 2.3 0 0 1 0 4.6zm7 0a2.3 2.3 0 1 1 0-4.6 2.3 2.3 0 0 1 0 4.6zM12 15.1l-1.2 2.1h2.4z';
+    return `<svg class="art" viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice"><defs>${DEFS(u)}
+      <linearGradient id="dg${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a1255"/><stop offset=".55" stop-color="#d0377f"/><stop offset="1" stop-color="#ff9a4a"/></linearGradient>
+      <linearGradient id="ds${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe27a"/><stop offset="1" stop-color="#ff5d8f"/></linearGradient>
+      <clipPath id="dc${u}"><circle cx="160" cy="120" r="74"/></clipPath></defs>
+      <rect width="320" height="200" fill="url(#dg${u})"/>${stripes(18, .05)}${halftone(u)}
+      <g clip-path="url(#dc${u})"><rect x="80" y="40" width="160" height="160" fill="url(#ds${u})"/>${[0, 1, 2, 3, 4].map(i => `<rect x="80" y="${130 + i * 13}" width="160" height="${3 + i * 1.6}" fill="#d0377f"/>`).join('')}</g>
+      <g transform="translate(124 36) scale(3)"><path fill-rule="evenodd" d="${skull}" fill="#1a0614" opacity=".45" transform="translate(.6 .9)"/><path fill-rule="evenodd" d="${skull}" fill="#ff2b3a" stroke="#1a0614" stroke-width=".7"/></g>
+      <rect width="320" height="200" fill="url(#hl${u})"/>
+      ${(() => { const w = 'DEATHMATCH'; return bigText(u, 176, 44, w, '<tspan fill="url(#slv' + u + ')">' + w + '</tspan>', '#3a0a2a'); })()}
+      ${finish(u)}</svg>`;
+  },
   range() {
     const u = ++artN;
     return `<svg class="art" viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice"><defs>${DEFS(u)}
@@ -1016,16 +1031,18 @@ function skinIcon(sk) {
 const DEFAULT_MODES = [
   { id: 'range', name: 'Strzelnica', desc: 'Solo · strzelnica w bunkrze, tarcze-fasolki', icon: 'range', tag: 'SOLO' },
   { id: '1v1', name: '1v1', desc: 'Mapa Bagno · bot · do 5 trafień', icon: 'duel', tag: '1 NA 1' },
-  // tryb „Z botem” schowany na razie za kafelkiem „Więcej wkrótce” (kod trybu zostaje w grze); żeby go przywrócić, zamień { soon: true } na:
+  { id: 'dm', name: 'Deathmatch', desc: 'Do 20 graczy · 3 minuty · top 3 wygrywa', icon: 'dm', tag: 'FFA' },
+  // tryb „Z botem” schowany (kod trybu zostaje w grze); żeby go przywrócić, dopisz kafelek:
   // { id: 'bot', name: 'Z botem', desc: 'Trening 1 na 1 · bez stawki i serwera · do 3 wygranych rund', icon: 'bot', tag: 'BOT' },
-  { soon: true },
 ];
 
 // deterministyczny generator losowy, żeby las wyglądał zawsze tak samo
 function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
 
 export function createLobby({ renderer, bean, animate = () => {}, onPlay = () => {}, onSkin = () => {}, modes = DEFAULT_MODES, skins: skinsIn = SKINS }) {
-  let skins = skinsIn.slice();
+  const BASIC_IDS = new Set(BUILTIN_SKINS.map(k => k.id));   // podstawowe skiny to tylko zapas: w wyborze skinów są same skiny z kreatora
+  const noBasic = l => { const c = l.filter(k => !BASIC_IDS.has(k.id)); return c.length ? c : l; };
+  let skins = noBasic(skinsIn.slice());
   const rnd = rng(7);
   const R = (a, b) => a + (b - a) * rnd();
 
@@ -1464,7 +1481,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   const BUILTIN_IDS = new Set(BUILTIN_SKINS.map(k => k.id));
   // podmienia skiny z kreatora (z skins.json albo z panelu admina) i od razu przebudowuje kafelki
   const setCustomSkins = list => {
-    skins = [...BUILTIN_SKINS, ...list.filter(k => k && k.id && !BUILTIN_IDS.has(k.id))];
+    skins = noBasic([...BUILTIN_SKINS, ...list.filter(k => k && k.id && !BUILTIN_IDS.has(k.id))]);
     const want = skins.find(k => k.id === store.get('fasolka-skin'));
     if (want && want !== skin) setSkin(want, true);
     else if (!skins.some(k => k.id === skin.id)) setSkin(skins[0], true);
@@ -1528,7 +1545,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   uiApi = initLobbyUI({
     ui, $, lobbyMap: LOBBY_MAP, lobbyMaps: LOBBY_MAPS.map(m => m.id), isActive: () => active,
     getMode: () => mode.id,
-    setName: n => { plateName.textContent = n; },
+    setName: (n, vip) => { plateName.textContent = n; plateName.classList.toggle('vip-nick', !!vip); },   // vip: złoty nick z poświatą (vip.js)
     play: (id, opts) => { if (active) onPlay(id, opts); },
     refresh: () => { renderMode(); skinGrid.querySelectorAll('.lb-skin').forEach(b => { const k = skins.find(x => x.id === b.dataset.id); if (k) b.querySelector('span').textContent = skinName(k); }); },
   });
