@@ -239,7 +239,7 @@ export function createWallet({ api, root, getLang, toast, onChange, local = null
     async restore() { if (!token) return null; try { return take(await call('GET', '/me')); } catch (e) { if (e.status !== 401) online = false; return null; } },
     async logout() { try { await call('POST', '/logout'); } catch {} setSession(null); },
     async refresh(scan) { if (!token) return; try { take(await call(scan ? 'POST' : 'GET', scan ? '/scan' : '/me')); } catch { online = false; render(); } },
-    async startMatch(stakeUsd) { const j = await call('POST', '/match/start', { stakeUsd }); take(j); return j.matchId; },
+    async startMatch(stakeUsd) { const j = await call('POST', '/match/start', { stakeUsd, pv: 2 /* wersja gry, serwer: GAME_PROTO */ }); take(j); return j.matchId; },
     async endMatch(matchId, won, forfeit, map) { const j = await call('POST', '/match/end', { matchId, won, forfeit, map }); earn = null; take(j); },
     async stats(o) { try { await call('POST', '/stats', o); } catch {} },
     async earnings() { try { earn = (await call('GET', '/earnings')).points; } catch { earn = earn || []; } return earn; },

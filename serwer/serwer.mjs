@@ -40,6 +40,7 @@ const STAKE_MSG = { 5: 'Nowe konto: stawka najwyżej $5 (więcej po 5 meczach)',
 const MM_BLOCK_LINKED = env.MM_BLOCK_LINKED === '1';                 // 1 = kolejka 1v1 nie paruje kont z tym samym IP/urządzeniem/adresem wypłat (domyślnie wyłączone; wygrana takich kont i tak czeka na admina)
 const REVIEW_STAKE_USD = +(env.REVIEW_STAKE_USD || 250);               // od takiej stawki każda wygrana czeka na sprawdzenie przez admina
 const REPLAY_DAYS = +(env.REPLAY_DAYS || 60);                          // powtórki meczów trzymamy tyle dni (wstrzymane i odrzucone – zawsze)
+const GAME_PROTO = 2;                                                  // wersja gry wymagana do meczu 1v1 (stara karta musi się odświeżyć)
 const TX_FEE = 5000;
 const GOOGLE_CLIENT_ID = (env.GOOGLE_CLIENT_ID || '').trim();   // logowanie przez Google (OAuth, typ: aplikacja internetowa)
 const HOST = env.HOST || '127.0.0.1';                                   // tylko ta maszyna (nginx); 0.0.0.0 = cały internet (niezalecane)
@@ -179,11 +180,10 @@ function banUser(uid, reason, on = true) {
   q('UPDATE users SET banned=?, ban_reason=? WHERE id=?').run(on ? 1 : 0, on ? String(reason || '').slice(0, 200) : null, uid);
   console.log(`[antycheat] ${on ? 'zablokowane' : 'odblokowane'} konto ${u.username}${on ? ': ' + reason : ''}`);
 }
-// dwa konta jednej osoby: wspólne urządzenie, adres wypłat albo adres IP (z ostatnich 30 dni)
+// dwa konta jednej osoby: wspólne urządzenie albo adres wypłat (wspólne IP – np. jedno wifi – się NIE liczy)
 function linkOf(a, b) {
-  const since = Date.now() - 30 * 864e5;
   return q(`SELECT s1.kind FROM seen s1 JOIN seen s2 ON s2.kind=s1.kind AND s2.value=s1.value AND s2.user_id=?
-    WHERE s1.user_id=? AND (s1.kind!='ip' OR (s1.last>? AND s2.last>?)) LIMIT 1`).get(b, a, since, since) || null;
+    WHERE s1.user_id=? AND s1.kind!='ip' LIMIT 1`).get(b, a) || null;
 }
 const linkedAccounts = uid => q(`SELECT u.username name, u.banned, GROUP_CONCAT(DISTINCT s1.kind) kinds FROM seen s1
   JOIN seen s2 ON s2.kind=s1.kind AND s2.value=s1.value AND s2.user_id!=s1.user_id JOIN users u ON u.id=s2.user_id WHERE s1.user_id=? GROUP BY u.id LIMIT 30`).all(uid);
@@ -389,7 +389,9 @@ const routes = {
     return { ok: true, sig, url: explorer(sig), account: publicUser(fresh(user.id)), history: histOf(user.id) };
   },
   'POST /api/match/start': async ({ user, body }) => {
-    need(user); const usd = Math.round(+body.stakeUsd * 100) / 100;
+    need(user);
+    if (+body.pv !== GAME_PROTO) throw new E('old', 'Jest nowa wersja gry – odśwież stronę (Ctrl+F5) i zagraj jeszcze raz.', 409);   // stara karta z pamięci przeglądarki
+    const usd = Math.round(+body.stakeUsd * 100) / 100;
     if (!(usd >= STAKE_MIN_USD && usd <= STAKE_MAX_USD)) throw new E('stake', `Stawka od $${STAKE_MIN_USD} do $${STAKE_MAX_USD}`);
     if (fresh(user.id).banned) throw new E('banned', BANNED_MSG, 403);
     const cap = stakeCap(user.id); if (usd > cap.cap) throw new E('stake_cap', STAKE_MSG[cap.cap] || `Stawka najwyżej $${cap.cap}`, 403);
@@ -905,7 +907,7 @@ function onDuelMessage(ws, user, raw, arsChecked = false) {
   const room = me.room, op = room.p[1 - me.seat];
   if (m.t === 'ready') {
     room.ready[me.seat] = true;
-    if (room.ready[0] && room.ready[1] && room.game.phase === 'wait') { MECZ.startRound(room.game, nowS(), MECZ.START_DELAY); room.out(-1, { t: 'go' }); }
+    if (room.ready[0] && room.ready[1] && room.game.phase === 'wait') { MECZ.beginIntro(room.game, nowS()); room.out(-1, { t: 'go' }); }
     return;
   }
   if (m.t === 'leave') return endRoom(room, 1 - me.seat, 'left');

@@ -24,7 +24,9 @@ const EYE = (s) => s.y + 1.3 - s.cr * (CROUCH_DROP + 0.12) - 0.1 * (s.sl || 0);
 const V_MAX = 11.5, V_AVG = 9.0, SLACK = 1.0, JUMP_H = 1.35, UP_V = 7.5, SUP_M = 0.45;
 const ROUND_DELAY = 6.6;               // od zabójstwa do „WALCZ!” (killcam 1 s + wynik 3,1 s + kurtyna + odliczanie 2,4 s)
 const START_DELAY = 6.8;               // od 'go' do „WALCZ!” (wczytanie + intro 4,4 s + odliczanie 2,4 s)
-const LIVE_GRACE = 2.5;                // po tylu sekundach od planowanego startu gracz jest w grze, nawet bez 'lv'
+const COUNT_DELAY = 2.4;               // pierwsza runda: od 'count' (obaj gracze są już na mapie, po intro) do „WALCZ!”
+const INTRO_MAX = 20;                  // gdy klient nie zgłosi końca intro ('in') tyle sekund po 'go', odliczanie i tak rusza
+const LIVE_GRACE = 2.5;               // po tylu sekundach od planowanego startu gracz jest w grze, nawet bez 'lv'
 const REWIND_MAX = 0.25;               // kompensacja opóźnienia: maksymalne cofnięcie przeciwnika (s) – więcej nie daje sztuczny lag
 const LAG_SHOT = 0.35;                 // bez paczek ruchu dłużej niż tyle (lag switch) strzały nie są przyjmowane
 
@@ -161,6 +163,13 @@ export function startRound(room, now, delay) {
   room.p.forEach((p) => { Object.assign(p, { inited: false, live: false, hp: 100 }); refill(p); });
   room.liveAt = now + delay; room.phase = 'count';
 }
+// start meczu: po 'go' każdy klient wczytuje mapę i ogląda intro we własnym tempie (słabszy komputer potrzebuje więcej czasu);
+// odliczanie pierwszej rundy rusza dopiero, gdy OBAJ zgłoszą koniec intro ('in') – wtedy obaj startują w tej samej chwili
+export function beginIntro(room, now) {
+  room.p.forEach((p) => { Object.assign(p, { inited: false, live: false, hp: 100 }); refill(p); });
+  room.phase = 'intro'; room.goAt = now; room.inG = [false, false];
+}
+function startCount(room, now, out) { startRound(room, now, COUNT_DELAY); out(-1, { t: 'count', d: COUNT_DELAY }); }
 
 // ---------------- ruch ----------------
 function supportTop(map, x, z, y) {
@@ -480,6 +489,7 @@ export function handleMessage(room, seat, m, now, out) {
       if (me.reloadW < 0 && a.mag < WEAPONS[id].mag && a.res > 0) { me.reloadW = me.w; me.reloadAt = now + WEAPONS[id].reload * 0.9; }
       return;
     }
+    case 'in': if (room.phase === 'intro') { room.inG[seat] = true; if (room.inG[0] && room.inG[1]) startCount(room, now, out); } return;
     case 'rs': if (room.phase !== 'live') placeAtSpawn(room, seat, now); return;
     case 'lv': if (room.phase !== 'inter' && now >= room.liveAt - 1.2) { me.live = true; if (room.phase === 'count') room.phase = 'live'; } return;
     case 'po': { const rtt = now - (+m.s || 0); if (rtt >= 0 && rtt < 2) { me.rtt = me.rtt * 0.7 + rtt * 0.3; me.an.rtts.push(+rtt.toFixed(3)); if (me.an.rtts.length > 200) me.an.rtts.shift(); } return; }
@@ -503,6 +513,7 @@ function relayState(room, seat, now, out) {
 // co ~100 ms: wymuszenie startu rundy, gdy klient nie zgłosił 'lv', i pingi do pomiaru opóźnienia
 export function tick(room, now, out) {
   if (room.over) return;
+  if (room.phase === 'intro' && now - room.goAt > INTRO_MAX) startCount(room, now, out);
   if (room.phase === 'count') room.p.forEach((p, s) => { if (!p.inited && now >= room.liveAt - 0.5) { placeAtSpawn(room, s, now); out(s, { t: 'fix', p: [p.x, p.y, p.z] }); } });
   if ((room.phase === 'count') && now >= room.liveAt + LIVE_GRACE) { room.p.forEach((p) => { p.live = true; }); room.phase = 'live'; }
   if (room.phase === 'live') room.p.forEach((p, s) => { if (!p.live && now >= room.liveAt + LIVE_GRACE) p.live = true; });
