@@ -357,7 +357,7 @@ function mountXShare($) {
         <label class="fa-dmf"><span>Sprawdzaj post ponownie co (godz., 0 = nigdy)</span><input class="fa-q" type="number" min="0" max="720" step="1" id="fa-xs-re" value="${cfg.recheckHours}"></label>
       </div>
       <label class="fa-dmf" style="display:block;margin-top:10px"><span>Tekst posta</span><textarea class="fa-q" id="fa-xs-text" rows="6" maxlength="600" style="width:100%;box-sizing:border-box;resize:vertical;font:inherit">${esc(cfg.text)}</textarea></label>
-      <h4>Podgląd (z przykładowym kodem)</h4><pre class="fa-msg" style="white-space:pre-wrap;margin:0">${esc(info.preview || '')}</pre>`;
+      <h4>Podgląd (z przykładowym kodem) – <span style="color:${info.len > 280 ? '#ff6b8b' : 'inherit'}">${info.len || 0}/280 znaków X${info.len > 280 ? ' – za długi, X go nie opublikuje' : ''}</span></h4><pre class="fa-msg" style="white-space:pre-wrap;margin:0">${esc(info.preview || '')}</pre>`;
     const s = info.stats || {};
     $('fa-xs-sum').textContent = (cfg.enabled ? 'włączone' : 'wyłączone – Deathmatch bez posta') + ` · zweryfikowanych graczy: ${s.v || 0}` + (cfg.enabled && cfg.requireCa && !(cfg.ca || info.ca) ? ' · brak CA – sprawdzany tylko kod' : '') + (!cfg.url && !info.site ? ' · brak domeny – post bez linku do gry' : '');
   }

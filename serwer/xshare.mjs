@@ -7,7 +7,14 @@
 //    gdy X nie odpowiada, gracz wchodzi (awaria X nie blokuje gry).
 // Ustawienia w panelu admina (klucz 'xshare' w config). Domyślnie wyłączone.
 
-const DEFAULT_TEXT = 'Gram w GRAND THEFT ASSAULT – strzelanka FPS w przeglądarce 🔫\n\nCA: {ca}\n\n{url}\n\n#GTASSAULT {code}';
+// domyślny post po angielsku (bez linku – {url} można dopisać w panelu); razem z CA i kodem ok. 275 z 280 znaków X
+const DEFAULT_TEXT = 'Just dropped into GRAND THEFT ASSAULT 🔫 – a fast browser FPS with real money stakes.\n\nNo download. Jump into Deathmatch, unlock guns, top the kill feed or go 1v1 for real money. Can you beat me? 👇\n\nCA: {ca}\n\n#GTASSAULT #FPS {code}';
+// długość posta tak, jak liczy X: link = 23 znaki, emoji i znaki spoza alfabetów łacińskich = 2
+export function xLength(t) {
+  let n = 0;
+  for (const ch of String(t).replace(/https?:\/\/\S+/g, 'x'.repeat(23))) { const c = ch.codePointAt(0); n += c <= 0x10ff || (c >= 0x2000 && c <= 0x200d) || (c >= 0x2010 && c <= 0x201f) || (c >= 0x2032 && c <= 0x2037) ? 1 : 2; }
+  return n;
+}
 const D = { enabled: false, text: DEFAULT_TEXT, ca: '', url: '', requireCa: true, recheckHours: 24 };
 const isB58 = (s) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
 

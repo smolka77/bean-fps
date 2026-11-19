@@ -631,7 +631,7 @@ const routes = {
     need(user); if (limited('xs:' + user.id, 6) || limited('xsip:' + ip, 20)) throw new E('rate', 'Za dużo prób – odczekaj minutę', 429);
     return xshare.verify(user.id, body && body.url, originOf(req), E);
   },
-  'GET /api/admin/xshare': async ({ req }) => { adminGate(req); return { config: xsCfg, defaults: XS.sanitize({}), stats: xshare.stats(), ca: xsCfg.ca || (arsCfg.unit === 'token' ? arsCfg.mint : ''), site: originOf(req), preview: xshare.textFor('GTA-XXXXX', originOf(req)) }; },
+  'GET /api/admin/xshare': async ({ req }) => { adminGate(req); return { config: xsCfg, defaults: XS.sanitize({}), stats: xshare.stats(), ca: xsCfg.ca || (arsCfg.unit === 'token' ? arsCfg.mint : ''), site: originOf(req), preview: xshare.textFor('GTA-XXXXX', originOf(req)), len: XS.xLength(xshare.textFor('GTA-XXXXX', originOf(req))) }; },
   'POST /api/admin/xshare': async ({ body, req, ip }) => {
     const adm = adminGate(req);
     const next = XS.sanitize(body && body.reset ? {} : (body.config || {}));
