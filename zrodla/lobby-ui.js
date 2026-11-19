@@ -4,6 +4,7 @@
 
 import { createSfx } from './sfx.js';
 import { weaponSfx, setWeaponAccess, weaponAccessFor } from './weaponry.js';
+import { isVip, ensureVipCss } from './vip.js';
 import { createWallet } from './wallet.js';
 import { walletApi } from './wallet-config.js';
 import { createProfile, paintAvatar } from './profile.js';
@@ -649,7 +650,7 @@ export function initLobbyUI(ctx) {
     $('lb-acct-name').textContent = acct ? acct.username : t('top.signin');
     if (acct) paintAvatar($('lb-acct-av'), acct); else { $('lb-acct-av').textContent = '?'; $('lb-acct-av').style.background = ''; }
     $('lb-bal').textContent = usd(acct ? acct.balance : 0);   // bez konta: $0,00
-    ctx.setName(acct ? acct.username : t('top.guest'));
+    ensureVipCss(); ctx.setName(acct ? acct.username : t('top.guest'), isVip(acct));   // VIP: złoty nick (na razie nikt)
     menu.querySelector('[data-act="auth"] span').textContent = acct ? t('menu.account') : t('menu.login');
     $('lb-acct').hidden = $('lb-acct-hr').hidden = !acct; menu.querySelector('[data-act="auth"]').hidden = !!acct;   // konto w menu: karta po zalogowaniu, „Zaloguj się” bez konta
     menu.querySelector('[data-act="logout"]').hidden = !acct;

@@ -1543,7 +1543,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   uiApi = initLobbyUI({
     ui, $, lobbyMap: LOBBY_MAP, lobbyMaps: LOBBY_MAPS.map(m => m.id), isActive: () => active,
     getMode: () => mode.id,
-    setName: n => { plateName.textContent = n; },
+    setName: (n, vip) => { plateName.textContent = n; plateName.classList.toggle('vip-nick', !!vip); },   // vip: złoty nick z poświatą (vip.js)
     play: (id, opts) => { if (active) onPlay(id, opts); },
     refresh: () => { renderMode(); skinGrid.querySelectorAll('.lb-skin').forEach(b => { const k = skins.find(x => x.id === b.dataset.id); if (k) b.querySelector('span').textContent = skinName(k); }); },
   });
