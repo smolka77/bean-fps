@@ -366,9 +366,9 @@ const routes = {
     if (!PRICE) throw new E('price', 'Brak kursu SOL – spróbuj za chwilę', 503);
     const lam = Math.round(usd / PRICE * LAMPORTS_PER_SOL), price = PRICE;
     return tx(() => {
-      // poprzedni niezamknięty mecz (np. zamknięta karta) liczy się jako przegrany
-      // (poza meczem, który właśnie czeka w kolejce albo trwa – ten rozliczy serwer meczu)
-      for (const m of q("SELECT * FROM matches WHERE user_id=? AND state='open'").all(user.id)) if (!duelActive(m.id)) q("UPDATE matches SET state='lost', forfeit=1, ended=? WHERE id=?").run(Date.now(), m.id);
+      // poprzednia opłacona stawka, która nie czeka w kolejce ani nie trwa (nieudane połączenie, podwójne kliknięcie) – nie było gry,
+      // więc wraca do gracza (wcześniej przepadała jako przegrana). Mecz w kolejce albo w trakcie rozlicza wyłącznie serwer meczu.
+      for (const m of q("SELECT * FROM matches WHERE user_id=? AND state='open'").all(user.id)) if (!duelActive(m.id)) refundOpen(m, 'nierozegrana stawka');
       const u = fresh(user.id); if (u.lamports < lam) throw new E('funds', 'Za mało środków na stawkę');
       q('UPDATE users SET lamports=lamports-? WHERE id=?').run(lam, u.id);
       const id = Number(q('INSERT INTO matches(user_id,t,stake_usd,stake_lamports,price,map) VALUES(?,?,?,?,?,?)').run(u.id, Date.now(), usd, lam, price, body.map || null).lastInsertRowid);
@@ -1092,4 +1092,27 @@ async function handleHttp(req, res) {
   if (!h && req.method === 'GET' && !url.pathname.startsWith('/api/')) return serveGame(url.pathname, res);
   if (!h) return send(res, 404, { error: 'not_found', message: 'Nie ma takiej ścieżki' }, origin);
   try {
-    const body = req.method === 'POST' ? await readBo
+    const body = req.method === 'POST' ? await readBody(req) : {};
+    const ip = OCH.clientIp(req), dev = cleanDev(req.headers['x-dev']);
+    const user = userFromReq(req); if (user) { user._auth = req.headers.authorization; noteSeen(user.id, 'ip', ip); noteSeen(user.id, 'dev', dev); }
+    send(res, 200, await h({ req, body, ip, dev, user }), origin);
+  } catch (e) {
+    if (!(e instanceof E)) console.error(key, e);
+    send(res, e.status || 500, { error: e.code || 'server', message: e instanceof E ? e.message : 'Błąd serwera' }, origin);
+  }
+}
+refundOrphans();                                              // stawki z meczów przerwanych restartem / awarią wracają do graczy
+server.on('upgrade', onUpgrade);                              // WebSocket /ws: kolejka i mecze 1v1
+server.listen(PORT, HOST, () => {
+  console.log(`Portfele BEANLADEN: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}  sieć: ${CLUSTER}  skarbiec: ${TREASURY.publicKey.toBase58()}`);
+});
+refreshPrice(); setInterval(refreshPrice, 60000);
+function cleanReplays() {                                        // stare powtórki znikają; wstrzymane i odrzucone mecze zostają
+  try {
+    const keep = new Set(q("SELECT replay FROM matches WHERE replay IS NOT NULL AND (state='held' OR review IN ('held','rejected'))").all().map(r => r.replay));
+    const lim = Date.now() - REPLAY_DAYS * 864e5;
+    for (const f of fs.readdirSync(REPLAY_DIR)) { const fp = path.join(REPLAY_DIR, f); if (!keep.has(f) && fs.statSync(fp).mtimeMs < lim) fs.unlinkSync(fp); }
+  } catch (e) { console.warn('[powtórki]', e.message); }
+}
+setInterval(cleanReplays, 6 * 3600e3); setTimeout(cleanReplays, 60e3);
+setInterval(scanAll, SCAN_MS); setTimeout(scanAll, 3000);
