@@ -227,7 +227,7 @@ export async function openAdmin({ onClose } = {}) {
   const onKey = e => { if (e.key !== 'Escape' || !root) return; const rp = root.querySelector('.fa-rp'), d = root.querySelector('.fa-drw');
     if (rp && !rp.hidden) rp.querySelector('[data-rpx]').click(); else if (d && !d.hidden) d.hidden = true; else close(); };
   addEventListener('keydown', onKey); cleanup.push(() => removeEventListener('keydown', onKey));
-  root.innerHTML = `<div class="fa-wrap"><div class="fa-head"><div class="fa-brand"><b>BEAN<i>GTA</i></b><span>Panel admina</span></div><div class="fa-sp"></div>
+  root.innerHTML = `<div class="fa-wrap"><div class="fa-head"><div class="fa-brand"><b><i>GTA</i>SSAULT</b><span>Panel admina</span></div><div class="fa-sp"></div>
     <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div><p class="fa-empty">Ładowanie danych…</p></div>`;
   root.querySelector('[data-close]').addEventListener('click', close);
 
@@ -314,7 +314,7 @@ function mountArsenal($) {
   const box = $('fa-ars'), msg = $('fa-ars-msg'); let cfg = null, info = null;
   function render() {
     const tok = cfg.unit === 'token';
-    box.innerHTML = `<div class="fa-row" style="gap:14px;margin:0 0 10px"><label class="fa-chk"><input type="checkbox" id="fa-ars-on" ${cfg.enabled ? 'checked' : ''}> Arsenał włączony</label>
+    box.innerHTML = `<div class="fa-row" style="gap:14px;margin:0 0 10px"><label class="fa-chk"><input type="checkbox" id="fa-ars-on" ${cfg.enabled ? 'checked' : ''}> Ekwipunek włączony</label>
         <label class="fa-dmf" style="min-width:280px"><span>Odblokowanie za</span><select class="fa-q" id="fa-ars-unit"><option value="sol" ${tok ? '' : 'selected'}>saldo SOL w grze (nic się nie pobiera)</option><option value="token" ${tok ? 'selected' : ''}>token SPL na adresie gracza</option></select></label></div>
       <div class="fa-dmg" ${tok ? '' : 'style="display:none"'}>
         <label class="fa-dmf" style="grid-column:span 2"><span>Adres mintu tokenu (Solana)</span><input class="fa-q" id="fa-ars-mint" value="${esc(cfg.mint)}" placeholder="np. 7xKX…pump" spellcheck="false"></label>
@@ -340,7 +340,7 @@ function mountArsenal($) {
     catch (e) { msg.textContent = e.message; }
   });
   $('fa-ars-reset').addEventListener('click', async () => {
-    if (!confirm('Przywrócić domyślne ustawienia Arsenału (wyłączony, bez mintu)?')) return;
+    if (!confirm('Przywrócić domyślne ustawienia Ekwipunku (wyłączony, bez mintu)?')) return;
     try { const j = await srvPost('/api/admin/arsenal', { reset: true }); cfg = JSON.parse(JSON.stringify(j.config)); render(); msg.textContent = 'Przywrócono domyślne.'; } catch (e) { msg.textContent = e.message; }
   });
 }
@@ -516,7 +516,7 @@ function relockAdmin() { admTok.set(''); cleanup.forEach(f => { try { f(); } cat
 
 function buildDashboard(db, close) {
   root.innerHTML = `<div class="fa-wrap">
-    <div class="fa-head"><div class="fa-brand"><b>BEAN<i>GTA</i></b><span>Panel admina</span></div><span class="fa-live" id="fa-live">Łączenie…</span><div class="fa-sp"></div>
+    <div class="fa-head"><div class="fa-brand"><b><i>GTA</i>SSAULT</b><span>Panel admina</span></div><span class="fa-live" id="fa-live">Łączenie…</span><div class="fa-sp"></div>
       ${SRV ? '<button class="fa-btn" type="button" id="fa-lock" title="Kończy sesję panelu – następne wejście wymaga loginu, hasła i kodu 2FA">Wyloguj z panelu</button>' : ''}
       <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div>
     <p class="fa-note" id="fa-note" hidden></p>
@@ -534,11 +534,11 @@ function buildDashboard(db, close) {
       <div id="fa-dm"><p class="fa-empty">Ładowanie…</p></div>
       <div class="fa-row"><button class="fa-btn pri" type="button" id="fa-dm-save">Zapisz ustawienia</button><button class="fa-btn" type="button" id="fa-dm-reset">Przywróć domyślne</button><span class="fa-msg" id="fa-dm-msg"></span></div>
       <h4>Ostatnie mecze Deathmatch</h4><ul class="fa-list" id="fa-dm-recent"><li class="fa-empty">—</li></ul></section>
-    <section class="fa-card" id="fa-ars-card"><div class="fa-ch"><h3>Arsenał – bronie za trzymanie SOL / tokenu</h3><small id="fa-ars-sum"></small></div>
+    <section class="fa-card" id="fa-ars-card"><div class="fa-ch"><h3>Ekwipunek – bronie za trzymanie SOL / tokenu</h3><small id="fa-ars-sum"></small></div>
       <p class="fa-msg" style="margin:0 0 12px">Włączony: w 1v1 i Deathmatch gracz poniżej progu ma tylko pistolet (Glock-17). Każda broń ma próg – ile gracz musi mieć: saldo SOL w grze
         (stawka zamrożona na mecz też się liczy) albo token na adresie depozytu. Nic się nie pobiera. Bronie serwer ustala na starcie meczu. Z botem i Strzelnica – bez zmian.</p>
       <div id="fa-ars"><p class="fa-empty">Ładowanie…</p></div>
-      <div class="fa-row"><button class="fa-btn pri" type="button" id="fa-ars-save">Zapisz Arsenał</button><button class="fa-btn" type="button" id="fa-ars-reset">Przywróć domyślne</button><span class="fa-msg" id="fa-ars-msg"></span></div></section>` : ''}
+      <div class="fa-row"><button class="fa-btn pri" type="button" id="fa-ars-save">Zapisz Ekwipunek</button><button class="fa-btn" type="button" id="fa-ars-reset">Przywróć domyślne</button><span class="fa-msg" id="fa-ars-msg"></span></div></section>` : ''}
     <section class="fa-grid2">
       <div class="fa-card"><div class="fa-ch"><h3>Mecze dziennie</h3><small id="fa-ch-m-sum">ostatnie 14 dni</small></div><div class="fa-chart" id="fa-ch-m"></div></div>
       <div class="fa-card"><div class="fa-ch"><h3>Prowizja dziennie</h3><small id="fa-ch-f-sum">USD (płatne w SOL) · ostatnie 14 dni</small></div><div class="fa-chart" id="fa-ch-f"></div></div>

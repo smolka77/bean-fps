@@ -37,16 +37,16 @@ trafienia w głowę i tułów z kompensacją opóźnienia, pancerz, zabójstwa, 
 - **Panel admina → Deathmatch:** wszystkie liczby trybu (gracze, czasy, nagrody, ceny i statystyki broni, pancerz, poziomy, podział puli).
 - **Boty testowe:** `node narzedzia/dm-boty.mjs 8 http://127.0.0.1:8787 free` – zakładają konta, grają mecz i wypisują wynik.
 
-## Arsenał (bronie za trzymanie SOL)
+## Ekwipunek (bronie za trzymanie SOL)
 
-Kafelek **ARSENAŁ** w lewym dolnym rogu lobby otwiera sklep z broniami. Na start każdy ma pistolet (Glock-17).
+Kafelek **EKWIPUNEK** w lewym dolnym rogu lobby otwiera sklep z broniami. Na start każdy ma pistolet (Glock-17).
 Pozostałe bronie (Desert Eagle, MP5K, SPAS-12, AKM, M4A1) mają progi: ile SOL gracz musi **mieć** na saldzie w grze. Nic się nie pobiera –
 broń odblokowuje samo saldo (domyślnie 0,1 / 0,25 / 0,5 / 1 / 1,5 SOL). Stawka zamrożona na czas meczu też się liczy.
 
 - Działa w **1v1** (pistolet + odblokowane bronie zamiast broni drużyn) i w **Deathmatch** (w sklepie meczu da się kupić tylko odblokowane bronie;
   zablokowane mają kłódkę z progiem, np. „1 SOL”). Z botem i Strzelnica: wszystkie bronie jak dawniej.
 - Pilnuje tego serwer (`serwer/arsenal.mjs`): bronie ustala na starcie meczu, serwer meczu nie przyjmie broni poniżej progu.
-- **Panel admina → Arsenał:** włączenie, progi broni (0 = broń dla każdego) i „odblokowanie za”: saldo SOL w grze (domyślnie)
+- **Panel admina → Ekwipunek:** włączenie, progi broni (0 = broń dla każdego) i „odblokowanie za”: saldo SOL w grze (domyślnie)
   albo token SPL na adresie depozytu gracza (adres mintu, nazwa, sieć, co ile sprawdzać saldo; własny RPC: zmienna `TOKEN_RPC_URL` w `serwer/.env`).
 
 Sterowanie w Deathmatch: jak wyżej, do tego Tab – tabela wyników, G – emotka (machanie / taniec / radość); w sklepie Q/E zakładki, W/S lista, A/D przedmioty,

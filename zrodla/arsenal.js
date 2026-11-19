@@ -111,48 +111,48 @@ function createViewer(host, onInput = () => {}) {
 }
 
 const TXT = {
-  pl: { title: 'Arsenał', sub: 'Na start masz pistolet. Trzymaj token na swoim adresie w grze, a odblokujesz resztę broni.',
+  pl: { title: 'Ekwipunek', sub: 'Na start masz pistolet. Trzymaj token na swoim adresie w grze, a odblokujesz resztę broni.',
     subSol: 'Na start masz pistolet. Miej SOL na saldzie w grze, a odblokujesz resztę broni – nic się nie pobiera, liczy się samo saldo.',
     howSol: 'Wpłać SOL na swoje saldo w grze i po prostu je trzymaj. Broń nic nie kosztuje – SOL zostaje na koncie. Gdy saldo spadnie poniżej progu, broń znów się zablokuje.', deposit: 'Wpłać SOL',
-    tile: 'Arsenał', tileOf: '{n} / {m} broni', tileOff: 'Bronie i odblokowania', balance: 'Twoje saldo', refresh: 'Sprawdź saldo', checking: 'Sprawdzam…',
+    tile: 'Ekwipunek', tileOf: '{n} / {m} broni', tileOff: 'Bronie i odblokowania', balance: 'Twoje saldo', refresh: 'Sprawdź saldo', checking: 'Sprawdzam…',
     ago: 'sprawdzone {t} temu', now: 'sprawdzone przed chwilą', base: 'W zestawie', open: 'Odblokowane', all: 'Dostępne', need: 'Trzymaj', missing: 'Brakuje {n}',
     have: 'Masz tę broń', free: 'Za darmo – dostępna dla każdego', haveBase: 'Pistolet startowy – zawsze w zestawie', modes: 'Działa w 1v1 i Deathmatch (tam kupujesz ją w sklepie meczu). Z botem i w Strzelnicy masz wszystkie bronie.',
     how: 'Jak odblokować', howTxt: 'Wyślij {s} na swój adres w grze i trzymaj go tam. Serwer sprawdza saldo co kilka minut – gdy tokenów ubędzie, broń znów się zablokuje.',
     addr: 'Twój adres w grze (Solana)', copy: 'Kopiuj', copied: 'Skopiowano adres', login: 'Zaloguj się, żeby zobaczyć saldo i swój adres do wpłaty.', loginBtn: 'Zaloguj się',
-    off: 'Arsenał nie jest jeszcze włączony – na razie każdy ma wszystkie bronie.', offline: 'Arsenał działa z serwerem gry – tu masz wszystkie bronie.', close: 'Zamknij', err: 'Nie udało się sprawdzić salda – spróbuj za chwilę',
+    off: 'Ekwipunek nie jest jeszcze włączony – na razie każdy ma wszystkie bronie.', offline: 'Ekwipunek działa z serwerem gry – tu masz wszystkie bronie.', close: 'Zamknij', err: 'Nie udało się sprawdzić salda – spróbuj za chwilę',
     st_dmg: 'Obrażenia', st_rof: 'Szybkostrzelność', st_acc: 'Celność', st_mag: 'Magazynek', c_pistol: 'Pistolet', c_hand: 'Pistolet ciężki', c_smg: 'Pistolet maszynowy', c_shot: 'Strzelba', c_rifle: 'Karabin szturmowy',
     keys: 'W / S wybór · Esc zamknij', net: 'sieć', drag: 'Przeciągnij, żeby obrócić · kółko: przybliż · 2× klik: od nowa' },
-  en: { title: 'Arsenal', sub: 'You start with a pistol. Hold the token on your in-game address to unlock the other guns.',
+  en: { title: 'Inventory', sub: 'You start with a pistol. Hold the token on your in-game address to unlock the other guns.',
     subSol: 'You start with a pistol. Keep SOL in your in-game balance to unlock the other guns – nothing is charged, only the balance counts.',
     howSol: 'Deposit SOL to your in-game balance and simply keep it there. The guns cost nothing – the SOL stays in your account. If the balance drops below a threshold, that gun locks again.', deposit: 'Deposit SOL',
-    tile: 'Arsenal', tileOf: '{n} / {m} guns', tileOff: 'Guns and unlocks', balance: 'Your balance', refresh: 'Check balance', checking: 'Checking…',
+    tile: 'Inventory', tileOf: '{n} / {m} guns', tileOff: 'Guns and unlocks', balance: 'Your balance', refresh: 'Check balance', checking: 'Checking…',
     ago: 'checked {t} ago', now: 'checked just now', base: 'Included', open: 'Unlocked', all: 'Available', need: 'Hold', missing: '{n} to go',
     have: 'You have this gun', free: 'Free – available to everyone', haveBase: 'Starter pistol – always included', modes: 'Works in 1v1 and Deathmatch (there you buy it in the match shop). Vs bot and on the Range you have every gun.',
     how: 'How to unlock', howTxt: 'Send {s} to your in-game address and keep it there. The server checks the balance every few minutes – if it drops, the gun locks again.',
     addr: 'Your in-game address (Solana)', copy: 'Copy', copied: 'Address copied', login: 'Log in to see your balance and deposit address.', loginBtn: 'Log in',
-    off: 'The Arsenal is not switched on yet – for now everyone has every gun.', offline: 'The Arsenal works with the game server – here you have every gun.', close: 'Close', err: 'Could not check the balance – try again shortly',
+    off: 'The Inventory is not switched on yet – for now everyone has every gun.', offline: 'The Inventory works with the game server – here you have every gun.', close: 'Close', err: 'Could not check the balance – try again shortly',
     st_dmg: 'Damage', st_rof: 'Fire rate', st_acc: 'Accuracy', st_mag: 'Magazine', c_pistol: 'Pistol', c_hand: 'Heavy pistol', c_smg: 'Submachine gun', c_shot: 'Shotgun', c_rifle: 'Assault rifle',
     keys: 'W / S select · Esc close', net: 'network', drag: 'Drag to rotate · wheel: zoom · double-click: reset' },
-  ru: { title: 'Арсенал', sub: 'На старте у тебя пистолет. Держи токен на своём игровом адресе – и откроешь остальное оружие.',
+  ru: { title: 'Инвентарь', sub: 'На старте у тебя пистолет. Держи токен на своём игровом адресе – и откроешь остальное оружие.',
     subSol: 'На старте у тебя пистолет. Держи SOL на игровом балансе – и откроешь остальное оружие. Ничего не списывается, важен только баланс.',
     howSol: 'Пополни игровой баланс в SOL и просто держи его. Оружие ничего не стоит – SOL остаётся на счёте. Если баланс упадёт ниже порога, оружие снова закроется.', deposit: 'Пополнить SOL',
-    tile: 'Арсенал', tileOf: '{n} / {m} оружия', tileOff: 'Оружие и открытия', balance: 'Твой баланс', refresh: 'Проверить баланс', checking: 'Проверяю…',
+    tile: 'Инвентарь', tileOf: '{n} / {m} оружия', tileOff: 'Оружие и открытия', balance: 'Твой баланс', refresh: 'Проверить баланс', checking: 'Проверяю…',
     ago: 'проверено {t} назад', now: 'проверено только что', base: 'В комплекте', open: 'Открыто', all: 'Доступно', need: 'Держи', missing: 'Не хватает {n}',
     have: 'Это оружие у тебя есть', free: 'Бесплатно – доступно всем', haveBase: 'Стартовый пистолет – всегда в комплекте', modes: 'Работает в 1v1 и Deathmatch (там покупаешь в магазине матча). С ботом и в тире – всё оружие.',
     how: 'Как открыть', howTxt: 'Отправь {s} на свой игровой адрес и держи его там. Сервер проверяет баланс каждые несколько минут – если токенов станет меньше, оружие снова закроется.',
     addr: 'Твой игровой адрес (Solana)', copy: 'Копировать', copied: 'Адрес скопирован', login: 'Войди, чтобы увидеть баланс и адрес для пополнения.', loginBtn: 'Войти',
-    off: 'Арсенал ещё не включён – пока у всех всё оружие.', offline: 'Арсенал работает с игровым сервером – здесь у тебя всё оружие.', close: 'Закрыть', err: 'Не удалось проверить баланс – попробуй чуть позже',
+    off: 'Инвентарь ещё не включён – пока у всех всё оружие.', offline: 'Инвентарь работает с игровым сервером – здесь у тебя всё оружие.', close: 'Закрыть', err: 'Не удалось проверить баланс – попробуй чуть позже',
     st_dmg: 'Урон', st_rof: 'Скорострельность', st_acc: 'Точность', st_mag: 'Магазин', c_pistol: 'Пистолет', c_hand: 'Тяжёлый пистолет', c_smg: 'Пистолет-пулемёт', c_shot: 'Дробовик', c_rifle: 'Штурмовая винтовка',
     keys: 'W / S выбор · Esc закрыть', net: 'сеть', drag: 'Тяни, чтобы вращать · колесо: зум · двойной клик: сброс' },
-  es: { title: 'Arsenal', sub: 'Empiezas con una pistola. Guarda el token en tu dirección del juego y desbloquea el resto de armas.',
+  es: { title: 'Inventario', sub: 'Empiezas con una pistola. Guarda el token en tu dirección del juego y desbloquea el resto de armas.',
     subSol: 'Empiezas con una pistola. Mantén SOL en tu saldo del juego y desbloquea el resto de armas: no se cobra nada, solo cuenta el saldo.',
     howSol: 'Deposita SOL en tu saldo del juego y simplemente mantenlo. Las armas no cuestan nada: el SOL se queda en tu cuenta. Si el saldo baja del umbral, el arma se vuelve a bloquear.', deposit: 'Depositar SOL',
-    tile: 'Arsenal', tileOf: '{n} / {m} armas', tileOff: 'Armas y desbloqueos', balance: 'Tu saldo', refresh: 'Comprobar saldo', checking: 'Comprobando…',
+    tile: 'Inventario', tileOf: '{n} / {m} armas', tileOff: 'Armas y desbloqueos', balance: 'Tu saldo', refresh: 'Comprobar saldo', checking: 'Comprobando…',
     ago: 'comprobado hace {t}', now: 'comprobado ahora mismo', base: 'Incluida', open: 'Desbloqueada', all: 'Disponible', need: 'Guarda', missing: 'Faltan {n}',
     have: 'Tienes esta arma', free: 'Gratis – disponible para todos', haveBase: 'Pistola inicial – siempre incluida', modes: 'Funciona en 1v1 y Deathmatch (allí la compras en la tienda de la partida). Contra el bot y en la galería tienes todas las armas.',
     how: 'Cómo desbloquear', howTxt: 'Envía {s} a tu dirección del juego y mantenlo allí. El servidor comprueba el saldo cada pocos minutos: si baja, el arma se vuelve a bloquear.',
     addr: 'Tu dirección del juego (Solana)', copy: 'Copiar', copied: 'Dirección copiada', login: 'Inicia sesión para ver tu saldo y tu dirección de depósito.', loginBtn: 'Iniciar sesión',
-    off: 'El Arsenal aún no está activado: por ahora todos tienen todas las armas.', offline: 'El Arsenal funciona con el servidor del juego: aquí tienes todas las armas.', close: 'Cerrar', err: 'No se pudo comprobar el saldo, inténtalo en un momento',
+    off: 'El Inventario aún no está activado: por ahora todos tienen todas las armas.', offline: 'El Inventario funciona con el servidor del juego: aquí tienes todas las armas.', close: 'Cerrar', err: 'No se pudo comprobar el saldo, inténtalo en un momento',
     st_dmg: 'Daño', st_rof: 'Cadencia', st_acc: 'Precisión', st_mag: 'Cargador', c_pistol: 'Pistola', c_hand: 'Pistola pesada', c_smg: 'Subfusil', c_shot: 'Escopeta', c_rifle: 'Fusil de asalto',
     keys: 'W / S elegir · Esc cerrar', net: 'red', drag: 'Arrastra para girar · rueda: zoom · doble clic: restablecer' },
 };
@@ -334,7 +334,7 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
 
   function renderTile() {
     const list = guns(), n = list.filter((id) => stateOf(id) !== 'lk').length;
-    tile.querySelector('small').textContent = !active() ? 'GTAssault' : solMode() ? 'SOL' : '$' + String(s.symbol || '').replace(/^\$/, '');
+    tile.querySelector('small').textContent = !active() ? 'GTASSAULT' : solMode() ? 'SOL' : '$' + String(s.symbol || '').replace(/^\$/, '');
     tile.querySelector('b').textContent = T('tile');
     tile.querySelector('em').textContent = active() ? T('tileOf', { n, m: list.length }) : T('tileOff');
     tile.querySelector('.pips').innerHTML = active() ? list.map((id) => `<u class="${stateOf(id) !== 'lk' ? 'on' : ''}"></u>`).join('') : '';
