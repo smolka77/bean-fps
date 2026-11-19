@@ -309,10 +309,10 @@ const DM_WCOLS = [['name', 'Nazwa'], ['price', 'Cena $'], ['dmg', 'Obr.'], ['hea
   ['falloff.0', 'Spadek od m'], ['falloff.1', 'Min. przy m'], ['falloff.2', 'Min. ×'], ['recoil.pitch', 'Odrzut ↑'], ['recoil.yaw', 'Odrzut ↔'], ['spread.hip', 'Rozrzut z biodra'], ['spread.ads', 'Rozrzut celując'], ['auto', 'Auto']];
 const getP = (o, p) => p.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
 const setP = (o, p, v) => { const ks = p.split('.'); let a = o; for (let i = 0; i < ks.length - 1; i++) a = a[ks[i]]; a[ks[ks.length - 1]] = v; };
-// Arsenał: mint tokenu, nazwa, sieć, co ile sprawdzać saldo, progi broni (serwer: serwer/arsenal.mjs)
+// Arsenał: mint tokenu, nazwa, sieć, co ile sprawdzać saldo, progi broni i skinów z kreatora (serwer: serwer/arsenal.mjs)
 const ARS_NAMES = { deagle: 'Desert Eagle', mp5k: 'MP5K', spas12: 'SPAS-12', akm: 'AKM', m4a1: 'M4A1' };
 function mountArsenal($) {
-  const box = $('fa-ars'), msg = $('fa-ars-msg'); let cfg = null, info = null;
+  const box = $('fa-ars'), msg = $('fa-ars-msg'); let cfg = null, info = null, skinList = [];   // skinList: skiny z kreatora (skins.json) – mają progi
   function render() {
     const tok = cfg.unit === 'token';
     box.innerHTML = `<div class="fa-row" style="gap:14px;margin:0 0 10px"><label class="fa-chk"><input type="checkbox" id="fa-ars-on" ${cfg.enabled ? 'checked' : ''}> Ekwipunek włączony</label>
@@ -324,7 +324,10 @@ function mountArsenal($) {
         <label class="fa-dmf"><span>Sprawdzanie salda co (s)</span><input class="fa-q" type="number" min="30" max="3600" step="10" id="fa-ars-ref" value="${cfg.refresh}"></label>
       </div>
       <h4>Progi broni – ${tok ? 'ile tokenów' : 'ile SOL'} gracz musi mieć (nic się nie pobiera; Glock-17 zawsze za darmo, 0 = broń dla każdego)</h4>
-      <div class="fa-dmg">${info.guns.map((g) => `<label class="fa-dmf"><span>${esc(ARS_NAMES[g] || g)}</span><input class="fa-q" type="number" min="0" step="any" data-need="${g}" value="${cfg.need[g]}"></label>`).join('')}</div>`;
+      <div class="fa-dmg">${info.guns.map((g) => `<label class="fa-dmf"><span>${esc(ARS_NAMES[g] || g)}</span><input class="fa-q" type="number" min="0" step="any" data-need="${g}" value="${cfg.need[g]}"></label>`).join('')}</div>
+      <h4>Progi skinów z kreatora – ${tok ? 'ile tokenów' : 'ile SOL'} gracz musi mieć (podstawowe kolorowe fasolki zawsze za darmo; puste pole = próg domyślny, 0 = skin dla każdego)</h4>
+      <div class="fa-dmg"><label class="fa-dmf"><span><b>Próg domyślny</b></span><input class="fa-q" type="number" min="0" step="any" id="fa-ars-skdef" value="${cfg.skinDefault ?? 0}"></label>
+        ${skinList.map((k) => `<label class="fa-dmf"><span>${esc(k.name || k.id)}</span><input class="fa-q" type="number" min="0" step="any" data-skin="${esc(k.id)}" value="${cfg.skinNeed && cfg.skinNeed[k.id] !== undefined ? cfg.skinNeed[k.id] : ''}" placeholder="${cfg.skinDefault ?? 0} (domyślny)"></label>`).join('') || '<p class="fa-empty">Brak skinów z kreatora (skins.json).</p>'}</div>`;
     $('fa-ars-sum').textContent = !cfg.enabled ? 'wyłączony – wszystkie bronie dla każdego' : !tok ? 'włączony · progi w SOL (saldo w grze)'
       : cfg.mint ? `włączony · token ${cfg.symbol} · ${cfg.network} · RPC: ${info.rpc}` : 'włączony, ale bez mintu tokenu – nie działa';
     $('fa-ars-unit').addEventListener('change', () => { collect(); render(); });
@@ -332,8 +335,12 @@ function mountArsenal($) {
   function collect() {
     cfg.enabled = $('fa-ars-on').checked; cfg.unit = $('fa-ars-unit').value; cfg.mint = $('fa-ars-mint').value.trim(); cfg.symbol = $('fa-ars-sym').value.trim(); cfg.network = $('fa-ars-net').value; cfg.refresh = +$('fa-ars-ref').value;
     box.querySelectorAll('[data-need]').forEach((i) => { cfg.need[i.dataset.need] = +i.value; });
+    cfg.skinDefault = +$('fa-ars-skdef').value || 0; cfg.skinNeed = {};
+    box.querySelectorAll('[data-skin]').forEach((i) => { if (i.value.trim() !== '') cfg.skinNeed[i.dataset.skin] = +i.value; });   // puste = próg domyślny
   }
-  (async () => { try { info = await srvGet('/api/admin/arsenal'); cfg = JSON.parse(JSON.stringify(info.config)); render(); }
+  (async () => { try { info = await srvGet('/api/admin/arsenal'); cfg = JSON.parse(JSON.stringify(info.config));
+      try { const l = await (await fetch('skins.json?v=' + Date.now(), { cache: 'no-store' })).json(); if (Array.isArray(l)) skinList = l.filter((k) => k && k.id).map((k) => ({ id: k.id, name: k.name })); } catch {}
+      render(); }
     catch (e) { if (e.code === 'admin2fa') return relockAdmin(); box.innerHTML = `<p class="fa-empty">${esc(e.message)}</p>`; } })();
   $('fa-ars-save').addEventListener('click', async () => {
     if (!cfg) return; collect(); msg.textContent = 'Zapisywanie…';

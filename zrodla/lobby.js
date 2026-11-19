@@ -543,6 +543,8 @@ const CSS = `
 #lb-ui .lb-skin.sel{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc);background:rgba(255,46,147,.1)}
 #lb-ui .lb-skin svg,#lb-ui .lb-skin img{width:42px;height:56px;display:block;object-fit:contain}
 #lb-ui .lb-skin span{font:600 12.5px/1.1 Barlow,sans-serif;text-align:center}
+#lb-ui .lb-skin.locked{opacity:.55;filter:grayscale(.7)}
+#lb-ui .lb-skin.locked:hover{opacity:.8}
 #lb-ui .lb-skin small{font:700 8.5px/1 Barlow,sans-serif;letter-spacing:.12em;color:var(--acc);min-height:9px}
 #lb-ui .lb-skins .lb-btn{align-self:flex-start;margin-top:auto}
 /* panel trybu, stawki i GRAJ – skala na komputerze (cały element w tej samej proporcji) */
@@ -1495,24 +1497,38 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   if (bean.userData.mats && bean.userData.mats.skin) skinMats.push(bean.userData.mats.skin, ...(bean.userData.mats.body ? [bean.userData.mats.body] : []));
   else bean.traverse(o => { if (o.isMesh && o.material && !skinMats.includes(o.material)) skinMats.push(o.material); });
   let skin = skins.find(k => k.id === store.get('fasolka-skin')) || skins[0];
+  let skinLock = () => null;   // Arsenał (arsenal.js): skin z kreatora poniżej progu trzymanego tokenu/SOL → { need, unit }
   const setSkin = (k, keep) => { skin = k; skinMats.forEach(m => applySkin(m, k)); if (!keep) store.set('fasolka-skin', k.id); onSkin(k);
     skinGrid.querySelectorAll('.lb-skin').forEach(b => b.classList.toggle('sel', b.dataset.id === k.id)); };
   const skinPanel = $('lb-skins'), skinGrid = $('lb-skin-grid');
   const buildSkinGrid = () => { skinGrid.innerHTML = '';
     skins.forEach(k => { const b = document.createElement('button'); b.type = 'button'; b.className = 'lb-skin'; b.dataset.id = k.id;
-      b.innerHTML = skinIcon(k) + '<span></span><small></small>'; b.querySelector('span').textContent = skinName(k); b.querySelector('small').textContent = skinTag(k);
+      b.innerHTML = skinIcon(k) + '<span></span><small></small>'; b.querySelector('span').textContent = skinName(k);
+      const lk = BUILTIN_IDS.has(k.id) ? null : skinLock(k.id);
+      b.querySelector('small').textContent = lk ? '🔒 ' + fmtNeed(lk) : skinTag(k); b.classList.toggle('locked', !!lk);
       b.classList.toggle('sel', k.id === skin.id);
-      b.addEventListener('click', () => { setSkin(k); hopT = 0; }); skinGrid.appendChild(b); }); };
-  buildSkinGrid();
+      b.addEventListener('click', () => { const lk2 = BUILTIN_IDS.has(k.id) ? null : skinLock(k.id);
+        if (lk2) { dispatchEvent(new CustomEvent('fasolka:skin-locked', { detail: { name: skinName(k), need: fmtNeed(lk2) } })); return; }
+        setSkin(k); hopT = 0; }); skinGrid.appendChild(b); }); };
+  const fmtNeed = lk => (+lk.need).toLocaleString(undefined, { maximumFractionDigits: 6 }) + ' ' + lk.unit;
+  // saldo albo progi się zmieniły: kłódki od nowa; wybrany skin, który przestał być dostępny, zamienia się na podstawowy (wybór zostaje zapamiętany)
+  const applyLocks = () => {
+    const want = skins.find(k => k.id === store.get('fasolka-skin')) || skin;
+    const ok = k => BUILTIN_IDS.has(k.id) || !skinLock(k.id);
+    if (!ok(skin)) setSkin(skins.find(ok) || BUILTIN_SKINS[0], true); else if (want !== skin && ok(want)) setSkin(want, true);   // wszystkie zablokowane: podstawowa fasolka (schowana w wyborze)
+    buildSkinGrid();
+  };
+  addEventListener('fasolka:arsenal', e => { if (e.detail && typeof e.detail.lock === 'function') { skinLock = e.detail.lock; applyLocks(); } });
   const BUILTIN_IDS = new Set(BUILTIN_SKINS.map(k => k.id));
+  buildSkinGrid();
   // podmienia skiny z kreatora (z skins.json albo z panelu admina) i od razu przebudowuje kafelki
   const setCustomSkins = list => {
     skins = noBasic([...BUILTIN_SKINS, ...list.filter(k => k && k.id && !BUILTIN_IDS.has(k.id))]);
     const want = skins.find(k => k.id === store.get('fasolka-skin'));
-    if (want && want !== skin) setSkin(want, true);
-    else if (!skins.some(k => k.id === skin.id)) setSkin(skins[0], true);
-    else { const same = skins.find(k => k.id === skin.id); if (same !== skin) setSkin(same, true); }
-    buildSkinGrid();
+    if (want && want !== skin && (BUILTIN_IDS.has(want.id) || !skinLock(want.id))) setSkin(want, true);
+    else if (!skins.some(k => k.id === skin.id) && !BUILTIN_IDS.has(skin.id)) setSkin(skins[0], true);
+    else { const same = skins.find(k => k.id === skin.id); if (same && same !== skin) setSkin(same, true); }
+    applyLocks();   // kłódki Arsenału i ewentualna zamiana zablokowanego skina na dostępny
   };
   loadSkinsJson().then(list => { if (Array.isArray(list)) setCustomSkins(list); }).catch(() => {});
   addEventListener('fasolka:skins', e => { if (Array.isArray(e.detail)) setCustomSkins(e.detail); });   // panel admina: podgląd zmian na żywo
@@ -1521,7 +1537,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   $('lb-skin-close').addEventListener('click', closeSkins);
   addEventListener('keydown', e => { if (e.key === 'Escape' && !skinPanel.hidden) { closeSkins(); e.stopPropagation(); } }, true);
   let hopT = -1;
-  setSkin(skin);
+  setSkin(skin, !!store.get('fasolka-skin'));   // zapamiętany wybór zostaje, dopóki nie wczytają się skiny z kreatora (skins.json)
   // panel admina (wybór mapy lobby, statystyki) jest teraz osobny: admin.js, link z #admin – patrz lobby-ui.js
   bean.rotation.y = Math.PI;                 // model patrzy w -Z, kamera stoi na +Z
   bean.traverse(o => { if (o.isMesh) o.castShadow = true; });

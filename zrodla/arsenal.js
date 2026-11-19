@@ -354,8 +354,16 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     const dmg = Math.min(10, (w.dmg * pel) / 13), rof = Math.min(10, w.rpm / 90), acc = Math.max(.5, Math.min(10, 10 - (w.spread.hip * 600 + (w.pelletSpread || 0) * 80))), mag = Math.min(10, w.mag / 3);
     return [[T('st_dmg'), dmg, pel > 1 ? w.dmg + '×' + pel : String(w.dmg)], [T('st_rof'), rof, w.rpm + ' rpm'], [T('st_acc'), acc, acc.toFixed(1)], [T('st_mag'), mag, w.mag + ' / ' + w.reserve]];
   }
+  // skiny z kreatora: próg (własny albo domyślny) – null = skin dostępny; lobby.js rysuje kłódki na kafelkach skinów
+  function skinLock(id) {
+    if (!active() || s.skinDefault === undefined) return null;
+    const need = s.skinNeed && Object.prototype.hasOwnProperty.call(s.skinNeed, id) ? s.skinNeed[id] : s.skinDefault;
+    if (!(need > 0) || bal() + 1e-9 >= need) return null;
+    return { need, unit: solMode() ? 'SOL' : String(s.symbol || 'TOKEN') };
+  }
   function render() {
     renderTile();
+    dispatchEvent(new CustomEvent('fasolka:arsenal', { detail: { lock: skinLock } }));
     if (ov.hidden) return;
     const list = guns(); sel = Math.max(0, Math.min(list.length - 1, sel)); const id = list[sel], st = stateOf(id), sym = s && s.symbol ? s.symbol : 'TOKEN';
     Q('h2').innerHTML = `<b>${esc(T('title'))}</b>`; Q('.sub').textContent = T(solMode() || !s ? 'subSol' : 'sub');

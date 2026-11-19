@@ -1018,7 +1018,7 @@ function onDuelMessage(ws, user, raw, arsChecked = false) {
     if ([...rooms].some(r => !r.over && r.p.some(p => p.matchId === match.id))) return wsSend(ws, { t: 'error', code: 'dup', message: 'Ten mecz już trwa w innej karcie.' });
     for (const x of mmQueue.filter(x => x.user.id === user.id)) { leaveQueue(x.ws, x.matchId !== match.id); wsSend(x.ws, { t: 'error', code: 'dup', message: 'Szukasz meczu w innej karcie.' }); }
     if (!q("SELECT 1 FROM matches WHERE id=? AND state='open'").get(match.id)) return noMatch();   // stawka mogła właśnie wrócić
-    const entry ={ ws, user, matchId: match.id, stake: match.stake_usd, lam: match.stake_lamports || 0, nick: user.username, skin: String(m.skin || '').slice(0, 64) };
+    const entry ={ ws, user, matchId: match.id, stake: match.stake_usd, lam: match.stake_lamports || 0, nick: user.username, skin: arsenalSkin(user.id, String(m.skin || '').slice(0, 64), match.stake_lamports || 0) };   // skin z kreatora tylko powyżej progu Arsenału
     const i = mmQueue.findIndex(x => x.stake === entry.stake && x.user.id !== user.id && x.ws.readyState === 1 && !(MM_BLOCK_LINKED && linkOf(x.user.id, user.id)));
     if (i < 0) { mmQueue.push(entry); ws.mm = entry; wsSend(ws, { t: 'queued', waiting: mmQueue.filter(x => x.stake === entry.stake).length }); return; }
     startRoom(mmQueue.splice(i, 1)[0], entry); return;
@@ -1047,7 +1047,7 @@ function afterGame(room) {
 setInterval(() => { const t = nowS(); for (const room of rooms) { if (room.over) continue; MECZ.tick(room.game, t, room.out); afterGame(room); } }, 100);
 
 // ---------------- ARSENAŁ: bronie za trzymanie tokenu (arsenal.mjs) ----------------
-// Bez tokenu w 1v1 i Deathmatch tylko pistolet; progi i mint ustawia panel admina (klucz 'arsenal' w config).
+// Bez tokenu w 1v1 i Deathmatch tylko pistolet i podstawowe skiny; progi i mint ustawia panel admina (klucz 'arsenal' w config).
 // Wejście do kolejki ze starym saldem (> 10 min) najpierw sprawdza saldo, potem dopiero wpuszcza gracza do kolejki.
 let arsCfg = (() => { try { const r = q("SELECT value FROM config WHERE key='arsenal'").get(); return ARS.sanitize(r ? JSON.parse(r.value) : {}); } catch { return ARS.sanitize({}); } })();
 const arsenal = ARS.createArsenal({ getCfg: () => arsCfg, rpcUrl: (env.TOKEN_RPC_URL || '').trim(),
@@ -1062,6 +1062,16 @@ function arsenalWait(ws, user, again) {
   return true;
 }
 // bronie gracza w meczu (null = Arsenał wyłączony); `ids` = bronie, które zna dany tryb; lam = stawka / wpisowe zamrożone na ten mecz (liczy się do salda SOL)
+// skiny z kreatora (ids z skins.json, wczytywane ponownie po zmianie pliku) – tylko one mają progi Arsenału
+let skinIdsCache = { t: -1, ids: new Set() };
+function creatorSkinIds() {
+  try { const f = path.join(GAME_DIR, 'skins.json'), t = fs.statSync(f).mtimeMs;
+    if (t !== skinIdsCache.t) { const l = JSON.parse(fs.readFileSync(f, 'utf8')); skinIdsCache = { t, ids: new Set((Array.isArray(l) ? l : []).map((k) => k && k.id).filter(Boolean)) }; }
+  } catch {}
+  return skinIdsCache.ids;
+}
+// skin, z którym gracz wchodzi do meczu: skin z kreatora poniżej progu → '' (podstawowa fasolka)
+const arsenalSkin = (uid, skin, lam = 0) => (!skin || !creatorSkinIds().has(skin) || arsenal.skinOk(uid, skin, (lam || 0) / LAMPORTS_PER_SOL) ? skin : '');
 const arsenalGuns = (uid, ids, lam = 0) => { const g = arsenal.gunsFor(uid, (lam || 0) / LAMPORTS_PER_SOL); return g ? g.filter((id) => ids.includes(id)) : null; };
 
 // ---------------- Udostępnienie na X (warunek wejścia do Deathmatch, xshare.mjs) ----------------
@@ -1126,7 +1136,7 @@ function dmJoin(ws, user, m, arsChecked = false, xsChecked = false) {
   let room = dmLobby();
   if (!room) { try { room = dmOpenLobby(); } catch (er) { console.error('[dm] lobby', er); return wsSend(ws, { t: 'error', code: 'start', message: 'Nie udało się otworzyć lobby Deathmatch.' }); } }
   if (DM.playerCount(room.game) >= dmCfg.maxPlayers) dmBotRemove(room);   // komplet z botami: bot ustępuje miejsca graczowi
-  const e = { ws, user, nick: user.username, skin: String(m.skin || '').slice(0, 64), room, pid: 0, entryId: 0 };
+  const e = { ws, user, nick: user.username, skin: arsenalSkin(user.id, String(m.skin || '').slice(0, 64)), room, pid: 0, entryId: 0 };   // skin z kreatora tylko powyżej progu Arsenału
   try { e.entryId = Number(q("INSERT INTO dm_entries(user_id,t,tier,entry_usd,lamports,price,state,room,map) VALUES(?,?,?,?,?,?,'playing',?,?)")
     .run(user.id, Date.now(), room.tier.id, 0, 0, 0, room.key, room.game.mapName).lastInsertRowid); } catch (er) { console.error('[dm] zapis wejścia', er); }
   const t = nowS();

@@ -22,7 +22,7 @@ const DICT = {
     'plate.ready': 'GOTOWY', 'plate.skin': 'KLIKNIJ, BY ZMIENIĆ SKIN',
     'mode.label': 'Tryb gry', 'mode.change': 'Zmień', 'mode.range.name': 'Strzelnica', 'mode.range.desc': 'Trening solo – strzelnica w bunkrze, tarcze-fasolki',
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Pojedynek · do 3 wygranych rund · Bagno / Jachty / Salon',
-    'tag.range': 'SOLO', 'tag.bot': 'BOT', 'mode.bot.name': 'Z botem', 'mode.bot.desc': 'Trening 1 na 1 · bez stawki i serwera · do 3 wygranych rund', 'tag.1v1': '1 NA 1', 'soon': 'WKRÓTCE', 'soon.art': 'WIĘCEJ WKRÓTCE',
+    'tag.range': 'SOLO', 'skin.locked': 'Skin {s} odblokujesz, trzymając {n} (Ekwipunek)', 'tag.bot': 'BOT', 'mode.bot.name': 'Z botem', 'mode.bot.desc': 'Trening 1 na 1 · bez stawki i serwera · do 3 wygranych rund', 'tag.1v1': '1 NA 1', 'soon': 'WKRÓTCE', 'soon.art': 'WIĘCEJ WKRÓTCE',
     'mode.dm.name': 'Deathmatch', 'mode.dm.desc': 'Za darmo · do 20 graczy · wchodzisz kiedy chcesz', 'tag.dm': 'FFA', 'dm.tier': 'Lobby', 'dm.free': 'FREE', 'dm.entry': 'Wpisowe', 'dm.top1': 'Za 1. miejsce do', 'dm.wait': '{n}/{max} w lobby', 'dm.full': 'PEŁNE', 'dm.fullMsg': 'Lobby Deathmatch jest pełne ({max}/{max}). Spróbuj za chwilę.', 'dm.noServer': 'Deathmatch wymaga serwera gry',
     'cur.tag': 'USD · płatność w SOL', 'cur.in': 'w SOL', 'stake.label': 'Stawka', 'stake.custom': 'Własna', 'stake.win': 'Możliwa wygrana', 'stake.free': 'Trening – bez stawki', 'stake.range': 'Kwota $1–$1000', 'stake.invalid': 'Podaj stawkę od $1 do $1000',
     'play': 'GRAJ', 'play.login': 'ZALOGUJ SIĘ', 'picker.title': 'Wybierz tryb', 'done': 'Gotowe', 'skins.title': 'Skiny', 'close': 'Zamknij',
@@ -54,7 +54,7 @@ const DICT = {
     'plate.ready': 'READY', 'plate.skin': 'CLICK TO CHANGE SKIN',
     'mode.label': 'Game mode', 'mode.change': 'Change', 'mode.range.name': 'Shooting range', 'mode.range.desc': 'Solo practice – bunker range, bean targets',
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Duel · first to 3 rounds · Swamp / Yachts / Dealership',
-    'tag.range': 'SOLO', 'tag.bot': 'BOT', 'mode.bot.name': 'Vs bot', 'mode.bot.desc': 'Practice duel · no stake, no server · first to 3 rounds', 'tag.1v1': '1 VS 1', 'soon': 'SOON', 'soon.art': 'MORE SOON',
+    'tag.range': 'SOLO', 'skin.locked': 'Hold {n} to unlock the {s} skin (Inventory)', 'tag.bot': 'BOT', 'mode.bot.name': 'Vs bot', 'mode.bot.desc': 'Practice duel · no stake, no server · first to 3 rounds', 'tag.1v1': '1 VS 1', 'soon': 'SOON', 'soon.art': 'MORE SOON',
     'mode.dm.name': 'Deathmatch', 'mode.dm.desc': 'Free · up to 20 players · drop in any time', 'tag.dm': 'FFA', 'dm.tier': 'Lobby', 'dm.free': 'FREE', 'dm.entry': 'Entry', 'dm.top1': '1st place up to', 'dm.wait': '{n}/{max} in lobby', 'dm.full': 'FULL', 'dm.fullMsg': 'The Deathmatch lobby is full ({max}/{max}). Try again soon.', 'dm.noServer': 'Deathmatch needs the game server',
     'cur.tag': 'USD · paid in SOL', 'cur.in': 'in SOL', 'stake.label': 'Stake', 'stake.custom': 'Custom', 'stake.win': 'Potential win', 'stake.free': 'Practice – no stake', 'stake.range': 'Amount $1–$1000', 'stake.invalid': 'Enter a stake between $1 and $1000',
     'play': 'PLAY', 'play.login': 'LOG IN', 'picker.title': 'Choose mode', 'done': 'Done', 'skins.title': 'Skins', 'close': 'Close',
@@ -86,7 +86,7 @@ const DICT = {
     'plate.ready': 'ГОТОВ', 'plate.skin': 'НАЖМИ, ЧТОБЫ СМЕНИТЬ СКИН',
     'mode.label': 'Режим игры', 'mode.change': 'Сменить', 'mode.range.name': 'Стрельбище', 'mode.range.desc': 'Соло-тренировка – тир в бункере, мишени-фасолины',
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Дуэль · до 3 выигранных раундов · Болото / Яхты / Автосалон',
-    'tag.range': 'СОЛО', 'tag.bot': 'БОТ', 'mode.bot.name': 'С ботом', 'mode.bot.desc': 'Тренировочная дуэль · без ставки и сервера · до 3 побед', 'tag.1v1': '1 НА 1', 'soon': 'СКОРО', 'soon.art': 'СКОРО БОЛЬШЕ',
+    'tag.range': 'СОЛО', 'skin.locked': 'Скин {s} откроется, если держать {n} (Инвентарь)', 'tag.bot': 'БОТ', 'mode.bot.name': 'С ботом', 'mode.bot.desc': 'Тренировочная дуэль · без ставки и сервера · до 3 побед', 'tag.1v1': '1 НА 1', 'soon': 'СКОРО', 'soon.art': 'СКОРО БОЛЬШЕ',
     'mode.dm.name': 'Deathmatch', 'mode.dm.desc': 'Бесплатно · до 20 игроков · заходи когда хочешь', 'tag.dm': 'FFA', 'dm.tier': 'Лобби', 'dm.free': 'FREE', 'dm.entry': 'Взнос', 'dm.top1': 'За 1 место до', 'dm.wait': '{n}/{max} в лобби', 'dm.full': 'ЗАПОЛНЕНО', 'dm.fullMsg': 'Лобби Deathmatch заполнено ({max}/{max}). Попробуй чуть позже.', 'dm.noServer': 'Для Deathmatch нужен игровой сервер',
     'cur.tag': 'USD · оплата в SOL', 'cur.in': 'в SOL', 'stake.label': 'Ставка', 'stake.custom': 'Своя', 'stake.win': 'Возможный выигрыш', 'stake.free': 'Тренировка – без ставки', 'stake.range': 'Сумма $1–$1000', 'stake.invalid': 'Введите ставку от $1 до $1000',
     'play': 'ИГРАТЬ', 'play.login': 'ВОЙТИ', 'picker.title': 'Выбери режим', 'done': 'Готово', 'skins.title': 'Скины', 'close': 'Закрыть',
@@ -118,7 +118,7 @@ const DICT = {
     'plate.ready': 'LISTO', 'plate.skin': 'HAZ CLIC PARA CAMBIAR DE SKIN',
     'mode.label': 'Modo de juego', 'mode.change': 'Cambiar', 'mode.range.name': 'Campo de tiro', 'mode.range.desc': 'Práctica en solitario – galería en un búnker, dianas de judía',
     'mode.1v1.name': '1v1', 'mode.1v1.desc': 'Duelo · a 3 rondas ganadas · Pantano / Yates / Concesionario',
-    'tag.range': 'SOLO', 'tag.bot': 'BOT', 'mode.bot.name': 'Contra bot', 'mode.bot.desc': 'Duelo de práctica · sin apuesta ni servidor · a 3 rondas', 'tag.1v1': '1 VS 1', 'soon': 'PRONTO', 'soon.art': 'MÁS, MUY PRONTO',
+    'tag.range': 'SOLO', 'skin.locked': 'Mantén {n} para desbloquear el skin {s} (Inventario)', 'tag.bot': 'BOT', 'mode.bot.name': 'Contra bot', 'mode.bot.desc': 'Duelo de práctica · sin apuesta ni servidor · a 3 rondas', 'tag.1v1': '1 VS 1', 'soon': 'PRONTO', 'soon.art': 'MÁS, MUY PRONTO',
     'mode.dm.name': 'Deathmatch', 'mode.dm.desc': 'Gratis · hasta 20 jugadores · entra cuando quieras', 'tag.dm': 'FFA', 'dm.tier': 'Lobby', 'dm.free': 'FREE', 'dm.entry': 'Entrada', 'dm.top1': '1.er puesto hasta', 'dm.wait': '{n}/{max} en el lobby', 'dm.full': 'LLENO', 'dm.fullMsg': 'El lobby de Deathmatch está lleno ({max}/{max}). Inténtalo en un rato.', 'dm.noServer': 'Deathmatch necesita el servidor del juego',
     'cur.tag': 'USD · pago en SOL', 'cur.in': 'en SOL', 'stake.label': 'Apuesta', 'stake.custom': 'Otra', 'stake.win': 'Ganancia posible', 'stake.free': 'Práctica – sin apuesta', 'stake.range': 'Importe $1–$1000', 'stake.invalid': 'Introduce una apuesta entre $1 y $1000',
     'play': 'JUGAR', 'play.login': 'ACCEDER', 'picker.title': 'Elige modo', 'done': 'Listo', 'skins.title': 'Skins', 'close': 'Cerrar',
@@ -434,6 +434,7 @@ export function initLobbyUI(ctx) {
     ({ settings: () => openModal('lb-set'), wallet: () => openWallet(), tutorial: () => TUT.show(), auth: () => openModal('lb-auth'), logout: () => logout() })[b.dataset.act](); });
 
   // ---- Arsenał: bronie za trzymanie tokenu (arsenal.js; kafelek w lewym dolnym rogu) ----
+  addEventListener('fasolka:skin-locked', e => { const d = e.detail || {}; toast(t('skin.locked', { s: d.name || '', n: d.need || '' }), 'err'); });   // skin z kreatora poniżej progu Arsenału
   const ARSX = createArsenal({ root: ui, getLang: () => LANG, toast, sfx: SFX, wallet: () => W, acct: () => acct, art: ctx.weaponArt || null, openAuth: () => openModal('lb-auth'), openWallet: () => openWallet() });
 
   // ---- okna dialogowe ----
