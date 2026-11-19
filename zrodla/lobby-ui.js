@@ -6,6 +6,7 @@ import { createSfx } from './sfx.js';
 import { weaponSfx, setWeaponAccess, weaponAccessFor } from './weaponry.js';
 import { createArsenal } from './arsenal.js';
 import { createXShare } from './xshare.js';
+import { createTutorial } from './tutorial.js';
 import { isVip, ensureVipCss } from './vip.js';
 import { createWallet, srvText } from './wallet.js';
 import { walletApi } from './wallet-config.js';
@@ -16,7 +17,7 @@ import { OPERATOR, LEGAL_TXT, legalDoc } from './legal.js';
 // ---------------- tłumaczenia ----------------
 const DICT = {
   pl: {
-    'menu.settings': 'Ustawienia', 'menu.wallet': 'Portfel', 'menu.login': 'Zaloguj się', 'menu.account': 'Konto', 'menu.logout': 'Wyloguj', 'menu.admin': 'Panel admina',
+    'menu.howto': 'Jak grać', 'menu.settings': 'Ustawienia', 'menu.wallet': 'Portfel', 'menu.login': 'Zaloguj się', 'menu.account': 'Konto', 'menu.logout': 'Wyloguj', 'menu.admin': 'Panel admina',
     'top.guest': 'Gość', 'top.signin': 'Zaloguj się',
     'plate.ready': 'GOTOWY', 'plate.skin': 'KLIKNIJ, BY ZMIENIĆ SKIN',
     'mode.label': 'Tryb gry', 'mode.change': 'Zmień', 'mode.range.name': 'Strzelnica', 'mode.range.desc': 'Trening solo – strzelnica w bunkrze, tarcze-fasolki',
@@ -48,7 +49,7 @@ const DICT = {
     'stake.fee': 'Prowizja (10%)', 'set.vMaster': 'Głośność ogólna', 'set.vMasterD': 'Wszystkie dźwięki', 'set.vMenu': 'Dźwięki w menu', 'set.vMenuD': 'Kliknięcia, okna, losowanie mapy', 'set.vMusic': 'Muzyka', 'set.vMusicD': 'Hymn GTASSAULT w lobby', 'set.vGame': 'Dźwięki w grze', 'set.vGameD': 'Strzały, trafienia, przeładowanie', 'set.preview': 'Odsłuchaj', 'set.secView': 'Widok', 'set.secKeys': 'Klawisze', 'set.fovD': 'Szerszy kąt = więcej widać, mniejsze obiekty', 'tx.fee': 'prowizja {a}', 'set.reserved': 'Ten klawisz jest zarezerwowany (bronie 1–4 i Esc)', 'kb.move': 'Ruch', 'kb.fight': 'Walka', 'kb.sys': 'Inne', 'kb.lmb': 'LPM', 'kb.rmb': 'PPM', 'kb.mmb': 'Kółko', 'kb.fire': 'Strzał', 'kb.aim': 'Celowanie', 'kb.wheel': 'Zmiana broni', 'kb.weapons': 'Broń 1–4', 'kb.pause': 'Pauza', 'kb.alt': 'zapasowy',
   },
   en: {
-    'menu.settings': 'Settings', 'menu.wallet': 'Wallet', 'menu.login': 'Log in', 'menu.account': 'Account', 'menu.logout': 'Log out', 'menu.admin': 'Admin panel',
+    'menu.howto': 'How to play', 'menu.settings': 'Settings', 'menu.wallet': 'Wallet', 'menu.login': 'Log in', 'menu.account': 'Account', 'menu.logout': 'Log out', 'menu.admin': 'Admin panel',
     'top.guest': 'Guest', 'top.signin': 'Log in',
     'plate.ready': 'READY', 'plate.skin': 'CLICK TO CHANGE SKIN',
     'mode.label': 'Game mode', 'mode.change': 'Change', 'mode.range.name': 'Shooting range', 'mode.range.desc': 'Solo practice – bunker range, bean targets',
@@ -80,7 +81,7 @@ const DICT = {
     'stake.fee': 'House fee (10%)', 'set.vMaster': 'Master volume', 'set.vMasterD': 'All sounds', 'set.vMenu': 'Menu sounds', 'set.vMenuD': 'Clicks, windows, map draw', 'set.vMusic': 'Music', 'set.vMusicD': 'GTASSAULT anthem in the lobby', 'set.vGame': 'Game sounds', 'set.vGameD': 'Shots, hits, reloads', 'set.preview': 'Preview', 'set.secView': 'View', 'set.secKeys': 'Keys', 'set.fovD': 'Wider angle = see more, smaller objects', 'tx.fee': 'fee {a}', 'set.reserved': 'This key is reserved (weapons 1–4 and Esc)', 'kb.move': 'Movement', 'kb.fight': 'Combat', 'kb.sys': 'Other', 'kb.lmb': 'LMB', 'kb.rmb': 'RMB', 'kb.mmb': 'Wheel', 'kb.fire': 'Fire', 'kb.aim': 'Aim', 'kb.wheel': 'Switch weapon', 'kb.weapons': 'Weapon 1–4', 'kb.pause': 'Pause', 'kb.alt': 'alternate',
   },
   ru: {
-    'menu.settings': 'Настройки', 'menu.wallet': 'Кошелёк', 'menu.login': 'Войти', 'menu.account': 'Аккаунт', 'menu.logout': 'Выйти', 'menu.admin': 'Админ-панель',
+    'menu.howto': 'Как играть', 'menu.settings': 'Настройки', 'menu.wallet': 'Кошелёк', 'menu.login': 'Войти', 'menu.account': 'Аккаунт', 'menu.logout': 'Выйти', 'menu.admin': 'Админ-панель',
     'top.guest': 'Гость', 'top.signin': 'Войти',
     'plate.ready': 'ГОТОВ', 'plate.skin': 'НАЖМИ, ЧТОБЫ СМЕНИТЬ СКИН',
     'mode.label': 'Режим игры', 'mode.change': 'Сменить', 'mode.range.name': 'Стрельбище', 'mode.range.desc': 'Соло-тренировка – тир в бункере, мишени-фасолины',
@@ -112,7 +113,7 @@ const DICT = {
     'stake.fee': 'Комиссия (10%)', 'set.vMaster': 'Общая громкость', 'set.vMasterD': 'Все звуки', 'set.vMenu': 'Звуки меню', 'set.vMenuD': 'Клики, окна, выбор карты', 'set.vMusic': 'Музыка', 'set.vMusicD': 'Гимн GTASSAULT в лобби', 'set.vGame': 'Звуки в игре', 'set.vGameD': 'Выстрелы, попадания, перезарядка', 'set.preview': 'Прослушать', 'set.secView': 'Обзор', 'set.secKeys': 'Клавиши', 'set.fovD': 'Шире угол – больше видно, объекты меньше', 'tx.fee': 'комиссия {a}', 'set.reserved': 'Эта клавиша зарезервирована (оружие 1–4 и Esc)', 'kb.move': 'Движение', 'kb.fight': 'Бой', 'kb.sys': 'Прочее', 'kb.lmb': 'ЛКМ', 'kb.rmb': 'ПКМ', 'kb.mmb': 'Колесо', 'kb.fire': 'Выстрел', 'kb.aim': 'Прицел', 'kb.wheel': 'Смена оружия', 'kb.weapons': 'Оружие 1–4', 'kb.pause': 'Пауза', 'kb.alt': 'запасная',
   },
   es: {
-    'menu.settings': 'Ajustes', 'menu.wallet': 'Cartera', 'menu.login': 'Iniciar sesión', 'menu.account': 'Cuenta', 'menu.logout': 'Cerrar sesión', 'menu.admin': 'Panel de admin',
+    'menu.howto': 'Cómo jugar', 'menu.settings': 'Ajustes', 'menu.wallet': 'Cartera', 'menu.login': 'Iniciar sesión', 'menu.account': 'Cuenta', 'menu.logout': 'Cerrar sesión', 'menu.admin': 'Panel de admin',
     'top.guest': 'Invitado', 'top.signin': 'Iniciar sesión',
     'plate.ready': 'LISTO', 'plate.skin': 'HAZ CLIC PARA CAMBIAR DE SKIN',
     'mode.label': 'Modo de juego', 'mode.change': 'Cambiar', 'mode.range.name': 'Campo de tiro', 'mode.range.desc': 'Práctica en solitario – galería en un búnker, dianas de judía',
@@ -430,7 +431,7 @@ export function initLobbyUI(ctx) {
   burger.addEventListener('click', e => { e.stopPropagation(); openMenu(menu.hidden); });
   addEventListener('pointerdown', e => { if (!menu.hidden && !menu.contains(e.target) && e.target !== burger && !burger.contains(e.target)) openMenu(false); });
   menu.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (!b) return; openMenu(false);
-    ({ settings: () => openModal('lb-set'), wallet: () => openWallet(), auth: () => openModal('lb-auth'), logout: () => logout() })[b.dataset.act](); });
+    ({ settings: () => openModal('lb-set'), wallet: () => openWallet(), tutorial: () => TUT.show(), auth: () => openModal('lb-auth'), logout: () => logout() })[b.dataset.act](); });
 
   // ---- Arsenał: bronie za trzymanie tokenu (arsenal.js; kafelek w lewym dolnym rogu) ----
   const ARSX = createArsenal({ root: ui, getLang: () => LANG, toast, sfx: SFX, wallet: () => W, acct: () => acct, art: ctx.weaponArt || null, openAuth: () => openModal('lb-auth'), openWallet: () => openWallet() });
@@ -561,6 +562,8 @@ export function initLobbyUI(ctx) {
   let acct = null, acctId = null;
   // serwer portfeli (serwer/ w repo): gdy ustawiony, konta, saldo, wpłaty, wypłaty i stawki idą przez niego (prawdziwe SOL w sieci Solana)
   const API = walletApi();
+  // tutorial w slajdach: raz przy pierwszym wejściu (po ekranie wczytywania), potem z menu „Jak grać”
+  const TUT = createTutorial({ getLang: () => LANG, api: API }); TUT.maybeShow();
   // kafelek X obok wyboru języka: link do strony gry na X (panel admina → Udostępnienie na X); bez linku ukryty
   (async () => { const a = $('lb-xlink'); if (!a || !API) return;
     try { const r = await fetch(API.replace(/\/+$/, '') + '/api/xshare', { cache: 'no-store' }); if (!r.ok) return; const j = await r.json();
@@ -919,7 +922,7 @@ export function initLobbyUI(ctx) {
   const askLogin = () => { closeAll(); openModal('lb-auth'); showTab('lb-auth', 'login'); };
   const GATED = 'button,a,input,select,textarea,label,[role=button],[role=menuitem],[data-act],.lb-tile,.lb-skin,.lb-key';
   ui.addEventListener('click', e => {
-    if (acct || e.target.closest('.lb-lang,#lb-auth,.lb-toast,#bl-w')) return;
+    if (acct || e.target.closest('.lb-lang,#lb-auth,.lb-toast,#bl-w,.lb-xchip')) return;   // kafelek X (link do strony na X) działa też bez konta
     if (!e.target.closest(GATED)) return;
     e.preventDefault(); e.stopImmediatePropagation(); askLogin();
   }, true);

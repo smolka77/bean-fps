@@ -703,6 +703,7 @@ const HTML = `
   <hr id="lb-acct-hr">
   <button type="button" role="menuitem" data-act="settings">${IC.gear}<span data-i18n="menu.settings"></span></button>
   <button type="button" role="menuitem" data-act="wallet">${IC.wallet}<span data-i18n="menu.wallet"></span></button>
+  <button type="button" role="menuitem" data-act="tutorial">${IC.info}<span data-i18n="menu.howto"></span></button>
   <button type="button" role="menuitem" data-act="auth">${IC.user}<span></span></button>
   <hr>
   <button type="button" role="menuitem" data-act="logout" class="danger">${IC.logout}<span data-i18n="menu.logout"></span></button>
