@@ -19,6 +19,7 @@ import * as bip39 from 'bip39';
 import { WebSocketServer } from 'ws';
 import * as MECZ from './mecz.mjs';
 import * as DM from './dm.mjs';                                   // tryb Deathmatch: do 20 graczy, 3 minuty, kasa meczu, WANTED, sklep po śmierci
+import * as ARS from './arsenal.mjs';                             // Arsenał: bronie za trzymanie tokenu na adresie depozytu (1v1 i Deathmatch)
 import * as OCH from './ochrona.mjs';
 import * as ANTY from './antycheat.mjs';                          // ocena ryzyka cheatów po meczu (aimbot, triggerbot, silent aim)
 
@@ -620,6 +621,25 @@ const routes = {
     audit(adm.username, ip, 'dm_config', body && body.reset ? 'reset' : Object.keys(body.config || {}).join(','));
     return { config: dmCfg };
   },
+  // ---- Arsenał (bronie za trzymanie tokenu) ----
+  // lobby: progi broni, saldo tokenu na adresie depozytu gracza i odblokowane bronie (saldo sprawdzane najwyżej co `refresh` s)
+  'GET /api/arsenal': async ({ user }) => {
+    if (!user) return { ...ARS.publicConfig(arsCfg), address: '', balance: 0, unlocked: [ARS.BASE], checkedAt: 0, guest: true, price: PRICE };   // bez logowania: same progi
+    const u = fresh(user.id);
+    if (ARS.active(arsCfg) && !arsenal.isFresh(u.id, arsCfg.refresh * 1000)) await arsenal.refresh(u);
+    return { ...arsenal.status(u), price: PRICE };
+  },
+  // przycisk „Sprawdź saldo” (po wpłacie tokenu): od razu, ale najwyżej co 10 s
+  'POST /api/arsenal/refresh': async ({ user }) => { need(user); const u = fresh(user.id); await arsenal.refresh(u, arsenal.refreshDelay()); return { ...arsenal.status(u), price: PRICE }; },
+  'GET /api/admin/arsenal': async ({ req }) => { adminGate(req); return { config: arsCfg, defaults: ARS.sanitize({}), guns: ARS.GUNS, base: ARS.BASE, rpc: env.TOKEN_RPC_URL ? 'własny (TOKEN_RPC_URL)' : 'publiczny ' + arsCfg.network }; },
+  'POST /api/admin/arsenal': async ({ body, req, ip }) => {
+    const adm = adminGate(req);
+    const next = ARS.sanitize(body && body.reset ? {} : (body.config || {}));
+    if (body && body.config && String(body.config.mint || '').trim() && !next.mint) throw new E('mint', 'Nieprawidłowy adres mintu tokenu (Solana)');
+    cfgPut('arsenal', JSON.stringify(next)); arsCfg = next;
+    audit(adm.username, ip, 'arsenal_config', body && body.reset ? 'reset' : `${next.enabled ? 'wł.' : 'wył.'} ${next.symbol} ${next.mint.slice(0, 6)}…`);
+    return { config: arsCfg };
+  },
 };
 
 // gra pod tym samym adresem co API: index.html z wpisanym adresem serwera portfeli + skins.json
@@ -749,8 +769,10 @@ function startRoom(a, b) {
   room.out = (seat, m) => { if (seat < 0) room.p.forEach((pl) => wsSend(pl.ws, m)); else wsSend(room.p[seat].ws, m); };
   rooms.add(room);
   [a, b].forEach((pl, seat) => { pl.room = room; pl.seat = seat; pl.ws.mm = pl; });
+  // Arsenał: pistolet + bronie odblokowane tokenem (serwer meczu nie przyjmie innej broni); wyłączony = bronie drużyn jak dawniej
+  [a, b].forEach((pl, seat) => { pl.guns = arsenalGuns(pl.user.id, MECZ.WEAPON_IDS, pl.lam); if (pl.guns) MECZ.setGuns(room.game, seat, pl.guns); });
   for (const pl of [a, b]) try { q('UPDATE matches SET map=? WHERE id=?').run(room.map, pl.matchId); } catch {}
-  [a, b].forEach((pl, seat) => { const op = room.p[1 - seat]; wsSend(pl.ws, { t: 'matched', seat, map: room.map, opp: { nick: op.nick, skin: op.skin } }); });
+  [a, b].forEach((pl, seat) => { const op = room.p[1 - seat]; wsSend(pl.ws, { t: 'matched', seat, map: room.map, opp: { nick: op.nick, skin: op.skin }, ...(pl.guns ? { guns: pl.guns } : {}) }); });
   console.log(`[1v1] pokój ${room.id}: ${a.nick} vs ${b.nick}, stawka $${a.stake}, mapa ${room.map}`);
 }
 function endRoom(room, winner, reason) {
@@ -767,7 +789,7 @@ function endRoom(room, winner, reason) {
   console.log(`[1v1] pokój ${room.id}: koniec, wygrał ${room.p[winner].nick} (${room.score.join(':')}${reason === 'left' ? ', walkower' : reason === 'cheat' ? ', przeciwnik wyrzucony za oszukiwanie' : ''})`);
   if (room.game.log.length) console.log(`[1v1] pokój ${room.id}: odrzucone ruchy:`, room.game.log.slice(-20).join(' | '));
 }
-function onDuelMessage(ws, user, raw) {
+function onDuelMessage(ws, user, raw, arsChecked = false) {
   let m; try { m = JSON.parse(raw); } catch { return; }
   if (!m || typeof m.t !== 'string') return;
   const me = ws.mm;
@@ -776,8 +798,9 @@ function onDuelMessage(ws, user, raw) {
     if ((fresh(user.id) || {}).banned) return wsSend(ws, { t: 'error', code: 'banned', message: BANNED_MSG });
     const match = q("SELECT * FROM matches WHERE id=? AND user_id=? AND state='open'").get(+m.matchId, user.id);
     if (!match) return wsSend(ws, { t: 'error', code: 'match', message: 'Brak opłaconej stawki – zagraj jeszcze raz z lobby.' });
+    if (!arsChecked && arsenalWait(ws, user, () => { if (!ws.mm) onDuelMessage(ws, user, raw, true); })) return;   // Arsenał: najpierw aktualne saldo tokenu
     for (const x of mmQueue.filter(x => x.user.id === user.id)) { leaveQueue(x.ws, true); wsSend(x.ws, { t: 'error', code: 'dup', message: 'Szukasz meczu w innej karcie.' }); }
-    const entry = { ws, user, matchId: match.id, stake: match.stake_usd, nick: user.username, skin: String(m.skin || '').slice(0, 64) };
+    const entry = { ws, user, matchId: match.id, stake: match.stake_usd, lam: match.stake_lamports || 0, nick: user.username, skin: String(m.skin || '').slice(0, 64) };
     const i = mmQueue.findIndex(x => x.stake === entry.stake && x.user.id !== user.id && x.ws.readyState === 1 && !(MM_BLOCK_LINKED && linkOf(x.user.id, user.id)));
     if (i < 0) { mmQueue.push(entry); ws.mm = entry; wsSend(ws, { t: 'queued', waiting: mmQueue.filter(x => x.stake === entry.stake).length }); return; }
     startRoom(mmQueue.splice(i, 1)[0], entry); return;
@@ -804,6 +827,26 @@ function afterGame(room) {
   if (g.over && !room.ending) { room.ending = true; setTimeout(() => endRoom(room, g.winner, 'score'), 1200); }
 }
 setInterval(() => { const t = nowS(); for (const room of rooms) { if (room.over) continue; MECZ.tick(room.game, t, room.out); afterGame(room); } }, 100);
+
+// ---------------- ARSENAŁ: bronie za trzymanie tokenu (arsenal.mjs) ----------------
+// Bez tokenu w 1v1 i Deathmatch tylko pistolet; progi i mint ustawia panel admina (klucz 'arsenal' w config).
+// Wejście do kolejki ze starym saldem (> 10 min) najpierw sprawdza saldo, potem dopiero wpuszcza gracza do kolejki.
+let arsCfg = (() => { try { const r = q("SELECT value FROM config WHERE key='arsenal'").get(); return ARS.sanitize(r ? JSON.parse(r.value) : {}); } catch { return ARS.sanitize({}); } })();
+const arsenal = ARS.createArsenal({ getCfg: () => arsCfg, rpcUrl: (env.TOKEN_RPC_URL || '').trim(),
+  solOf: (uid) => { const u = fresh(uid); return u ? u.lamports / LAMPORTS_PER_SOL : 0; } });   // tryb SOL: saldo w grze (nic się nie pobiera)
+console.log(!ARS.active(arsCfg) ? '[arsenał] wyłączony – wszystkie bronie dla każdego'
+  : arsCfg.unit === 'token' ? `[arsenał] włączony: token ${arsCfg.symbol} (${arsCfg.mint}), sieć ${arsCfg.network}` : '[arsenał] włączony: progi w SOL (saldo w grze)');
+// progi do sklepu meczu (kłódka z kwotą); null = Arsenał wyłączony
+const arsenalInfo = () => ARS.active(arsCfg) ? { unit: ARS.unitLabel(arsCfg), need: arsCfg.need } : null;
+// true = najpierw trzeba sprawdzić saldo (wtedy `again` wywoła się po sprawdzeniu, jeśli karta jest dalej otwarta)
+function arsenalWait(ws, user, again) {
+  if (!ARS.active(arsCfg) || arsenal.isFresh(user.id, ARS.QUEUE_AGE)) return false;
+  const u = fresh(user.id); if (!u) return false;
+  arsenal.refresh(u).then(() => { if (ws.readyState === 1) again(); });
+  return true;
+}
+// bronie gracza w meczu (null = Arsenał wyłączony); `ids` = bronie, które zna dany tryb; lam = stawka / wpisowe zamrożone na ten mecz (liczy się do salda SOL)
+const arsenalGuns = (uid, ids, lam = 0) => { const g = arsenal.gunsFor(uid, (lam || 0) / LAMPORTS_PER_SOL); return g ? g.filter((id) => ids.includes(id)) : null; };
 
 // ---------------- DEATHMATCH: kolejki według poziomu (wpisowego), pokoje do 20 graczy, rozliczenie podium ----------------
 // Gracz łączy się z /ws i wysyła {t:'dmq', tier, skin}. Serwer pobiera wpisowe z salda (poziom darmowy: 0), wstawia gracza do kolejki
@@ -841,12 +884,13 @@ function dmQueueStatus(tierId) {
   const qu = dmQueues.get(tierId) || [], now = Date.now(), wait = qu.length ? (now - qu[0].t) / 1000 : 0;
   for (const e of qu) wsSend(e.ws, { t: 'dmq', n: qu.length, max: dmCfg.maxPlayers, min: dmCfg.minPlayers, wait: +wait.toFixed(1), timeout: dmCfg.queueTimeout, tier: tierId });
 }
-function dmJoin(ws, user, m) {
+function dmJoin(ws, user, m, arsChecked = false) {
   if (ws.dm || ws.mm) return wsSend(ws, { t: 'error', code: 'dup', message: 'Już szukasz meczu albo grasz.' });
   const u = fresh(user.id) || {};
   if (u.banned) return wsSend(ws, { t: 'error', code: 'banned', message: BANNED_MSG });
   if (inDuel(user.id)) return wsSend(ws, { t: 'error', code: 'dup', message: 'Grasz już mecz 1v1.' });
   const tier = dmCfg.tiers.find((t) => t.id === String(m.tier || '')); if (!tier) return wsSend(ws, { t: 'error', code: 'tier', message: 'Nie ma takiego poziomu.' });
+  if (!arsChecked && arsenalWait(ws, user, () => { if (!ws.dm && !ws.mm) dmJoin(ws, user, m, true); })) return;   // Arsenał: najpierw aktualne saldo tokenu
   const old = dmUsers.get(user.id);
   if (old) {
     if (old.room) return wsSend(ws, { t: 'error', code: 'dup', message: 'Grasz już mecz Deathmatch w innej karcie.' });
@@ -885,7 +929,7 @@ function dmStart(entries) {
   const tier = entries[0].tier, cfg = dmCfg, maps = dmMapsReady(cfg.maps), map = maps[Math.floor(Math.random() * maps.length)];
   const key = Date.now().toString(36) + '-d' + (++dmSeq);
   let game;
-  try { game = DM.createRoom(cfg, map, entries.map((e) => ({ uid: e.user.id, nick: e.nick, skin: e.skin })), nowS()); }
+  try { game = DM.createRoom(cfg, map, entries.map((e) => ({ uid: e.user.id, nick: e.nick, skin: e.skin, guns: arsenalGuns(e.user.id, DM.DM_GUNS, e.lamports) })), nowS()); }
   catch (er) { console.error('[dm] start pokoju', er); for (const e of entries) { dmRefund(e); dmUsers.delete(e.user.id); e.ws.dm = null; wsSend(e.ws, { t: 'error', code: 'start', message: 'Nie udało się utworzyć meczu – wpisowe wróciło.' }); } return; }
   const room = { id: dmSeq, key, tier, entries, game, settled: false };
   entries.forEach((e, i) => { e.pid = i + 1; e.room = room; });
@@ -897,7 +941,8 @@ function dmStart(entries) {
   dmRooms.add(room);
   try { for (const e of entries) q("UPDATE dm_entries SET state='playing', room=?, map=?, players=? WHERE id=?").run(key, map, entries.length, e.entryId); } catch (er) { console.error('[dm] zapis pokoju', er); }
   const t = nowS();
-  for (const e of entries) wsSend(e.ws, DM.startMessage(game, e.pid, t));
+  const ars = arsenalInfo();
+  for (const e of entries) wsSend(e.ws, { ...DM.startMessage(game, e.pid, t), ...(ars ? { ars } : {}) });
   dmQueueStatus(tier.id);
   console.log(`[dm] pokój ${key}: ${entries.length} graczy, poziom ${tier.id} ($${tier.entry}), mapa ${map}`);
 }

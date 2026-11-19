@@ -11,28 +11,30 @@ export const PISTOL_ID = 'glock17';                  // pistolet startowy (Death
 
 // Statystyki. recoil.pitch/yaw w radianach na strzał, spread w radianach (połowa kąta stożka). snd = klucz próbek w _audio.js.
 export const WEAPON_STATS = {
-  akm:     { name: 'AKM',          slot: 1, auto: true,  rpm: 600, dmg: 36, head: 3,   mag: 30, reserve: 90,  reload: 2.45, draw: .55,
+  // obrażenia (ciało / głowa) wspólne dla wszystkich trybów – te same liczby są w serwer/mecz.mjs (1v1) i serwer/dm.mjs (Deathmatch):
+  // AKM 25/75, AKM Gold 34/90, M4A1 25/75, Glock-17 20/60, Desert Eagle 33/99, SPAS-12 10/15 na śrucinę, MP5K 18/54
+  akm:     { name: 'AKM',          slot: 1, auto: true,  rpm: 600, dmg: 25, head: 3,   mag: 30, reserve: 90,  reload: 2.45, draw: .55,
              recoil: { pitch: .0125, yaw: .0045, kick: .045, rot: .06 }, spread: { hip: .0075, ads: .0016, move: 1.15, bloom: .14 }, snd: 'akm',
              fov: 52, relief: .085, recoilTravel: .055 },
-  m4a1:    { name: 'M4A1',         slot: 2, auto: true,  rpm: 700, dmg: 32, head: 3,   mag: 30, reserve: 90,  reload: 2.3,  draw: .55,
+  m4a1:    { name: 'M4A1',         slot: 2, auto: true,  rpm: 700, dmg: 25, head: 3,   mag: 30, reserve: 90,  reload: 2.3,  draw: .55,
              recoil: { pitch: .0092, yaw: .0032, kick: .036, rot: .045 }, spread: { hip: .0065, ads: .0011, move: 1.0, bloom: .11 }, snd: 'm4a1',
              fov: 48, relief: .085, recoilTravel: 0 },
-  glock17: { name: 'Glock-17',     slot: 3, auto: false, rpm: 400, dmg: 22, head: 2.5, mag: 17, reserve: 102, reload: 1.75, draw: .4,
+  glock17: { name: 'Glock-17',     slot: 3, auto: false, rpm: 400, dmg: 20, head: 3,   mag: 17, reserve: 102, reload: 1.75, draw: .4,
              recoil: { pitch: .0065, yaw: .0028, kick: .028, rot: .09 }, spread: { hip: .006, ads: .002, move: .7, bloom: .12 }, snd: 'glock17',
              fov: 62, relief: .3, recoilTravel: .022 },
-  deagle:  { name: 'Desert Eagle', slot: 4, auto: false, rpm: 267, dmg: 48, head: 2.6, mag: 7,  reserve: 35,  reload: 2.2,  draw: .5,
+  deagle:  { name: 'Desert Eagle', slot: 4, auto: false, rpm: 267, dmg: 33, head: 3,   mag: 7, reserve: 35,  reload: 2.2,  draw: .5,
              recoil: { pitch: .021, yaw: .006, kick: .05, rot: .2 },  spread: { hip: .009, ads: .0016, move: 1.0, bloom: .32 }, snd: 'deagle',
              fov: 60, relief: .3, recoilTravel: .03 },
   // strzelba (śruciny, pompka) i pistolet maszynowy; w Deathmatch dokładne liczby podaje serwer
-  spas12:  { name: 'SPAS-12',      slot: 5, auto: false, rpm: 72,  dmg: 15, head: 1.6, mag: 8,  reserve: 32,  reload: 2.6,  draw: .6, pellets: 9, pelletSpread: .052, pump: true,
+  spas12:  { name: 'SPAS-12',      slot: 5, auto: false, rpm: 72,  dmg: 10, head: 1.5, mag: 8, reserve: 32,  reload: 2.6,  draw: .6, pellets: 9, pelletSpread: .052, pump: true,
              recoil: { pitch: .045, yaw: .008, kick: .09, rot: .16 }, spread: { hip: .004, ads: .003, move: .4, bloom: .1 }, snd: 'spas12',
              fov: 60, relief: .1, recoilTravel: 0 },
-  mp5k:    { name: 'MP5K',         slot: 6, auto: true,  rpm: 900, dmg: 25, head: 2.5, mag: 30, reserve: 120, reload: 2.1,  draw: .45,
+  mp5k:    { name: 'MP5K',         slot: 6, auto: true,  rpm: 900, dmg: 18, head: 3,   mag: 30, reserve: 120, reload: 2.1,  draw: .45,
              recoil: { pitch: .0072, yaw: .004, kick: .03, rot: .05 }, spread: { hip: .0075, ads: .0022, move: .8, bloom: .09 }, snd: 'mp5k',
              fov: 58, relief: .085, recoilTravel: 0 },
 };
-// Złoty AKM: ta sama broń co AKM (statystyki, dźwięki, animacje), inny model; tylko dla wybranych graczy (restricted)
-WEAPON_STATS.akmgold = { ...WEAPON_STATS.akm, name: 'AKM Gold', slot: 7, restricted: true };
+// Złoty AKM: ta sama broń co AKM (dźwięki, animacje, odrzut), inny model i mocniejszy strzał (34 / 90); tylko dla wybranych graczy (restricted)
+WEAPON_STATS.akmgold = { ...WEAPON_STATS.akm, name: 'AKM Gold', slot: 7, restricted: true, dmg: 34, head: 90 / 34 };
 
 // ---------------- dostęp do broni z ograniczeniami ----------------
 // Broń z restricted: true widać (w slotach, później w sklepie) tylko u graczy, którym dano do niej dostęp.

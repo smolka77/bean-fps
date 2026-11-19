@@ -308,6 +308,42 @@ const DM_WCOLS = [['name', 'Nazwa'], ['price', 'Cena $'], ['dmg', 'Obr.'], ['hea
   ['falloff.0', 'Spadek od m'], ['falloff.1', 'Min. przy m'], ['falloff.2', 'Min. ×'], ['recoil.pitch', 'Odrzut ↑'], ['recoil.yaw', 'Odrzut ↔'], ['spread.hip', 'Rozrzut z biodra'], ['spread.ads', 'Rozrzut celując'], ['auto', 'Auto']];
 const getP = (o, p) => p.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
 const setP = (o, p, v) => { const ks = p.split('.'); let a = o; for (let i = 0; i < ks.length - 1; i++) a = a[ks[i]]; a[ks[ks.length - 1]] = v; };
+// Arsenał: mint tokenu, nazwa, sieć, co ile sprawdzać saldo, progi broni (serwer: serwer/arsenal.mjs)
+const ARS_NAMES = { deagle: 'Desert Eagle', mp5k: 'MP5K', spas12: 'SPAS-12', akm: 'AKM', m4a1: 'M4A1' };
+function mountArsenal($) {
+  const box = $('fa-ars'), msg = $('fa-ars-msg'); let cfg = null, info = null;
+  function render() {
+    const tok = cfg.unit === 'token';
+    box.innerHTML = `<div class="fa-row" style="gap:14px;margin:0 0 10px"><label class="fa-chk"><input type="checkbox" id="fa-ars-on" ${cfg.enabled ? 'checked' : ''}> Arsenał włączony</label>
+        <label class="fa-dmf" style="min-width:280px"><span>Odblokowanie za</span><select class="fa-q" id="fa-ars-unit"><option value="sol" ${tok ? '' : 'selected'}>saldo SOL w grze (nic się nie pobiera)</option><option value="token" ${tok ? 'selected' : ''}>token SPL na adresie gracza</option></select></label></div>
+      <div class="fa-dmg" ${tok ? '' : 'style="display:none"'}>
+        <label class="fa-dmf" style="grid-column:span 2"><span>Adres mintu tokenu (Solana)</span><input class="fa-q" id="fa-ars-mint" value="${esc(cfg.mint)}" placeholder="np. 7xKX…pump" spellcheck="false"></label>
+        <label class="fa-dmf"><span>Nazwa tokenu (np. BEAN)</span><input class="fa-q" id="fa-ars-sym" value="${esc(cfg.symbol)}" maxlength="12"></label>
+        <label class="fa-dmf"><span>Sieć tokenu</span><select class="fa-q" id="fa-ars-net">${['mainnet-beta', 'devnet', 'testnet'].map((n) => `<option ${cfg.network === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+        <label class="fa-dmf"><span>Sprawdzanie salda co (s)</span><input class="fa-q" type="number" min="30" max="3600" step="10" id="fa-ars-ref" value="${cfg.refresh}"></label>
+      </div>
+      <h4>Progi broni – ${tok ? 'ile tokenów' : 'ile SOL'} gracz musi mieć (nic się nie pobiera; Glock-17 zawsze za darmo, 0 = broń dla każdego)</h4>
+      <div class="fa-dmg">${info.guns.map((g) => `<label class="fa-dmf"><span>${esc(ARS_NAMES[g] || g)}</span><input class="fa-q" type="number" min="0" step="any" data-need="${g}" value="${cfg.need[g]}"></label>`).join('')}</div>`;
+    $('fa-ars-sum').textContent = !cfg.enabled ? 'wyłączony – wszystkie bronie dla każdego' : !tok ? 'włączony · progi w SOL (saldo w grze)'
+      : cfg.mint ? `włączony · token ${cfg.symbol} · ${cfg.network} · RPC: ${info.rpc}` : 'włączony, ale bez mintu tokenu – nie działa';
+    $('fa-ars-unit').addEventListener('change', () => { collect(); render(); });
+  }
+  function collect() {
+    cfg.enabled = $('fa-ars-on').checked; cfg.unit = $('fa-ars-unit').value; cfg.mint = $('fa-ars-mint').value.trim(); cfg.symbol = $('fa-ars-sym').value.trim(); cfg.network = $('fa-ars-net').value; cfg.refresh = +$('fa-ars-ref').value;
+    box.querySelectorAll('[data-need]').forEach((i) => { cfg.need[i.dataset.need] = +i.value; });
+  }
+  (async () => { try { info = await srvGet('/api/admin/arsenal'); cfg = JSON.parse(JSON.stringify(info.config)); render(); }
+    catch (e) { if (e.code === 'admin2fa') return relockAdmin(); box.innerHTML = `<p class="fa-empty">${esc(e.message)}</p>`; } })();
+  $('fa-ars-save').addEventListener('click', async () => {
+    if (!cfg) return; collect(); msg.textContent = 'Zapisywanie…';
+    try { const j = await srvPost('/api/admin/arsenal', { config: cfg }); cfg = JSON.parse(JSON.stringify(j.config)); render(); msg.textContent = 'Zapisano. Działa od następnego meczu.'; }
+    catch (e) { msg.textContent = e.message; }
+  });
+  $('fa-ars-reset').addEventListener('click', async () => {
+    if (!confirm('Przywrócić domyślne ustawienia Arsenału (wyłączony, bez mintu)?')) return;
+    try { const j = await srvPost('/api/admin/arsenal', { reset: true }); cfg = JSON.parse(JSON.stringify(j.config)); render(); msg.textContent = 'Przywrócono domyślne.'; } catch (e) { msg.textContent = e.message; }
+  });
+}
 function mountDeathmatch($) {
   const box = $('fa-dm'), msg = $('fa-dm-msg'); let cfg = null, defs = null;
   const field = (p, lbl, step) => `<label class="fa-dmf"><span>${esc(lbl)}</span><input class="fa-q" type="number" step="${step}" data-p="${p}" value="${esc(getP(cfg, p))}"></label>`;
@@ -497,7 +533,12 @@ function buildDashboard(db, close) {
       <p class="fa-msg" style="margin:0 0 12px">Zmiany działają od następnego meczu (kolejki – od razu). Ranking: zabójstwa, przy remisie zadane obrażenia. WANTED = 1. miejsce, za jego zabójstwo nagroda × mnożnik.</p>
       <div id="fa-dm"><p class="fa-empty">Ładowanie…</p></div>
       <div class="fa-row"><button class="fa-btn pri" type="button" id="fa-dm-save">Zapisz ustawienia</button><button class="fa-btn" type="button" id="fa-dm-reset">Przywróć domyślne</button><span class="fa-msg" id="fa-dm-msg"></span></div>
-      <h4>Ostatnie mecze Deathmatch</h4><ul class="fa-list" id="fa-dm-recent"><li class="fa-empty">—</li></ul></section>` : ''}
+      <h4>Ostatnie mecze Deathmatch</h4><ul class="fa-list" id="fa-dm-recent"><li class="fa-empty">—</li></ul></section>
+    <section class="fa-card" id="fa-ars-card"><div class="fa-ch"><h3>Arsenał – bronie za trzymanie SOL / tokenu</h3><small id="fa-ars-sum"></small></div>
+      <p class="fa-msg" style="margin:0 0 12px">Włączony: w 1v1 i Deathmatch gracz poniżej progu ma tylko pistolet (Glock-17). Każda broń ma próg – ile gracz musi mieć: saldo SOL w grze
+        (stawka zamrożona na mecz też się liczy) albo token na adresie depozytu. Nic się nie pobiera. Bronie serwer ustala na starcie meczu. Z botem i Strzelnica – bez zmian.</p>
+      <div id="fa-ars"><p class="fa-empty">Ładowanie…</p></div>
+      <div class="fa-row"><button class="fa-btn pri" type="button" id="fa-ars-save">Zapisz Arsenał</button><button class="fa-btn" type="button" id="fa-ars-reset">Przywróć domyślne</button><span class="fa-msg" id="fa-ars-msg"></span></div></section>` : ''}
     <section class="fa-grid2">
       <div class="fa-card"><div class="fa-ch"><h3>Mecze dziennie</h3><small id="fa-ch-m-sum">ostatnie 14 dni</small></div><div class="fa-chart" id="fa-ch-m"></div></div>
       <div class="fa-card"><div class="fa-ch"><h3>Prowizja dziennie</h3><small id="fa-ch-f-sum">USD (płatne w SOL) · ostatnie 14 dni</small></div><div class="fa-chart" id="fa-ch-f"></div></div>
@@ -584,6 +625,7 @@ function buildDashboard(db, close) {
     $('fa-lock').addEventListener('click', async () => { try { await srvPost('/api/admin/logout'); } catch {} admTok.set(''); close(); });
     mountAnticheat($);
     mountDeathmatch($);
+    mountArsenal($);
   } else if (db) {
     const timer = setTimeout(() => { if (!gotA) { note.hidden = false; note.textContent = 'Baza danych jeszcze nie odpowiada – dane mogą być niepełne.'; } }, 10000);
     cleanup.push(() => clearTimeout(timer));

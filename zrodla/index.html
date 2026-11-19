@@ -776,12 +776,14 @@ function refillAll(){
 }
 // ---- drużyny w 1v1, losowane po cichu na początku meczu: niebieska (Spawn_A) ma M4A1 i Desert Eagle, czerwona (Spawn_B) AKM i Glocka-17;
 //      w Strzelnicy bez drużyn – wszystkie bronie ----
-const TEAM={me:null};                                      // 0 = niebieska, 1 = czerwona, null = bez drużyn
+const TEAM={me:null,guns:null};                            // 0 = niebieska, 1 = czerwona, null = bez drużyn; guns = Arsenał (1v1 online)
 const TEAM_GUNS=[['m4a1','deagle'],['akm','glock17']];
+const ARS_ORDER=['m4a1','akm','deagle','glock17'];        // Arsenał w 1v1: pistolet + bronie odblokowane tokenem (lista od serwera), karabin w ręku na start
 let DMX=null;                                              // tryb Deathmatch (createDM niżej); bronie w slotach = kupione w tym życiu
 const DM_ORDER=['glock17','deagle','spas12','mp5k','akm','m4a1'];
 function slotList(){
   if(DMX&&DMX.active&&MODE==='dm')return DM_ORDER.filter(id=>DMX.owned.includes(id)).map(id=>inv.findIndex(w=>w.id===id)).filter(i=>i>=0);
+  if(TEAM.me!=null&&TEAM.guns)return ARS_ORDER.filter(id=>TEAM.guns.includes(id)).map(id=>inv.findIndex(w=>w.id===id)).filter(i=>i>=0);
   return TEAM.me==null?inv.map((_,i)=>i).filter(i=>weaponAllowed(inv[i].id)):TEAM_GUNS[TEAM.me].map(id=>inv.findIndex(w=>w.id===id)).filter(i=>i>=0)}   // Strzelnica: bronie z ograniczonym dostępem tylko dla uprawnionych
 addEventListener('fasolka:weapon-access',()=>{try{const sl=slotList();if(!sl.includes(curW)&&gun.switchTo<0&&sl.length)equipNow(sl[0]);setHud()}catch(e){}});   // konto zmieniło dostęp (lobby może to zgłosić, zanim gra wystartuje)
 function equipNow(i){                                       // broń od razu w rękach (start meczu), bez animacji wyjmowania
@@ -817,6 +819,28 @@ function renderWeaponIcons(){
   }catch(e){console.warn('Ikony broni:',e)}
   finally{if(r){r.dispose();try{r.forceContextLoss()}catch(e){}}}
   return out;
+}
+// Arsenał w lobby: kolorowe zdjęcia broni z boku (lufa w prawo), światło jak w sklepie; robione raz, przy pierwszym otwarciu Arsenału
+let WEAPON_ART=null;
+function renderWeaponArt(){
+  if(WEAPON_ART)return WEAPON_ART;const out={};let r=null,env=null;
+  try{
+    const W=720,H=300;r=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
+    r.setPixelRatio(1);r.setSize(W,H,false);r.setClearColor(0x000000,0);r.outputColorSpace=THREE.SRGBColorSpace;r.toneMapping=THREE.ACESFilmicToneMapping;r.toneMappingExposure=1.1;
+    const sc=new THREE.Scene(),pm=new THREE.PMREMGenerator(r);env=pm.fromScene(new RoomEnvironment(),.04).texture;pm.dispose();sc.environment=env;sc.environmentIntensity=.85;
+    sc.add(new THREE.HemisphereLight(0xfff4fb,0x2a1430,1.2));
+    const key=new THREE.DirectionalLight(0xffffff,2.4);key.position.set(4,5,2);sc.add(key);
+    const rim=new THREE.DirectionalLight(0xff6ab4,1.6);rim.position.set(-3,2,-4);sc.add(rim);
+    for(const id of WEAPON_IDS){
+      const g=createWeapon(id,{fx:false}).group;sc.add(g);g.updateMatrixWorld(true);
+      const box=new THREE.Box3().setFromObject(g),cz=(box.min.z+box.max.z)/2,cy=(box.min.y+box.max.y)/2;
+      const hw=Math.max((box.max.z-box.min.z)/2,(box.max.y-box.min.y)/2*W/H)*1.06,hh=hw*H/W;
+      const cam=new THREE.OrthographicCamera(-hw,hw,hh,-hh,.01,20);cam.position.set(3,cy,cz);cam.up.set(0,1,0);cam.lookAt(0,cy,cz);
+      r.clear();r.render(sc,cam);out[id]=r.domElement.toDataURL('image/png');sc.remove(g);
+    }
+  }catch(e){console.warn('Zdjęcia broni:',e)}
+  finally{if(env)env.dispose();if(r){r.dispose();try{r.forceContextLoss()}catch(e){}}}
+  return WEAPON_ART=out;
 }
 function buildHudSlots(){
   CSHUD.built=true;const icons=renderWeaponIcons(),sl=$('slots');sl.innerHTML='';CSHUD.slotEls=[];
@@ -1672,7 +1696,9 @@ function stepDuelBot(e,dt){
       e.cd=.32+rnd()*.35;
       const pHit=clamp(.62-dist*.011-player.speed01*.25-player.crouch*.1-(player.onGround?0:.15),.1,.6),hit=rnd()<pHit;
       e.rifle.muzzle.getWorldPosition(_bm);_bt.copy(_bp);if(!hit)_bt.add(V3((rnd()-.5)*2.2,(rnd()-.3)*1.4,(rnd()-.5)*2.2));
-      spawnTracer(_bm,_bt);sndFar();if(hit)playerHit(rnd()<.18?24:12);
+      spawnTracer(_bm,_bt);sndFar();
+      if(hit){const ws=WEAPON_STATS[e.rifle.id]||WEAPON_STATS.akm,hd=rnd()<.18,np=ws.pellets>1?Math.max(1,Math.round(ws.pellets*clamp(1-dist/30,.2,1))):1;   // obrażenia z broni bota (te same co gracza)
+        playerHit(Math.round(ws.dmg*(hd?ws.head:1)*np))}
     }
   }
   r.rotation.y+=angDiff(Math.atan2(dx,dz)+Math.PI,r.rotation.y)*Math.min(1,dt*8);
@@ -1825,8 +1851,9 @@ function lobbyAnimate(b,t,dt,st){
 }
 let mySkin='';   // przed createLobby: lobby od razu wywołuje onSkin z zapisanym skinem
 loader.set(.85);
-const lobby=createLobby({renderer,bean:lobbyBean,animate:lobbyAnimate,
+const lobby=createLobby({renderer,bean:lobbyBean,animate:lobbyAnimate,weaponArt:renderWeaponArt,
   onPlay:(m,o)=>{o=o||{};if(m==='dm'){initAudio();if(AC&&AC.state==='suspended')AC.resume();DMX.join(o.tier,o.info);return}   // Deathmatch: kolejka na serwerze (poziom = wpisowe)
+    TEAM.guns=null;                                             // Arsenał: lista broni przychodzi od serwera w 'matched' (tylko 1v1 online)
     if(m==='bot'){BOT.on=true;matchLock();lobby.hide();ON.active=false;ON.opp=null;ON.seat=Math.random()<.5?0:1;match.start({stake:0});match.found(i18n('g.bot'));return}   // z botem: od razu „przeciwnik znaleziony”, mapę losuje mecz
     if(m==='1v1'){BOT.on=false;matchLock();lobby.hide();ON.active=false;match.start({stake:o.stake});    // 1v1: kolejka na serwerze, mapę losuje serwer
       NET.queue({matchId:o.matchId,skin:mySkin}).catch(e=>netFail(e.message));return}
@@ -1909,7 +1936,7 @@ function netFail(msg){
   dispatchEvent(new CustomEvent('fasolka:cancelled',{detail:{message:msg?srvText(msg,getLang()):i18n('net.offline')}}));
   toLobbyBg();if(document.pointerLockElement)document.exitPointerLock();lobby.show();
 }
-NET.on('matched',m=>{ON.active=true;ON.seat=m.seat===1?1:0;ON.opp=m.opp||{nick:'Gracz'};ON.st=null;ON.hidden=true;ON.q=0;ON.aim=[];match.found(ON.opp.nick,m.map)});
+NET.on('matched',m=>{TEAM.guns=Array.isArray(m.guns)&&m.guns.length?m.guns:null;ON.active=true;ON.seat=m.seat===1?1:0;ON.opp=m.opp||{nick:'Gracz'};ON.st=null;ON.hidden=true;ON.q=0;ON.aim=[];match.found(ON.opp.nick,m.map)});
 NET.on('go',()=>match.oppGo());
 NET.on('st',m=>{if(!ON.active)return;if(Array.isArray(m.s)){ON.st=m.s;ON.hidden=false}else if(m.s===null)ON.hidden=true});
 NET.on('sh',m=>{if(!ON.active||!Array.isArray(m.a)||!Array.isArray(m.b)||!match.on)return;spawnTracer(V3(...m.a),V3(...m.b));sndFar()});

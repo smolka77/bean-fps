@@ -12,10 +12,10 @@ import { pathToFileURL } from 'node:url';
 // ---------------- stałe zgodne z grą (zrodla/index.html, weaponry.js) ----------------
 export const WEAPON_IDS = ['akm', 'm4a1', 'glock17', 'deagle'];          // 1v1: drużyna niebieska M4A1 + Desert Eagle, czerwona AKM + Glock-17
 export const WEAPONS = {
-  akm: { rpm: 600, dmg: 36, head: 3, mag: 30, reserve: 90, reload: 2.45, spread: { hip: 0.0075, ads: 0.0016, move: 1.15, bloom: 0.14 } },
-  m4a1: { rpm: 700, dmg: 32, head: 3, mag: 30, reserve: 90, reload: 2.3, spread: { hip: 0.0065, ads: 0.0011, move: 1.0, bloom: 0.11 } },
-  glock17: { rpm: 400, dmg: 22, head: 2.5, mag: 17, reserve: 102, reload: 1.75, spread: { hip: 0.006, ads: 0.002, move: 0.7, bloom: 0.12 } },
-  deagle: { rpm: 267, dmg: 48, head: 2.6, mag: 7, reserve: 35, reload: 2.2, spread: { hip: 0.009, ads: 0.0016, move: 1.0, bloom: 0.32 } },
+  akm: { rpm: 600, dmg: 25, head: 3, mag: 30, reserve: 90, reload: 2.45, spread: { hip: 0.0075, ads: 0.0016, move: 1.15, bloom: 0.14 } },
+  m4a1: { rpm: 700, dmg: 25, head: 3, mag: 30, reserve: 90, reload: 2.3, spread: { hip: 0.0065, ads: 0.0011, move: 1.0, bloom: 0.11 } },
+  glock17: { rpm: 400, dmg: 20, head: 3, mag: 17, reserve: 102, reload: 1.75, spread: { hip: 0.006, ads: 0.002, move: 0.7, bloom: 0.12 } },
+  deagle: { rpm: 267, dmg: 33, head: 3, mag: 7, reserve: 35, reload: 2.2, spread: { hip: 0.009, ads: 0.0016, move: 1.0, bloom: 0.32 } },
 };
 const R = 0.3;                         // promień gracza w fizyce gry
 const CROUCH_DROP = 0.25;              // o tyle opada tułów w przysiadzie
@@ -130,6 +130,11 @@ export function createRoom(mapName, now) {
     t0: now, rec: { map: mapName, st: [], sh: [], rd: [] } };          // powtórka meczu do weryfikacji przez admina
   room.p.forEach(refill);
   return room;
+}
+// Arsenał: bronie, które gracz może mieć w rękach (pierwsza = pistolet, na nią przechodzi każda inna); bez wywołania – wszystkie
+export function setGuns(room, seat, ids) {
+  const p = room.p[seat], allow = (ids || []).map((id) => WEAPON_IDS.indexOf(id)).filter((i) => i >= 0);
+  p.allowW = allow.length ? allow : null; if (p.allowW && !p.allowW.includes(p.w)) p.w = p.allowW[0];
 }
 const spawnOf = (room, seat) => room.map.spawns[seat === 1 && room.map.spawns[1] ? 1 : 0];
 function placeAtSpawn(room, seat, now) {
@@ -452,6 +457,7 @@ export function handleMessage(room, seat, m, now, out) {
       if (!me.inited) return;
       const [x, y, z, yaw, pitch, cr, run, air, sl, legYaw, w, ads] = m.s.map(Number);
       const s = { x, y, z, yaw: yaw || 0, pitch: pitch || 0, cr: clamp01(cr), run: clamp01(run), air: clamp01(air), sl: clamp01(sl), legYaw: legYaw || 0, w: WEAPON_IDS[w | 0] ? w | 0 : 0, ads: ads > 0.5 ? 1 : 0 };
+      if (me.allowW && !me.allowW.includes(s.w)) s.w = me.allowW[0];   // Arsenał: broń bez tokenu = pistolet
       if (s.w !== me.w && me.reloadW >= 0) me.reloadW = -1;          // zmiana broni przerywa przeładowanie
       const why = checkMove(room, me, s, now);
       if (why) {

@@ -50,6 +50,7 @@ Testowe SOL na devnecie: <https://faucet.solana.com> (wklej adres z zakładki **
 | `REPLAY_DAYS` | `60` | ile dni serwer trzyma powtórki (wstrzymane i odrzucone mecze zawsze) |
 | `MIN_WITHDRAW_SOL` | `0.001` | minimalna wypłata |
 | `GOOGLE_CLIENT_ID` | — | identyfikator klienta OAuth Google (logowanie „Kontynuuj z Google”) |
+| `TOKEN_RPC_URL` | publiczny RPC sieci tokenu | RPC do sprawdzania salda tokenu Arsenału (np. Helius na mainnecie); token, próg broni i sieć ustawia panel admina → Arsenał |
 | `COVER_PASSWORD` | — | hasło bramki: czarny ekran z kotem (`cover.html`, jak na cryptostrike.pl) przed całą stroną i API; puste = bez bramki |
 
 Wymagany Node.js 22.5 lub nowszy (wbudowany `node:sqlite`).

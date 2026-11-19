@@ -35,17 +35,17 @@ export const DEFAULTS = {
   },
   // falloff: [od ilu m spada, przy ilu m minimum, mnożnik minimum]; recoil/spread jak w grze (radiany)
   weapons: {
-    glock17: { name: 'Glock-17',     price: 0,    dmg: 24, head: 2.4, rpm: 400, auto: false, mag: 17, reserve: 85,  reload: 1.75, pellets: 1, pelletSpread: 0,
+    glock17: { name: 'Glock-17',     price: 0,    dmg: 20, head: 3,   rpm: 400, auto: false, mag: 17, reserve: 85,  reload: 1.75, pellets: 1, pelletSpread: 0,
                falloff: [22, 55, 0.6],  recoil: { pitch: 0.0065, yaw: 0.0028 }, spread: { hip: 0.006, ads: 0.002, move: 0.7, bloom: 0.12 } },
-    deagle:  { name: 'Desert Eagle', price: 500,  dmg: 48, head: 2.6, rpm: 267, auto: false, mag: 7,  reserve: 35,  reload: 2.2,  pellets: 1, pelletSpread: 0,
+    deagle:  { name: 'Desert Eagle', price: 500,  dmg: 33, head: 3,   rpm: 267, auto: false, mag: 7,  reserve: 35,  reload: 2.2,  pellets: 1, pelletSpread: 0,
                falloff: [30, 70, 0.75], recoil: { pitch: 0.021, yaw: 0.006 },   spread: { hip: 0.009, ads: 0.0016, move: 1.0, bloom: 0.32 } },
-    spas12:  { name: 'SPAS-12',      price: 900,  dmg: 15, head: 1.6, rpm: 72,  auto: false, mag: 8,  reserve: 32,  reload: 2.6,  pellets: 9, pelletSpread: 0.052,
+    spas12:  { name: 'SPAS-12',      price: 900,  dmg: 10, head: 1.5, rpm: 72, auto: false, mag: 8,  reserve: 32,  reload: 2.6,  pellets: 9, pelletSpread: 0.052,
                falloff: [7, 26, 0.2],   recoil: { pitch: 0.045, yaw: 0.008 },   spread: { hip: 0.004, ads: 0.003, move: 0.4, bloom: 0.1 } },
-    mp5k:    { name: 'MP5K',         price: 1250, dmg: 25, head: 2.5, rpm: 900, auto: true,  mag: 30, reserve: 120, reload: 2.1,  pellets: 1, pelletSpread: 0,
+    mp5k:    { name: 'MP5K',         price: 1250, dmg: 18, head: 3,   rpm: 900, auto: true,  mag: 30, reserve: 120, reload: 2.1,  pellets: 1, pelletSpread: 0,
                falloff: [18, 45, 0.6],  recoil: { pitch: 0.0072, yaw: 0.004 },  spread: { hip: 0.0075, ads: 0.0022, move: 0.8, bloom: 0.09 } },
-    akm:     { name: 'AKM',          price: 1700, dmg: 34, head: 2.8, rpm: 600, auto: true,  mag: 30, reserve: 120, reload: 2.45, pellets: 1, pelletSpread: 0,
+    akm:     { name: 'AKM',          price: 1700, dmg: 25, head: 3,   rpm: 600, auto: true,  mag: 30, reserve: 120, reload: 2.45, pellets: 1, pelletSpread: 0,
                falloff: [30, 80, 0.7],  recoil: { pitch: 0.0125, yaw: 0.0045 }, spread: { hip: 0.0075, ads: 0.0016, move: 1.15, bloom: 0.14 } },
-    m4a1:    { name: 'M4A1',         price: 1900, dmg: 30, head: 3,   rpm: 700, auto: true,  mag: 30, reserve: 120, reload: 2.3,  pellets: 1, pelletSpread: 0,
+    m4a1:    { name: 'M4A1',         price: 1900, dmg: 25, head: 3,   rpm: 700, auto: true,  mag: 30, reserve: 120, reload: 2.3,  pellets: 1, pelletSpread: 0,
                falloff: [35, 90, 0.72], recoil: { pitch: 0.0092, yaw: 0.0032 }, spread: { hip: 0.0065, ads: 0.0011, move: 1.0, bloom: 0.11 } },
   },
 };
@@ -166,6 +166,7 @@ function spawnGrid(map) {
 const RW = 0.12;                                            // ile s po śmierci przeciwnik jeszcze jest w historii (żeby strzał oddany chwilę przed śmiercią się liczył)
 function newPlayer(pid, info, cfg) {
   return { pid, uid: info.uid, nick: info.nick, skin: info.skin || '', bot: !!info.bot,
+    guns: Array.isArray(info.guns) ? new Set(info.guns) : null,     // Arsenał: bronie, które gracz może kupić (null = wszystkie)
     x: 0, y: 0, z: 0, yaw: 0, pitch: 0, cr: 0, sl: 0, ads: 0, w: WIDS.indexOf(PISTOL), run: 0, air: 0, legYaw: 0,
     hp: 100, armor: 0, helmet: false, alive: false, dead: true, deadAt: -99, life: 0, protUntil: 0, inShop: false,
     money: cfg.startMoney, kills: 0, deaths: 0, damage: 0, heads: 0, shots: 0, hits: 0, streak: 0, best: 0, joinOrder: pid,
@@ -379,7 +380,8 @@ function buy(room, p, item, out) {
   if (!p.dead || room.phase === 'end') why = 'alive';
   else if (cfg.weapons[item] && item !== PISTOL) {
     const W = cfg.weapons[item];
-    if (p.owned.has(item)) why = 'owned'; else if (p.money < W.price) why = 'funds'; else { p.money -= W.price; p.owned.add(item); ok = true; }
+    if (p.owned.has(item)) why = 'owned'; else if (p.guns && !p.guns.has(item)) why = 'locked';   // Arsenał: broń bez tokenu
+    else if (p.money < W.price) why = 'funds'; else { p.money -= W.price; p.owned.add(item); ok = true; }
   } else if (item === 'vest' || item === 'helmet') {
     const A = cfg.armor[item], cur = p.armor > 0 ? (p.helmet ? 'helmet' : 'vest') : '';
     if (cur === item || (cur === 'helmet' && item === 'vest')) why = 'owned';
@@ -490,5 +492,5 @@ export function endMessage(room, prizes = {}) {
 export function startMessage(room, pid, now) {
   const p = room.p.get(pid);
   return { t: 'dm', you: pid, map: room.mapName, liveIn: +(room.liveAt - now).toFixed(2), duration: room.cfg.duration, cfg: publicConfig(room.cfg),
-    players: [...room.p.values()].map((q) => ({ id: q.pid, nick: q.nick, skin: q.skin })), ...invOf(p) };
+    players: [...room.p.values()].map((q) => ({ id: q.pid, nick: q.nick, skin: q.skin })), ...invOf(p), ...(p.guns ? { guns: [...p.guns] } : {}) };
 }

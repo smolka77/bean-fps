@@ -4,6 +4,7 @@
 
 import { createSfx } from './sfx.js';
 import { weaponSfx, setWeaponAccess, weaponAccessFor } from './weaponry.js';
+import { createArsenal } from './arsenal.js';
 import { isVip, ensureVipCss } from './vip.js';
 import { createWallet } from './wallet.js';
 import { walletApi } from './wallet-config.js';
@@ -364,7 +365,7 @@ export function initLobbyUI(ctx) {
     ui.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
     ui.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = t(el.dataset.i18nPh));
     ui.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); el.setAttribute('aria-label', el.title); });
-    renderTop(); renderStake(); renderSettings(); renderAuth(); renderWallet(); ctx.refresh();
+    renderTop(); renderStake(); renderSettings(); renderAuth(); renderWallet(); ctx.refresh(); ARSX.render();
   };
 
   // ---- menu ☰ ----
@@ -375,8 +376,11 @@ export function initLobbyUI(ctx) {
   menu.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (!b) return; openMenu(false);
     ({ settings: () => openModal('lb-set'), wallet: () => openWallet(), auth: () => openModal('lb-auth'), logout: () => logout() })[b.dataset.act](); });
 
+  // ---- Arsenał: bronie za trzymanie tokenu (arsenal.js; kafelek w lewym dolnym rogu) ----
+  const ARSX = createArsenal({ root: ui, getLang: () => LANG, toast, sfx: SFX, wallet: () => W, acct: () => acct, art: ctx.weaponArt || null, openAuth: () => openModal('lb-auth'), openWallet: () => openWallet() });
+
   // ---- okna dialogowe ----
-  const modals = ['lb-set', 'lb-auth', 'lb-wallet'].map($);
+  const modals = ['lb-set', 'lb-auth', 'lb-wallet', 'lb-arsenal'].map($);
   const openModal = id => { modals.forEach(m => m.hidden = m.id !== id); SFX.open(); };
   const closeAll = () => { if (modals.some(m => !m.hidden)) SFX.close(); modals.forEach(m => m.hidden = true); openMenu(false); Object.values(keyEls).forEach(k => k.classList.remove('down')); if (rebinding) { rebinding = null; renderSettings(); } };
   const anyOpen = () => modals.some(m => !m.hidden) || !menu.hidden;
@@ -780,7 +784,7 @@ export function initLobbyUI(ctx) {
     activeStake = lastStake; addTx(-lastStake, 'stake');
   });
 
-  function renderAll() { setWeaponAccess(weaponAccessFor(acct)); renderTop(); renderStake(); renderAuth(); renderWallet(); if (P) P.render(); }   // dostęp do broni (złoty AKM) zależy od konta
+  function renderAll() { setWeaponAccess(weaponAccessFor(acct)); renderTop(); renderStake(); renderAuth(); renderWallet(); if (P) P.render(); ARSX.render(); }   // dostęp do broni (złoty AKM) zależy od konta
   // ---- zakładka Business (ustawienia): e-mail do zapytań biznesowych, regulamin, polityka prywatności ----
   var bizDoc = null, bizEmail = OPERATOR.businessEmail, BIZ_IC = {
     mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',

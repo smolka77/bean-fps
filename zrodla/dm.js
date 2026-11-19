@@ -194,7 +194,7 @@ export function createDM(ctx) {
     Object.assign(S.me, { money: m.money, owned: m.owned, armor: m.armor, helmet: m.helmet });
     if (m.armor > 0) S.me.armorMax = m.armor;
     ui.setMoney(m.money, 0);
-    if (ui.shopOpen) ui.updateShop(shopState(), m.ok ? tx('bought', { n: itemName(m.item) }) : m.why === 'funds' ? tx('noFunds') : '');
+    if (ui.shopOpen) ui.updateShop(shopState(), m.ok ? tx('bought', { n: itemName(m.item) }) : m.why === 'funds' ? tx('noFunds') : m.why === 'locked' ? tx('locked') : '');
     if (shopScene) shopScene.setLoadout(null, S.me.armor, S.me.helmet);
     if (m.ok) ctx.sfx('buy');
   });
@@ -234,6 +234,8 @@ export function createDM(ctx) {
     S.names = new Map(m.players.map((p) => [p.id, p.nick])); S.board = []; S.wanted = 0; S.wantedPos = null; S.off = null; S.q = 0;
     S.endT = now() + m.liveIn + m.duration; S.liveT = now() + m.liveIn;
     Object.assign(S.me, { life: 0, money: m.money, owned: m.owned, armor: 0, armorMax: 100, helmet: false, hp: 100, kills: 0, deaths: 0, damage: 0, rank: 0 });
+    S.me.guns = Array.isArray(m.guns) ? m.guns : null;          // Arsenał: bronie do kupienia (poniżej progu – tylko pistolet); null = wszystkie
+    S.me.ars = m.ars || null;                                    // progi Arsenału do kłódek w sklepie ({unit, need})
     patchStats(m.cfg);
     clearRemotes();
     for (const p of m.players) if (p.id !== S.pid) S.players.set(p.id, makeRemote(p));
@@ -266,7 +268,7 @@ export function createDM(ctx) {
       kills: m.stats.kills, deaths: m.stats.deaths, damage: m.stats.damage, money: m.money });
     ctx.sfx('wasted');
   }
-  const shopState = () => ({ money: S.me.money, owned: S.me.owned.slice(), armor: S.me.armor, helmet: S.me.helmet });
+  const shopState = () => ({ money: S.me.money, owned: S.me.owned.slice(), armor: S.me.armor, helmet: S.me.helmet, guns: S.me.guns || null, ars: S.me.ars || null });
   function openShop() {
     S.phase = 'shop'; S.shopT = now();
     ui.hideWasted(); ctx.filter(''); ctx.unlock(); document.body.classList.add('dm-shop');

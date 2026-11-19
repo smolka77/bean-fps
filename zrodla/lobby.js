@@ -1039,7 +1039,7 @@ const DEFAULT_MODES = [
 // deterministyczny generator losowy, żeby las wyglądał zawsze tak samo
 function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
 
-export function createLobby({ renderer, bean, animate = () => {}, onPlay = () => {}, onSkin = () => {}, modes = DEFAULT_MODES, skins: skinsIn = SKINS }) {
+export function createLobby({ renderer, bean, animate = () => {}, onPlay = () => {}, onSkin = () => {}, modes = DEFAULT_MODES, skins: skinsIn = SKINS, weaponArt = null }) {
   let skins = skinsIn.slice();
   const rnd = rng(7);
   const R = (a, b) => a + (b - a) * rnd();
@@ -1541,7 +1541,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
 
   // ---------- interfejs: menu, ustawienia, konto, portfel, stawki, losowanie mapy ----------
   uiApi = initLobbyUI({
-    ui, $, lobbyMap: LOBBY_MAP, lobbyMaps: LOBBY_MAPS.map(m => m.id), isActive: () => active,
+    ui, $, lobbyMap: LOBBY_MAP, lobbyMaps: LOBBY_MAPS.map(m => m.id), isActive: () => active, weaponArt,   // weaponArt: zdjęcia broni do Arsenału (gra)
     getMode: () => mode.id,
     setName: (n, vip) => { plateName.textContent = n; plateName.classList.toggle('vip-nick', !!vip); },   // vip: złoty nick z poświatą (vip.js)
     play: (id, opts) => { if (active) onPlay(id, opts); },
