@@ -751,6 +751,7 @@ const VIEW_LABEL={fps:'',tps:'g.viewTps',front:'g.viewFront'};   // klucze słow
 function setLayer(o,l){o.traverse(c=>{if(c.isLight){c.layers.enable(0);c.layers.enable(1)}else c.layers.set(l)})}
 setLayer(fpsArmR,1);setLayer(fpsArmL,1);
 function attachRifle(view){
+  view='fps';                                           // gra tylko z 1. osoby (widok z 2. i 3. osoby usunięty z całej gry)
   for(const w of inv)if(w.inst!==rifle){w.inst.group.visible=false;if(w.inst.group.parent)w.inst.group.parent.remove(w.inst.group)}
   rifle.group.visible=true;for(const m of rifle.rear)m.visible=true;
   if(view==='fps'){viewModel.add(rifle.group);setLayer(rifle.group,1);me.visible=false;fpsArmR.visible=fpsArmL.visible=true}
@@ -990,7 +991,6 @@ addEventListener('keydown',e=>{
   if(/^Digit[1-9]$/.test(e.code)){const sl=slotList(),k=+e.code.slice(5)-1;if(k<sl.length)selectWeapon(sl[k])}
   if(e.code==='KeyQ')selectWeapon(prevW);
   if(e.code==='KeyM')setMuted(!muted);
-  if(e.code==='KeyV')attachRifle({fps:'tps',tps:'front',front:'fps'}[player.view]);
   if(e.code==='Escape'&&!document.pointerLockElement){playing=false;gun.firing=false;$('overlay').style.display='flex'}
 });
 addEventListener('keyup',e=>{keys[e.code]=false;if(DMX)DMX.key(e,false)});
@@ -1944,7 +1944,7 @@ function enterDM(name){                                   // start meczu: tryb '
   if(M&&M.ready)useOaza(true,M);else{useOaza(true);loadMaps.then(()=>{if(MODE==='dm'&&M&&M.ready)useOaza(true,M)})}
   TEAM.me=null;dmPrevView=player.view;
   Object.assign(player,{dead:false,slide:0,fatigue:0,ads:0});adsHeld=false;gun.firing=false;gun.trigger=false;cancelInspect(true);
-  equipNow(inv.findIndex(w=>w.id===PISTOL_ID));prevW=curW;attachRifle('tps');setHud();
+  equipNow(inv.findIndex(w=>w.id===PISTOL_ID));prevW=curW;attachRifle('fps');setHud();
   lobby.hide();document.body.classList.remove('in-lobby');$('overlay').style.display='none';
   for(const h of holes)scene.remove(h);holes.length=0;
   setPauseText();

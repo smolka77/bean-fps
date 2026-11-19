@@ -196,7 +196,7 @@ export function skinName(sk) { return (SKIN_NAMES[LANG] && SKIN_NAMES[LANG][sk.i
 // ---------------- sterowanie ----------------
 export const ACTIONS = [
   ['fwd', 'KeyW'], ['back', 'KeyS'], ['left', 'KeyA'], ['right', 'KeyD'], ['sprint', 'ShiftLeft'], ['jump', 'Space'], ['crouch', 'KeyC'],
-  ['reload', 'KeyR'], ['inspect', 'KeyF'], ['prev', 'KeyQ'], ['view', 'KeyV'], ['mute', 'KeyM'],
+  ['reload', 'KeyR'], ['inspect', 'KeyF'], ['prev', 'KeyQ'], ['mute', 'KeyM'],
 ];
 const keyLabel = c => ({ Space: 'Space', ShiftLeft: 'Shift', ShiftRight: 'R-Shift', ControlLeft: 'Ctrl', ControlRight: 'R-Ctrl', AltLeft: 'Alt', AltRight: 'R-Alt', Tab: 'Tab', CapsLock: 'Caps',
   ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Enter: 'Enter', Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/', Backslash: '\\' }[c]
