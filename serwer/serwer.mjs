@@ -35,6 +35,7 @@ const STAKE_MIN_USD = 1, STAKE_MAX_USD = 1000;
 // nowe konta grają o mniejsze stawki: [rozegrane mecze poniżej, najwyższa stawka w $] (cheater na świeżym koncie nie wygra od razu dużo)
 const STAKE_TIERS = [[5, 5], [20, 25], [50, 100]];
 const STAKE_MSG = { 5: 'Nowe konto: stawka najwyżej $5 (więcej po 5 meczach)', 25: 'Stawka najwyżej $25 – więcej po 20 meczach', 100: 'Stawka najwyżej $100 – więcej po 50 meczach' };
+const MM_BLOCK_LINKED = env.MM_BLOCK_LINKED === '1';                 // 1 = kolejka 1v1 nie paruje kont z tym samym IP/urządzeniem/adresem wypłat (domyślnie wyłączone; wygrana takich kont i tak czeka na admina)
 const REVIEW_STAKE_USD = +(env.REVIEW_STAKE_USD || 250);               // od takiej stawki każda wygrana czeka na sprawdzenie przez admina
 const REPLAY_DAYS = +(env.REPLAY_DAYS || 60);                          // powtórki meczów trzymamy tyle dni (wstrzymane i odrzucone – zawsze)
 const TX_FEE = 5000;
@@ -746,7 +747,7 @@ function onDuelMessage(ws, user, raw) {
     if (!match) return wsSend(ws, { t: 'error', code: 'match', message: 'Brak opłaconej stawki – zagraj jeszcze raz z lobby.' });
     for (const x of mmQueue.filter(x => x.user.id === user.id)) { leaveQueue(x.ws, true); wsSend(x.ws, { t: 'error', code: 'dup', message: 'Szukasz meczu w innej karcie.' }); }
     const entry = { ws, user, matchId: match.id, stake: match.stake_usd, nick: user.username, skin: String(m.skin || '').slice(0, 64) };
-    const i = mmQueue.findIndex(x => x.stake === entry.stake && x.user.id !== user.id && x.ws.readyState === 1 && !linkOf(x.user.id, user.id));
+    const i = mmQueue.findIndex(x => x.stake === entry.stake && x.user.id !== user.id && x.ws.readyState === 1 && !(MM_BLOCK_LINKED && linkOf(x.user.id, user.id)));
     if (i < 0) { mmQueue.push(entry); ws.mm = entry; wsSend(ws, { t: 'queued', waiting: mmQueue.filter(x => x.stake === entry.stake).length }); return; }
     startRoom(mmQueue.splice(i, 1)[0], entry); return;
   }
