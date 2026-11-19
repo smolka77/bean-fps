@@ -3,7 +3,7 @@
 // Otwierany osobnym linkiem (adres gry z #admin na końcu) albo skrótem Ctrl+Shift+A w lobby – nie ma go w menu.
 // Dostęp ma tylko właściciel artefaktu. Dane: baza artefaktu (accounts/*, matches/*, config/lobby);
 // poza claude.ai – konta z pamięci tej przeglądarki (tryb lokalny).
-import { LOBBY_MAPS, BUILTIN_SKINS, SKINS } from './lobby.js';
+import { LOBBY_MAPS, DEFAULT_LOBBY, BUILTIN_SKINS, SKINS } from './lobby.js';
 import { walletApi } from './wallet-config.js';
 import { AUTH_TXT } from './lobby-ui.js';
 import qrcode from 'qrcode-generator';
@@ -538,7 +538,7 @@ function buildDashboard(db, close) {
   // ---------- ustawienia: mapa lobby ----------
   const mapsBox = $('fa-maps'); let curMap = null;
   try { curMap = localStorage.getItem('fasolka-lobby-map'); } catch {}
-  const renderMaps = () => { mapsBox.innerHTML = LOBBY_MAPS.map(m => `<label><input type="radio" name="fa-lmap" value="${esc(m.id)}"${m.id === (curMap || LOBBY_MAPS[0].id) ? ' checked' : ''}><div><b>${esc(m.name)}</b><small>${esc(m.desc)}</small></div></label>`).join(''); };
+  const renderMaps = () => { mapsBox.innerHTML = LOBBY_MAPS.map(m => `<label><input type="radio" name="fa-lmap" value="${esc(m.id)}"${m.id === (curMap || DEFAULT_LOBBY) ? ' checked' : ''}><div><b>${esc(m.name)}</b><small>${esc(m.desc)}</small></div></label>`).join(''); };
   renderMaps();
   if (db) db.doc('config/lobby').get().then(s => { if (s.exists && s.data().map) { curMap = s.data().map; renderMaps(); } }).catch(() => {});
   $('fa-map-save').addEventListener('click', async e => {

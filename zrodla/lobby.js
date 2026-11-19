@@ -920,6 +920,7 @@ const ART = {
       ${finish(u)}</svg>`;
   },
 };
+export const DEFAULT_LOBBY = 'zatoka';   // domyślne lobby (gdy panel admina nic nie ustawił, np. na VPS bez bazy artefaktu)
 export const LOBBY_MAPS = [
   { id: 'pole-bitwy', name: 'Pole bitwy', desc: 'Zachód słońca, okopy, czołgi i wioska' },
   { id: 'las', name: 'Las', desc: 'Dzień, gęsty las i wioska, bez czołgów' },
@@ -1406,7 +1407,7 @@ export function createLobby({ renderer, bean, animate = () => {}, onPlay = () =>
   // podgląd mapy lobby z adresu (np. ?lobby=zatoka): zapisuje wybór w tej przeglądarce
   { let q = null; try { q = new URLSearchParams(location.search).get('lobby'); } catch {}
     if (q && LOBBY_MAPS.some(m => m.id === q)) { store.set('fasolka-lobby-map', q); try { sessionStorage.setItem('fasolka-lobby-sync', q); } catch {} } }
-  const LOBBY_MAP = LOBBY_MAPS.some(m => m.id === store.get('fasolka-lobby-map')) ? store.get('fasolka-lobby-map') : LOBBY_MAPS[0].id;
+  const LOBBY_MAP = LOBBY_MAPS.some(m => m.id === store.get('fasolka-lobby-map')) ? store.get('fasolka-lobby-map') : DEFAULT_LOBBY;   // bez wyboru w panelu admina: Zatoka
   const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.1, 1200);
   let envUpdate;
   const BAY = LOBBY_MAP === 'zatoka';   // estakada nad zatoką: kamera trochę wyżej, żeby nad barierą było widać wodę
