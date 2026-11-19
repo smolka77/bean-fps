@@ -567,19 +567,27 @@ export function initLobbyUI(ctx) {
       if (j.profile && /^https:\/\/(www\.)?(x|twitter)\.com\//.test(j.profile)) { a.href = j.profile; a.hidden = false; } } catch {} })();
   const W = API ? createWallet({ api: API, root: ui, getLang: () => LANG, toast, onChange: a => { acct = a; acctId = a ? a.username.toLowerCase() : null; renderAll(); } }) : null;
   // ---- napis „150 PLAYERS ONLINE” na górze lobby: liczba i tekst z panelu admina (GET /api/online), odświeżane co minutę ----
+  // Serwer podaje liczbę teraz i za minutę (rośnie wykładniczo) – między odświeżeniami lobby płynnie dolicza co sekundę.
+  let onA = 0, onB = 0, onT = 0, onEl = null, onShown = -1;
   async function loadOnline() {
     const box = $('lb-online'); if (!box || !API) return;
     try {
       const r = await fetch(API.replace(/\/+$/, '') + '/api/online', { cache: 'no-store' }); if (!r.ok) return;
       const j = await r.json(), t = $('lb-online-t');
-      if (!j.enabled) { box.hidden = true; return; }
-      const [a, ...rest] = String(j.text || '{n} players online').split('{n}'), n = document.createElement('b');
-      n.textContent = (+j.count || 0).toLocaleString('en-US');
-      t.replaceChildren(document.createTextNode(a), n, document.createTextNode(rest.join('{n}')));
-      box.hidden = false;
+      if (!j.enabled) { box.hidden = true; onEl = null; return; }
+      const [a, ...rest] = String(j.text || '{n} players online').split('{n}');
+      if (!onEl || !t.contains(onEl)) { onEl = document.createElement('b'); onShown = -1; }
+      t.replaceChildren(document.createTextNode(a), onEl, document.createTextNode(rest.join('{n}')));
+      onA = Math.max(+j.count || 0, onShown > 0 ? Math.min(onShown, +j.next || 0) : 0); onB = Math.max(onA, +j.next || +j.count || 0); onT = performance.now();
+      tickOnline(); box.hidden = false;
     } catch {}
   }
-  loadOnline(); setInterval(() => { if (!ui.hidden) loadOnline(); }, 60000);
+  function tickOnline() {
+    if (!onEl) return;
+    const k = Math.min(1, (performance.now() - onT) / 60000), v = Math.floor(onA + (onB - onA) * k);
+    if (v !== onShown) { onShown = v; onEl.textContent = v.toLocaleString('en-US'); }
+  }
+  loadOnline(); setInterval(() => { if (!ui.hidden) loadOnline(); }, 60000); setInterval(tickOnline, 1000);
   let activeMatch = null;
   // bez serwera: ten sam nowy portfel, ale na koncie lokalnym (tryb testowy)
   const WL = W ? null : createWallet({ api: '', root: ui, getLang: () => LANG, toast, onChange: () => {}, local: { acct: () => acct, addTx: (a, type, note) => addTx(a, type, note) } });
