@@ -338,9 +338,20 @@ export function initLobbyUI(ctx) {
         if (a.volume === goal) { clearInterval(timer); if (!goal) a.pause(); }
       }, 50);
     }
-    const unlock = () => { if (unlocked) return; unlocked = true; removeEventListener('pointerdown', unlock, true); removeEventListener('keydown', unlock, true); apply(); };
-    addEventListener('pointerdown', unlock, true); addEventListener('keydown', unlock, true);
-    new MutationObserver(apply).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    const GESTURES = ['pointerdown', 'keydown', 'touchstart', 'click'];
+    const unlock = () => { if (unlocked) return; unlocked = true; GESTURES.forEach((g) => removeEventListener(g, unlock, true)); apply(); };
+    GESTURES.forEach((g) => addEventListener(g, unlock, true));
+    // próba startu od razu po wejściu na stronę: przeglądarka pozwala, gdy gracz już wcześniej słuchał dźwięku na stronie
+    // (Chrome: „zaangażowanie w multimedia”, Firefox/Safari: zgoda na dźwięk dla strony); inaczej start przy pierwszym geście
+    function tryAuto() {
+      if (unlocked || !document.body.classList.contains('in-lobby') || document.hidden) return;
+      const a = ensure(); if (!a) return;
+      a.volume = 0;
+      a.play().then(() => { unlock(); }).catch(() => {});
+    }
+    setTimeout(tryAuto, 0);
+    document.addEventListener('visibilitychange', tryAuto);
+    new MutationObserver(() => { tryAuto(); apply(); }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     document.addEventListener('visibilitychange', apply);
     return { apply };
   })();
