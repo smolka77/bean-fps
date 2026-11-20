@@ -447,12 +447,12 @@ function mountHouse($) {
     } catch (e) { if (e.code === 'admin2fa') return relockAdmin(); $('fa-house-sum').textContent = e.message; }
   }
   $('fa-house-sol').addEventListener('input', () => { all = false; });
-  $('fa-house-max').addEventListener('click', () => { if (!st) return; all = true; $('fa-house-sol').value = (st.available / 1e9).toFixed(9).replace(/.?0+$/, ''); });
+  $('fa-house-max').addEventListener('click', () => { if (!st) return; all = true; $('fa-house-sol').value = (st.available / 1e9).toFixed(9).replace(/\.?0+$/, ''); });
   go.addEventListener('click', async () => {
     const to = $('fa-house-to').value.trim(), amount = +$('fa-house-sol').value, code = $('fa-house-code').value.trim();
     if (!to) return (msg.textContent = 'Podaj adres portfela.');
     if (!all && !(amount > 0)) return (msg.textContent = 'Podaj kwotę albo kliknij „Cała nadwyżka”.');
-    if (!/^d{6}$/.test(code)) return (msg.textContent = 'Wpisz 6-cyfrowy kod 2FA.');
+    if (!/^\d{6}$/.test(code)) return (msg.textContent = 'Wpisz 6-cyfrowy kod 2FA.');
     const label = all ? 'całą nadwyżkę (' + sol(st ? st.available : 0) + ')' : amount + ' SOL';
     if (!confirm(`Wysłać ${label} ze skarbca na adres
 ${to}?
