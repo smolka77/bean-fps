@@ -185,6 +185,7 @@ export function createDM(ctx) {
     const p = S.players.get(m.id); if (p) p.flash = 0.1;
     if (m.prot) { ui.notify(tx('protect'), 'pink'); return; }
     ctx.hitFeedback(!!m.h, !!m.k);
+    if (p && m.d && ctx.damageNumber) ctx.damageNumber(p.root.position, m.d, !!m.h, !!m.k, p);   // dymek z obrażeniami (liczy serwer)
   });
   on('kf', (m) => {
     const wid = ctx.WEAPON_IDS[m.w] || ctx.PISTOL_ID;

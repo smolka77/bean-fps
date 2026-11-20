@@ -102,6 +102,12 @@
   #cross.ads{opacity:.0}
   #marker{left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;opacity:0;transition:opacity .15s}
   #marker svg{width:100%;height:100%;display:block}
+  /* dymki z obrażeniami nad trafionym: białe, w głowę żółte, zabójcze czerwone (pozycja liczona co klatkę z miejsca w świecie) */
+  #dmgnums{inset:0;overflow:hidden}
+  #dmgnums b{position:absolute;left:0;top:0;font:400 27px/1 Anton,Oswald,Impact,'Arial Narrow Bold',sans-serif;color:#fff;letter-spacing:.02em;white-space:nowrap;
+    -webkit-text-stroke:1.2px rgba(20,10,30,.7);paint-order:stroke fill;text-shadow:0 2px 0 rgba(0,0,0,.5),0 0 10px rgba(0,0,0,.35);will-change:transform,opacity}
+  #dmgnums b.h{color:#ffd23a;font-size:33px}
+  #dmgnums b.k{color:#ff4f4f;font-size:35px}
   /* ---------- ekran wczytywania (loader.js): minimalny – czarne tło, nazwa gry, cienki pasek postępu ---------- */
   #ld{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:#000;color:#fff;
     font-family:Anton,Oswald,Impact,'Arial Narrow Bold',sans-serif;-webkit-user-select:none;user-select:none;transition:opacity .45s ease}
@@ -314,7 +320,7 @@
   <h2 class="ld-title" id="ld-title"></h2><div class="ld-sub" id="ld-sub"></div><div class="ld-row"><span class="ld-label" id="ld-label"></span><span class="ld-pct" id="ld-pct"></span></div></div>
 <script>(function(){try{var L='en',s=JSON.parse(localStorage.getItem('fasolka-settings')||'null');if(s&&s.langPicked&&s.lang)L=s.lang;var T={pl:'WCZYTYWANIE',en:'LOADING',ru:'ЗАГРУЗКА',es:'CARGANDO'}[L];if(!T)return;document.getElementById('ld-label').textContent=T}catch(e){}})()</script>
 <div id="cross" class="hud"><i class="h l"></i><i class="h r"></i><i class="v t"></i><i class="v b"></i></div>
-<div id="marker" class="hud"><svg viewBox="0 0 26 26" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M3 3l6 6M23 3l-6 6M3 23l6-6M23 23l-6-6"/></svg></div>
+<div id="dmgnums" class="hud"></div><div id="marker" class="hud"><svg viewBox="0 0 26 26" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M3 3l6 6M23 3l-6 6M3 23l6-6M23 23l-6-6"/></svg></div>
 <div id="vlabel" class="hud"></div>
 <div id="slots" class="hud"></div>
 <div id="score" class="hud">Trafione fasolki <b id="kills">0</b></div>
@@ -1083,6 +1089,32 @@ function hitFeedback(head,killed){
   sndHit(killed);const mk=$('marker');mk.style.opacity=1;mk.querySelector('svg').setAttribute('stroke',killed||head?'#ff5a4d':'#ffffff');
   clearTimeout(window.__mk);window.__mk=setTimeout(()=>mk.style.opacity=0,130);
 }
+// ---- dymki z obrażeniami: liczba nad trafionym, unosi się i znika; śruciny jednego strzału sumują się w jednym dymku,
+//      kolejne trafienia w ten sam cel układają się jeden nad drugim (nie zasłaniają się) ----
+const dmgNums=[],_dn=V3(),DMG_LIFE=.95;
+const paintDmg=n=>{n.el.textContent=n.d;n.el.className=n.kill?'k':n.head?'h':''};
+function showDamage(pos,d,head,killed,key){
+  d=Math.round(+d||0);if(d<=0||!pos)return;
+  const last=key!=null?dmgNums.find(n=>n.key===key&&n.t<.04&&!n.kill):null;
+  if(last){last.d+=d;last.head=last.head||!!head;last.kill=!!killed;last.t=0;paintDmg(last);return}
+  const el=document.createElement('b');$('dmgnums').appendChild(el);
+  const live=key!=null?dmgNums.filter(n=>n.key===key&&n.t<.55).length:0,side=live%2?1:-1;
+  const n={el,key,d,head:!!head,kill:!!killed,t:0,dx:side*(6+Math.random()*16),ox:side*(4+Math.random()*12),oy:-Math.min(live,4)*30,   // ox/oy: stałe przesunięcie na ekranie (px)
+    p:V3(pos.x+(Math.random()-.5)*.2,pos.y+1.85,pos.z+(Math.random()-.5)*.2)};
+  paintDmg(n);dmgNums.push(n);while(dmgNums.length>24)dmgNums.shift().el.remove();
+}
+function clearDamage(){for(const n of dmgNums)n.el.remove();dmgNums.length=0}
+function stepDamage(dt){
+  if(!dmgNums.length)return;
+  camera.updateMatrixWorld();const r=renderer.domElement.getBoundingClientRect();
+  for(let i=dmgNums.length-1;i>=0;i--){
+    const n=dmgNums[i];n.t+=dt;if(n.t>=DMG_LIFE){n.el.remove();dmgNums.splice(i,1);continue}
+    _dn.copy(n.p);_dn.y+=n.t*.85;_dn.project(camera);
+    if(_dn.z>1||_dn.z<-1){n.el.style.opacity=0;continue}                          // za kamerą
+    const pop=n.t<.09?1.4-(n.t/.09)*.4:1,a=n.t<DMG_LIFE-.3?1:(DMG_LIFE-n.t)/.3;
+    n.el.style.opacity=a;n.el.style.transform=`translate(${r.left+(_dn.x*.5+.5)*r.width+n.ox+n.dx*n.t}px,${r.top+(-_dn.y*.5+.5)*r.height+n.oy}px) translate(-50%,-50%) scale(${pop})`;
+  }
+}
 function fireShot(){
   const w=inv[curW],st=WEAPON_STATS[w.id],inst=rifle,ads=player.ads>.5;
   w.mag--;gun.cd=60/st.rpm;gun.trigger=false;cancelInspect(true);
@@ -1114,7 +1146,8 @@ function fireShot(){
         let killed=false;
         if(ON.active&&en===duel.bot)spawnSparks(h.point,n,0xff8a7a);   // 1v1 online: czy trafiło i ile zabrało, liczy SERWER (potwierdzenie: 'hc')
         else{
-          killed=damageEnemy(en,st.dmg*(head?st.head:1),h.point);
+          const hp0=en.dead?0:Math.max(0,en.hp),dv=st.dmg*(head?st.head:1);killed=damageEnemy(en,dv,h.point);
+          if(hp0>0)showDamage(en.root.position,Math.min(dv,hp0),head,killed,en);   // dymek: ile naprawdę zabrało
           if(range.active)range.onHit(en,head,killed);
           spawnSparks(h.point,n,0xff8a7a);hitFeedback(head,killed);
         }
@@ -1555,6 +1588,7 @@ function stepEnemies(dt){
 function updateFx(dt){
   for(let i=tracers.length-1;i>=0;i--){const t=tracers[i];t.life-=dt;t.m.material.opacity=Math.max(0,t.life/.07)*.9;if(t.life<=0){scene.remove(t.m);t.m.material.dispose();tracers.splice(i,1)}}
   for(let i=sparks.length-1;i>=0;i--){const s=sparks[i];s.life-=dt;s.v.y-=9*dt;s.m.position.addScaledVector(s.v,dt);if(s.life<=0){scene.remove(s.m);sparks.splice(i,1)}}
+  stepDamage(dt);
 }
 const camPos=V3(),_look=V3(),_back=V3();let camInit=false,deathK=0;
 // kolizja kamery 3. osoby z bryłami mapy (AABB): odcinek oko → kamera; trafienie = kamera bliżej postaci (z zapasem). Zwraca true, gdy przycięto.
@@ -1625,7 +1659,7 @@ window.__quality=QUAL;
 function frame(){
   const rawDt=clock.getDelta(),dt=Math.min(rawDt,.05);time+=dt;adaptQuality(rawDt*1000);
   if(thumbQ.length)snapMap(thumbQ.shift());           // miniatura mapy do losowania (renderuje się przed właściwą klatką)
-  if(lobby.active||match.lobbyPhase){lobby.update(dt);match.update(dt,false);requestAnimationFrame(frame);return}
+  if(lobby.active||match.lobbyPhase){if(dmgNums.length)clearDamage();lobby.update(dt);match.update(dt,false);requestAnimationFrame(frame);return}
   // menu pod Esc nie zatrzymuje gry (multiplayer): spadanie, przeładowanie, bot i odliczanie lecą dalej, tylko sterowanie jest wyłączone
   if(playing){if(match.frozen||(DMX&&DMX.frozen)){gun.firing=false;gun.trigger=false}}else{gun.firing=false;gun.trigger=false;adsHeld=false}
   stepPlayer(dt);stepGun(dt);applyRecoil();
@@ -1986,7 +2020,7 @@ NET.on('sh',m=>{if(!ON.active||!Array.isArray(m.a)||!Array.isArray(m.b)||!match.
 NET.on('dmg',m=>{if(!ON.active)return;const hp=Math.max(0,Math.min(100,+m.hp||0));setHp(hp);
   const el=$('dmg');el.style.boxShadow='inset 0 0 140px rgba(255,0,0,.6)';clearTimeout(el._t);el._t=setTimeout(()=>el.style.boxShadow='',140);
   if(hp<=0&&match.on&&!player.dead){player.dead=true;gun.firing=false;adsHeld=false;document.body.classList.add('mt-dead')}});
-NET.on('hc',m=>{if(!ON.active)return;if(duel.bot)duel.bot.flash=.12;hitFeedback(!!m.h,!!m.k)});
+NET.on('hc',m=>{if(!ON.active)return;if(duel.bot)duel.bot.flash=.12;hitFeedback(!!m.h,!!m.k);if(duel.bot&&m.d)showDamage(duel.bot.root.position,m.d,!!m.h,!!m.k,duel.bot)});
 NET.on('fix',m=>{if(!ON.active||!Array.isArray(m.p))return;player.pos.set(+m.p[0],+m.p[1],+m.p[2]);player.vel.set(0,0,0)});   // serwer cofa niedozwolony ruch
 NET.on('pi',m=>NET.send({t:'po',s:m.s}));                    // pomiar opóźnienia (kompensacja przy trafieniach)
 NET.on('round',m=>{if(!ON.active)return;const w=m.winner===ON.seat?'me':'op';if(w==='me'&&duel.bot){duel.bot.dead=99;duel.bot.fall=0}match.kill(w)});
@@ -2040,7 +2074,7 @@ DMX=createDM({THREE,scene,camera,renderer,player,me,net:DMNET,
   reloading:()=>gun.reloading>0,
   gunState:()=>gun.switching>0?i18n('g.switch'):gun.reloading>0?i18n('g.reload'):(gun.mag===0&&gun.reserve===0?i18n('g.noAmmo'):''),
   spawnTracer,spawnSparks,
-  hitFeedback,
+  hitFeedback,damageNumber:showDamage,
   remoteShot:(id,vol,dist=0)=>{if(AC)weaponSound(AC,master,noise(),WEAPON_STATS[id]?WEAPON_STATS[id].snd:WEAPON_STATS[PISTOL_ID].snd,vol*.8,dist)},
   sfx:n=>{const F={kill:()=>tone([[880,0,.08],[1320,.06,.14]],'triangle',.12),cash:()=>tone([[1568,0,.06],[2093,.05,.12]],'square',.05),buy:()=>tone([[660,0,.08],[990,.07,.16]],'triangle',.12),
     deny:()=>tone([[220,0,.15]],'sawtooth',.06),tick:()=>sndClick(2400,.03,.1),wanted:()=>tone([[392,0,.18],[523,.16,.18],[392,.32,.3]],'sawtooth',.06),

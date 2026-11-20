@@ -339,10 +339,10 @@ function shoot(room, seat, m, now, out) {
   analyzeShot(room, seat, o, aimDir, landed, landed && hit.head, open, W, now, q);
   room.rec.sh.push([Math.round((now - room.t0) * 100) / 100, seat, o.map((x) => +x.toFixed(2)), end(landed ? hit.t : Math.min(tWall, 120)), landed ? (hit.head ? 2 : 1) : 0]);
   if (hit && hit.t < tWall) {
-    const dmg = Math.round(W.dmg * (hit.head ? W.head : 1));
+    const dmg = Math.round(W.dmg * (hit.head ? W.head : 1)), hp0 = op.hp;
     op.hp = Math.max(0, op.hp - dmg);
     out(1 - seat, { t: 'dmg', d: dmg, hp: op.hp, h: hit.head });
-    out(seat, { t: 'hc', h: hit.head, k: op.hp <= 0 });
+    out(seat, { t: 'hc', h: hit.head, k: op.hp <= 0, d: hp0 - op.hp });           // d: ile naprawdę zabrało (dymek z obrażeniami u strzelającego)
     out(1 - seat, { t: 'sh', a: o.map((x) => +x.toFixed(2)), b: end(hit.t), w: wid });
     if (op.hp <= 0) roundWon(room, seat, now, out);
   } else out(1 - seat, { t: 'sh', a: o.map((x) => +x.toFixed(2)), b: end(Math.min(tWall, 120)), w: wid });
