@@ -21,7 +21,8 @@ import * as MECZ from './mecz.mjs';
 import * as DM from './dm.mjs';
 import * as BOTY from './dm-boty.mjs';                            // boty zapełniające lobby Deathmatch (ustawienie „bots” w panelu admina)                                   // tryb Deathmatch: stałe darmowe lobby do 20 graczy, broń za zabójstwa, WANTED
 import * as XS from './xshare.mjs';                              // udostępnienie gry na X = wejście do Deathmatch
-import * as ARS from './arsenal.mjs';                             // Arsenał: bronie za trzymanie tokenu na adresie depozytu (1v1 i Deathmatch)
+import * as ARS from './arsenal.mjs';
+import * as WSK from './wskins.mjs';                              // skiny broni (progi: zwykłe / średnie od 5 mln / legendarne od 10 mln tokenów)                             // Arsenał: bronie za trzymanie tokenu na adresie depozytu (1v1 i Deathmatch)
 import * as OCH from './ochrona.mjs';
 import * as ANTY from './antycheat.mjs';                          // ocena ryzyka cheatów po meczu (aimbot, triggerbot, silent aim)
 
@@ -94,6 +95,9 @@ CREATE TABLE IF NOT EXISTS withdrawals(id INTEGER PRIMARY KEY, tx_id INTEGER NOT
 for (const c of ['email TEXT', 'avatar TEXT', 'google_sub TEXT', 'totp TEXT', 'totp_step INTEGER', 'totp_pending TEXT', 'sec_changed INTEGER']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + c); } catch {} }
 // ochrona: blokada konta, podejrzenie (średnia ryzyka z meczów); przy meczu: przeciwnik, pokój, ryzyko, sygnały, powtórka, decyzja admina
 for (const c of ['banned INTEGER NOT NULL DEFAULT 0', 'ban_reason TEXT', 'suspicion REAL NOT NULL DEFAULT 0']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + c); } catch {} }
+// Ekwipunek (tryb 'hold'): własny portfel gracza podpięty podpisem wiadomości – tokeny na nim odblokowują bronie; jeden portfel = jedno konto
+for (const c of ['hold_wallet TEXT', 'hold_wallet_t INTEGER']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + c); } catch {} }
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_hold_wallet ON users(hold_wallet) WHERE hold_wallet IS NOT NULL');
 for (const c of ['opp_id INTEGER', 'room TEXT', 'risk REAL', 'flags TEXT', 'replay TEXT', 'review TEXT', 'score TEXT', 'hold TEXT']) { try { db.exec('ALTER TABLE matches ADD COLUMN ' + c); } catch {} }
 // urządzenia, adresy IP i adresy wypłat każdego konta (wykrywanie multikont i omijania blokady)
 // Deathmatch: wpis gracza do meczu (wpisowe pobrane przy dołączeniu do kolejki, zwrot przy anulowaniu, nagroda za miejsca 1–3)
@@ -121,6 +125,22 @@ async function refreshPrice() {
   if (!PRICE && env.FALLBACK_PRICE) { PRICE = +env.FALLBACK_PRICE; PRICE_AT = Date.now(); }
 }
 const toUsd = l => PRICE ? Math.round(l / LAMPORTS_PER_SOL * PRICE * 100) / 100 : 0;
+// ---------------- kurs tokenu Ekwipunku (tryb 'hold': SOL w grze przeliczany na tokeny) ----------------
+let TOKEN_SOL = 0, TOKEN_SOL_AT = 0, TOKEN_SOL_MINT = '';               // ile SOL kosztuje 1 token, kiedy pobrany, dla jakiego mintu
+async function refreshTokenPrice() {
+  const c = arsCfg; if (!ARS.isHold(c) || !c.mint) return;
+  if (TOKEN_SOL_MINT !== c.mint) { TOKEN_SOL = 0; TOKEN_SOL_AT = 0; TOKEN_SOL_MINT = c.mint; }
+  const mint = c.mint, srcs = [
+    async () => { const j = await (await fetch('https://api.dexscreener.com/latest/dex/tokens/' + mint, { signal: AbortSignal.timeout(8000) })).json();
+      const p = (j.pairs || []).filter(x => x.chainId === 'solana' && x.baseToken && x.baseToken.address === mint && x.quoteToken && x.quoteToken.symbol === 'SOL')
+        .sort((a, b) => ((b.liquidity && b.liquidity.usd) || 0) - ((a.liquidity && a.liquidity.usd) || 0))[0];
+      return p ? +p.priceNative : 0; },
+    async () => { const j = await (await fetch('https://lite-api.jup.ag/price/v3?ids=' + mint, { signal: AbortSignal.timeout(8000) })).json();
+      const u = j && j[mint] && +j[mint].usdPrice; return u > 0 && PRICE > 0 ? u / PRICE : 0; },
+  ];
+  for (const src of srcs) { try { const p = await src(); if (p > 0 && Number.isFinite(p)) { TOKEN_SOL = p; TOKEN_SOL_AT = Date.now(); return; } } catch {} }
+  if (TOKEN_SOL && Date.now() - TOKEN_SOL_AT > 6 * 3600e3) { console.warn('[arsenał] kurs tokenu nieaktualny od 6 h – SOL w grze nie odblokowuje broni'); TOKEN_SOL = 0; }
+}
 
 // ---------------- konta ----------------
 const { hashPass, checkPass } = OCH;                                    // scrypt (ochrona.mjs); stare hashe przepisywane przy logowaniu
@@ -202,7 +222,7 @@ function grantGold(uid) {                                              // wołan
 function publicUser(u) {
   return { username: u.username, email: u.email || '', avatar: u.avatar || '', createdAt: new Date(u.created).toISOString(), address: u.address, lamports: u.lamports, sol: u.lamports / LAMPORTS_PER_SOL,
     balance: toUsd(u.lamports), price: PRICE, cluster: CLUSTER, admin: false, banned: !!u.banned, stakeMax: stakeCap(u.id).cap,
-    limited: itemsOf(u.id), goldLeft: Math.max(0, GOLD_LIMIT - goldCount()),
+    limited: itemsOf(u.id), goldLeft: Math.max(0, GOLD_LIMIT - goldCount()), holdWallet: u.hold_wallet || '',
     stats: { ...Object.fromEntries(STAT_KEYS.map(k => [k, 0])), ...JSON.parse(u.stats || '{}'), ...totals(u.id), lastActive: u.last_active || u.created } };
 }
 const histOf = (uid, n = 60) => q('SELECT t,type,lamports,usd,fee_usd,note,sig,status FROM txs WHERE user_id=? ORDER BY t DESC, id DESC LIMIT ?').all(uid, n)
@@ -684,7 +704,14 @@ const routes = {
           payout: Math.round(r.payout_lamports / 1e9 * r.price * 100) / 100, banned: !!r.banned, banReason: r.ban_reason || '', suspicion: r.suspicion || 0,
           matches: playedMatches(r.user_id), linked: linkedAccounts(r.user_id) })) };
     });
-    return { rooms, held: q("SELECT COUNT(*) n FROM matches WHERE state='held'").get().n, holdRisk: ANTY.HOLD_RISK, reviewStake: REVIEW_STAKE_USD };
+    return { rooms, held: q("SELECT COUNT(*) n FROM matches WHERE state='held'").get().n, holdRisk: ANTY.HOLD_RISK, reviewStake: REVIEW_STAKE_USD, enabled: acOn };
+  },
+  // antycheat: włącz / wyłącz (wstrzymywanie wygranych 1v1 i wyrzucanie za oszukiwanie ruchu)
+  'POST /api/admin/anticheat': async ({ body, req, ip }) => {
+    const adm = adminGate(req);
+    acOn = !!(body && body.enabled); cfgPut('anticheat', acOn ? '1' : '0'); MECZ.setKick(acOn);
+    audit(adm.username, ip, 'anticheat', acOn ? 'wł.' : 'wył.'); console.log(`[antycheat] ${acOn ? 'włączony' : 'wyłączony'} przez ${adm.username}`);
+    return { enabled: acOn };
   },
   // powtórka meczu (ruch obu graczy, strzały, rundy) + bryły mapy do rysowania
   'GET /api/admin/replay': async ({ req }) => {
@@ -794,7 +821,7 @@ const routes = {
     need(user); if (limited('xs:' + user.id, 6) || limited('xsip:' + ip, 20)) throw new E('rate', 'Za dużo prób – odczekaj minutę', 429);
     return xshare.verify(user.id, body && body.url, originOf(req), E);
   },
-  'GET /api/admin/xshare': async ({ req }) => { adminGate(req); return { config: xsCfg, defaults: XS.sanitize({}), stats: xshare.stats(), ca: xsCfg.ca || (arsCfg.unit === 'token' ? arsCfg.mint : ''), site: originOf(req), preview: xshare.textFor('GTA-XXXXX', originOf(req)), len: XS.xLength(xshare.textFor('GTA-XXXXX', originOf(req))) }; },
+  'GET /api/admin/xshare': async ({ req }) => { adminGate(req); return { config: xsCfg, defaults: XS.sanitize({}), stats: xshare.stats(), ca: xsCfg.ca || (ARS.usesMint(arsCfg) ? arsCfg.mint : ''), site: originOf(req), preview: xshare.textFor('GTA-XXXXX', originOf(req)), len: XS.xLength(xshare.textFor('GTA-XXXXX', originOf(req))) }; },
   'POST /api/admin/xshare': async ({ body, req, ip }) => {
     const adm = adminGate(req);
     const next = XS.sanitize(body && body.reset ? {} : (body.config || {}));
@@ -807,19 +834,48 @@ const routes = {
   // ---- Arsenał (bronie za trzymanie tokenu) ----
   // lobby: progi broni, saldo tokenu na adresie depozytu gracza i odblokowane bronie (saldo sprawdzane najwyżej co `refresh` s)
   'GET /api/arsenal': async ({ user }) => {
-    if (!user) return { ...ARS.publicConfig(arsCfg), address: '', balance: 0, unlocked: [ARS.BASE], checkedAt: 0, guest: true, price: PRICE };   // bez logowania: same progi
+    if (!user) return { ...ARS.publicConfig(arsCfg), address: '', balance: 0, unlocked: [ARS.BASE], checkedAt: 0, guest: true, price: PRICE, priceSol: ARS.isHold(arsCfg) ? TOKEN_SOL : 0 };   // bez logowania: same progi
     const u = fresh(user.id);
     if (ARS.active(arsCfg) && !arsenal.isFresh(u.id, arsCfg.refresh * 1000)) await arsenal.refresh(u);
     return { ...arsenal.status(u), price: PRICE };
   },
   // przycisk „Sprawdź saldo” (po wpłacie tokenu): od razu, ale najwyżej co 10 s
   'POST /api/arsenal/refresh': async ({ user }) => { need(user); const u = fresh(user.id); await arsenal.refresh(u, arsenal.refreshDelay()); return { ...arsenal.status(u), price: PRICE }; },
-  'GET /api/admin/arsenal': async ({ req }) => { adminGate(req); return { config: arsCfg, defaults: ARS.sanitize({}), guns: ARS.GUNS, base: ARS.BASE, rpc: env.TOKEN_RPC_URL ? 'własny (TOKEN_RPC_URL)' : 'publiczny ' + arsCfg.network }; },
+  // ---- własny portfel gracza (tryb 'hold'): podpis wiadomości z jednorazowym kodem, bez transakcji ----
+  'POST /api/hold/nonce': async ({ user, ip }) => {
+    need(user); if (limited('hold:' + ip, 20)) throw new E('rate', 'Za dużo prób – odczekaj minutę', 429);
+    const code = crypto.randomBytes(9).toString('base64url'), message = holdMessage(user.username, code);
+    holdNonces.set(user.id, { message, exp: Date.now() + 5 * 60e3 });
+    return { message };
+  },
+  'POST /api/hold/link': async ({ user, body, ip }) => {
+    need(user); if (limited('hold:' + ip, 20)) throw new E('rate', 'Za dużo prób – odczekaj minutę', 429);
+    const n = holdNonces.get(user.id); holdNonces.delete(user.id);
+    if (!n || n.exp < Date.now() || String(body.message || '') !== n.message) throw new E('hold_nonce', 'Podpis wygasł – spróbuj jeszcze raz');
+    const addr = String(body.address || '').trim(); let pk;
+    try { pk = new PublicKey(addr); if (!PublicKey.isOnCurve(pk.toBytes()) || pk.toBase58() !== addr) throw 0; } catch { throw new E('hold_addr', 'Nieprawidłowy adres portfela'); }
+    let sig; try { sig = Buffer.from(String(body.signature || ''), 'base64'); } catch { sig = Buffer.alloc(0); }
+    if (sig.length !== 64 || !verifyEd25519(pk.toBytes(), Buffer.from(n.message, 'utf8'), sig)) throw new E('hold_sig', 'Nieprawidłowy podpis portfela');
+    const other = q('SELECT id FROM users WHERE hold_wallet=? AND id!=?').get(addr, user.id);
+    if (other) throw new E('hold_taken', 'Ten portfel jest już podpięty do innego konta');
+    if (q('SELECT 1 FROM users WHERE address=?').get(addr)) throw new E('hold_addr', 'Nieprawidłowy adres portfela');   // adres depozytu z gry to nie własny portfel
+    q('UPDATE users SET hold_wallet=?, hold_wallet_t=? WHERE id=?').run(addr, Date.now(), user.id);
+    audit(user.username, ip, 'hold_link', addr); arsenal.forget(user.id);
+    const u = fresh(user.id); await arsenal.refresh(u);
+    return { ...arsenal.status(u), price: PRICE, account: publicUser(u) };
+  },
+  'POST /api/hold/unlink': async ({ user, ip }) => {
+    need(user); const u0 = fresh(user.id); if (!u0.hold_wallet) return { ...arsenal.status(u0), price: PRICE, account: publicUser(u0) };
+    q('UPDATE users SET hold_wallet=NULL, hold_wallet_t=NULL WHERE id=?').run(user.id);
+    audit(user.username, ip, 'hold_unlink', u0.hold_wallet); arsenal.forget(user.id);
+    const u = fresh(user.id); return { ...arsenal.status(u), price: PRICE, account: publicUser(u) };
+  },
+  'GET /api/admin/arsenal': async ({ req }) => { adminGate(req); return { config: arsCfg, defaults: ARS.sanitize({}), guns: ARS.GUNS, base: ARS.BASE, priceSol: TOKEN_SOL, rpc: env.TOKEN_RPC_URL ? 'własny (TOKEN_RPC_URL)' : 'publiczny ' + arsCfg.network }; },
   'POST /api/admin/arsenal': async ({ body, req, ip }) => {
     const adm = adminGate(req);
     const next = ARS.sanitize(body && body.reset ? {} : (body.config || {}));
     if (body && body.config && String(body.config.mint || '').trim() && !next.mint) throw new E('mint', 'Nieprawidłowy adres mintu tokenu (Solana)');
-    cfgPut('arsenal', JSON.stringify(next)); arsCfg = next;
+    cfgPut('arsenal', JSON.stringify(next)); arsCfg = next; refreshTokenPrice().catch(() => {});
     audit(adm.username, ip, 'arsenal_config', body && body.reset ? 'reset' : `${next.enabled ? 'wł.' : 'wył.'} ${next.symbol} ${next.mint.slice(0, 6)}…`);
     return { config: arsCfg };
   },
@@ -978,6 +1034,14 @@ function settleDuel(matchId, userId, won, forfeit, map, x = {}) {
     });
   } catch (e) { console.error('[1v1] rozliczenie', e); }
 }
+// Antycheat (przełącznik w panelu admina, klucz 'anticheat' w config; domyślnie wyłączony):
+//  włączony  – wygrana 1v1 czeka na admina przy wysokim ryzyku, koncie pod obserwacją, częstych meczach tej pary, kontach powiązanych
+//              i dużej stawce; gracz z ciągle odrzucanym ruchem wylatuje z meczu (1v1: walkower, Deathmatch: powrót do lobby),
+//  wyłączony – wygrane wypłacane od razu, nikt nie wylatuje za ruch (serwer dalej cofa ruch przez ściany i za szybki);
+//              ocena ryzyka i powtórki zostają jako informacja w panelu.
+let acOn = (() => { try { const r = q("SELECT value FROM config WHERE key='anticheat'").get(); return !!r && r.value === '1'; } catch { return false; } })();
+MECZ.setKick(acOn);
+console.log(`[antycheat] ${acOn ? 'włączony' : 'wyłączony – wygrane bez wstrzymywania, bez wyrzucania za ruch'}`);
 // po meczu: ocena ryzyka obu graczy, powód wstrzymania wypłaty zwycięzcy, powtórka na dysk
 function judgeRoom(room, winner, reason) {
   const g = room.game, key = Date.now().toString(36) + '-' + room.id;
@@ -997,7 +1061,7 @@ function judgeRoom(room, winner, reason) {
     fs.writeFileSync(path.join(REPLAY_DIR, replay), zlib.gzipSync(JSON.stringify({ v: 1, key, t: Date.now(), map: room.map, stake: W.stake, reason, winner, score: g.score,
       players: room.p.map((p, s) => ({ uid: p.user.id, nick: p.nick, risk: ev[s].risk, flags: ev[s].flags, summary: ev[s].summary })), stats: stats.map(st => ({ ...st, rtts: undefined })), rec: g.rec })));
   } catch (e) { console.error('[powtórka]', e.message); replay = null; }
-  return { key, ev, hold, replay };
+  return { key, ev, hold: acOn ? hold : hold.filter((h) => h === 'konto zablokowane'), replay };   // antycheat wyłączony: bez wstrzymywania (poza zablokowanym kontem)
 }
 
 function leaveQueue(ws, refund) {
@@ -1019,7 +1083,7 @@ function startRoom(a, b) {
   // P90 (za grę w Deathmatch): dodatkowa broń w 1v1
   [a, b].forEach((pl, seat) => { if (hasItem(pl.user.id, 'p90')) { MECZ.setP90(room.game, seat, true); if (pl.guns && !pl.guns.includes('p90')) pl.guns.push('p90'); } });
   for (const pl of [a, b]) try { q('UPDATE matches SET map=? WHERE id=?').run(room.map, pl.matchId); } catch {}
-  [a, b].forEach((pl, seat) => { const op = room.p[1 - seat]; wsSend(pl.ws, { t: 'matched', seat, map: room.map, opp: { nick: op.nick, skin: op.skin }, ...(pl.guns ? { guns: pl.guns } : {}) }); });
+  [a, b].forEach((pl, seat) => { const op = room.p[1 - seat]; wsSend(pl.ws, { t: 'matched', seat, map: room.map, opp: { nick: op.nick, skin: op.skin, wsk: op.wsk || {} }, ...(pl.guns ? { guns: pl.guns } : {}) }); });
   console.log(`[1v1] pokój ${room.id}: ${a.nick} vs ${b.nick}, stawka $${a.stake}, mapa ${room.map}`);
 }
 function endRoom(room, winner, reason) {
@@ -1053,7 +1117,7 @@ function onDuelMessage(ws, user, raw, arsChecked = false) {
     if ([...rooms].some(r => !r.over && r.p.some(p => p.matchId === match.id))) return wsSend(ws, { t: 'error', code: 'dup', message: 'Ten mecz już trwa w innej karcie.' });
     for (const x of mmQueue.filter(x => x.user.id === user.id)) { leaveQueue(x.ws, x.matchId !== match.id); wsSend(x.ws, { t: 'error', code: 'dup', message: 'Szukasz meczu w innej karcie.' }); }
     if (!q("SELECT 1 FROM matches WHERE id=? AND state='open'").get(match.id)) return noMatch();   // stawka mogła właśnie wrócić
-    const entry ={ ws, user, matchId: match.id, stake: match.stake_usd, lam: match.stake_lamports || 0, nick: user.username, skin: arsenalSkin(user.id, String(m.skin || '').slice(0, 64), match.stake_lamports || 0) };   // skin z kreatora tylko powyżej progu Arsenału
+    const entry ={ ws, user, matchId: match.id, stake: match.stake_usd, lam: match.stake_lamports || 0, nick: user.username, skin: arsenalSkin(user.id, String(m.skin || '').slice(0, 64), match.stake_lamports || 0), wsk: arsenalWsk(user.id, m.wsk, match.stake_lamports || 0) };   // skin z kreatora tylko powyżej progu Arsenału
     const i = mmQueue.findIndex(x => x.stake === entry.stake && x.user.id !== user.id && x.ws.readyState === 1 && !(MM_BLOCK_LINKED && linkOf(x.user.id, user.id)));
     if (i < 0) { mmQueue.push(entry); ws.mm = entry; wsSend(ws, { t: 'queued', waiting: mmQueue.filter(x => x.stake === entry.stake).length }); return; }
     startRoom(mmQueue.splice(i, 1)[0], entry); return;
@@ -1086,9 +1150,12 @@ setInterval(() => { const t = nowS(); for (const room of rooms) { if (room.over)
 // Wejście do kolejki ze starym saldem (> 10 min) najpierw sprawdza saldo, potem dopiero wpuszcza gracza do kolejki.
 let arsCfg = (() => { try { const r = q("SELECT value FROM config WHERE key='arsenal'").get(); return ARS.sanitize(r ? JSON.parse(r.value) : {}); } catch { return ARS.sanitize({}); } })();
 const arsenal = ARS.createArsenal({ getCfg: () => arsCfg, rpcUrl: (env.TOKEN_RPC_URL || '').trim(),
-  solOf: (uid) => { const u = fresh(uid); return u ? u.lamports / LAMPORTS_PER_SOL : 0; } });   // tryb SOL: saldo w grze (nic się nie pobiera)
+  solOf: (uid) => { const u = fresh(uid); return u ? u.lamports / LAMPORTS_PER_SOL : 0; },   // tryb SOL: saldo w grze (nic się nie pobiera)
+  walletOf: (uid) => { const u = q('SELECT hold_wallet FROM users WHERE id=?').get(uid); return (u && u.hold_wallet) || ''; },   // tryb 'hold': podpięty portfel
+  priceSol: () => (TOKEN_SOL_MINT === arsCfg.mint ? TOKEN_SOL : 0) });
 console.log(!ARS.active(arsCfg) ? '[arsenał] wyłączony – wszystkie bronie dla każdego'
-  : arsCfg.unit === 'token' ? `[arsenał] włączony: token ${arsCfg.symbol} (${arsCfg.mint}), sieć ${arsCfg.network}` : '[arsenał] włączony: progi w SOL (saldo w grze)');
+  : arsCfg.unit === 'token' ? `[arsenał] włączony: token ${arsCfg.symbol} (${arsCfg.mint}), sieć ${arsCfg.network}`
+  : arsCfg.unit === 'hold' ? `[arsenał] włączony: ${arsCfg.symbol} na podpiętym portfelu albo SOL w grze po kursie (${arsCfg.mint})` : '[arsenał] włączony: progi w SOL (saldo w grze)');
 // true = najpierw trzeba sprawdzić saldo (wtedy `again` wywoła się po sprawdzeniu, jeśli karta jest dalej otwarta)
 function arsenalWait(ws, user, again) {
   if (!ARS.active(arsCfg) || arsenal.isFresh(user.id, ARS.QUEUE_AGE)) return false;
@@ -1106,12 +1173,23 @@ function creatorSkinIds() {
   return skinIdsCache.ids;
 }
 // skin, z którym gracz wchodzi do meczu: skin z kreatora poniżej progu → '' (podstawowa fasolka)
+// skiny broni od gracza: tylko z progu, na który pozwala jego saldo (lam = stawka zamrożona na mecz też się liczy)
+const arsenalWsk = (uid, src, lam = 0) => WSK.clean(src, arsenal.wskinRank(uid, (lam || 0) / LAMPORTS_PER_SOL));
 const arsenalSkin = (uid, skin, lam = 0) => (!skin || !creatorSkinIds().has(skin) || arsenal.skinOk(uid, skin, (lam || 0) / LAMPORTS_PER_SOL) ? skin : '');
 const arsenalGuns = (uid, ids, lam = 0) => { const g = arsenal.gunsFor(uid, (lam || 0) / LAMPORTS_PER_SOL); return g ? g.filter((id) => ids.includes(id)) : null; };
 
+// własny portfel (tryb 'hold'): jednorazowe kody do podpisu (id gracza -> { message, exp }) i weryfikacja podpisu
+const holdNonces = new Map();
+setInterval(() => { const t = Date.now(); for (const [k, v] of holdNonces) if (v.exp < t) holdNonces.delete(k); }, 300e3).unref();
+const holdMessage = (name, code) => `GTASSAULT: link this wallet to account ${name}.\nSigning is free and sends no transaction.\nCode: ${code}`;
+const ED25519_SPKI = Buffer.from('302a300506032b6570032100', 'hex');
+function verifyEd25519(pub, msg, sig) {
+  try { return crypto.verify(null, msg, crypto.createPublicKey({ key: Buffer.concat([ED25519_SPKI, Buffer.from(pub)]), format: 'der', type: 'spki' }), sig); } catch { return false; }
+}
+
 // ---------------- Udostępnienie na X (warunek wejścia do Deathmatch, xshare.mjs) ----------------
 let xsCfg = (() => { try { const r = q("SELECT value FROM config WHERE key='xshare'").get(); return XS.sanitize(r ? JSON.parse(r.value) : {}); } catch { return XS.sanitize({}); } })();
-const xshare = XS.createXShare({ db, getCfg: () => xsCfg, getCa: () => (arsCfg.unit === 'token' ? arsCfg.mint : ''), randomBytes: (n) => crypto.randomBytes(n) });
+const xshare = XS.createXShare({ db, getCfg: () => xsCfg, getCa: () => (ARS.usesMint(arsCfg) ? arsCfg.mint : ''), randomBytes: (n) => crypto.randomBytes(n) });
 // adres gry do tekstu posta, gdy admin nie wpisał własnego – zawsze domena (DNS), nigdy goły adres IP ani localhost:
 // PUBLIC_URL z .env → pierwsza domena z CORS_ORIGINS → domena, pod którą przyszło żądanie (za nginx: X-Forwarded-Host/Proto)
 const isDomainHost = (host) => /^(?=.*[a-z])[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?$/i.test(host) && !/^\d+(\.\d+){3}(:\d+)?$/.test(host) && !/^localhost(:|$)/i.test(host);
@@ -1175,7 +1253,7 @@ function dmJoin(ws, user, m, arsChecked = false, xsChecked = false) {
   try { e.entryId = Number(q("INSERT INTO dm_entries(user_id,t,tier,entry_usd,lamports,price,state,room,map) VALUES(?,?,?,?,?,?,'playing',?,?)")
     .run(user.id, Date.now(), room.tier.id, 0, 0, 0, room.key, room.game.mapName).lastInsertRowid); } catch (er) { console.error('[dm] zapis wejścia', er); }
   const t = nowS();
-  e.pid = DM.addPlayer(room.game, { uid: user.id, nick: e.nick, skin: e.skin, gold: hasGold(user.id), p90: hasItem(user.id, 'p90'), guns: arsenalGuns(user.id, DM.DM_GUNS) }, t, room.out);   // pozostali dostają {t:'joined'} (nowy gracz jeszcze nie jest na liście)
+  e.pid = DM.addPlayer(room.game, { uid: user.id, nick: e.nick, skin: e.skin, gold: hasGold(user.id), p90: hasItem(user.id, 'p90'), wsk: arsenalWsk(user.id, m.wsk), guns: arsenalGuns(user.id, DM.DM_GUNS) }, t, room.out);   // pozostali dostają {t:'joined'} (nowy gracz jeszcze nie jest na liście)
   room.entries.set(e.pid, e); dmUsers.set(user.id, e); ws.dm = e;
   wsSend(ws, DM.startMessage(room.game, e.pid, t));
   console.log(`[dm] lobby ${room.key}: ${e.nick} wszedł (${dmCount()}/${dmCfg.maxPlayers})`);
@@ -1205,7 +1283,7 @@ function dmPlayerGone(e, why, stats) {
 // boty: dodanie jednego do lobby / usunięcie (domyślnie martwego albo ostatnio dodanego)
 function dmBotAdd(room, t) {
   const taken = new Set([...room.game.p.values()].map((p) => String(p.nick).toLowerCase()));
-  const pid = DM.addPlayer(room.game, { uid: 0, nick: BOTY.botNick(taken), skin: BOTY.botSkin([...room.game.p.values()].map((p) => p.skin)), bot: true }, t, room.out);
+  const pid = DM.addPlayer(room.game, { uid: 0, nick: BOTY.botNick(taken), skin: BOTY.botSkin([...room.game.p.values()].map((p) => p.skin)), wsk: WSK.botSkins(), bot: true }, t, room.out);
   room.bots.set(pid, BOTY.createBot(pid, dmCfg.botSkill));
 }
 function dmBotRemove(room, pid) {
@@ -1312,7 +1390,7 @@ server.on('upgrade', onUpgrade);                              // WebSocket /ws: 
 server.listen(PORT, HOST, () => {
   console.log(`Portfele BEANLADEN: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}  sieć: ${CLUSTER}  skarbiec: ${TREASURY.publicKey.toBase58()}`);
 });
-refreshPrice(); setInterval(refreshPrice, 60000);
+refreshPrice().finally(() => refreshTokenPrice()); setInterval(() => refreshPrice().finally(() => refreshTokenPrice()), 60000);
 function cleanReplays() {                                        // stare powtórki znikają; wstrzymane i odrzucone mecze zostają
   try {
     const keep = new Set(q("SELECT replay FROM matches WHERE replay IS NOT NULL AND (state='held' OR review IN ('held','rejected'))").all().map(r => r.replay));

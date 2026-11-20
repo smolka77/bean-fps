@@ -314,9 +314,9 @@ const ARS_NAMES = { deagle: 'Desert Eagle', mp5k: 'MP5K', spas12: 'SPAS-12', akm
 function mountArsenal($) {
   const box = $('fa-ars'), msg = $('fa-ars-msg'); let cfg = null, info = null, skinList = [];   // skinList: skiny z kreatora (skins.json) – mają progi
   function render() {
-    const tok = cfg.unit === 'token';
+    const tok = cfg.unit === 'token' || cfg.unit === 'hold', hold = cfg.unit === 'hold';
     box.innerHTML = `<div class="fa-row" style="gap:14px;margin:0 0 10px"><label class="fa-chk"><input type="checkbox" id="fa-ars-on" ${cfg.enabled ? 'checked' : ''}> Ekwipunek włączony</label>
-        <label class="fa-dmf" style="min-width:280px"><span>Odblokowanie za</span><select class="fa-q" id="fa-ars-unit"><option value="sol" ${tok ? '' : 'selected'}>saldo SOL w grze (nic się nie pobiera)</option><option value="token" ${tok ? 'selected' : ''}>token SPL na adresie gracza</option></select></label></div>
+        <label class="fa-dmf" style="min-width:280px"><span>Odblokowanie za</span><select class="fa-q" id="fa-ars-unit"><option value="sol" ${tok ? '' : 'selected'}>saldo SOL w grze (nic się nie pobiera)</option><option value="token" ${cfg.unit === 'token' ? 'selected' : ''}>token SPL na adresie gracza w grze</option><option value="hold" ${hold ? 'selected' : ''}>token na podpiętym portfelu gracza albo SOL w grze po kursie tokenu</option></select></label></div>
       <div class="fa-dmg" ${tok ? '' : 'style="display:none"'}>
         <label class="fa-dmf" style="grid-column:span 2"><span>Adres mintu tokenu (Solana)</span><input class="fa-q" id="fa-ars-mint" value="${esc(cfg.mint)}" placeholder="np. 7xKX…pump" spellcheck="false"></label>
         <label class="fa-dmf"><span>Nazwa tokenu (np. BEAN)</span><input class="fa-q" id="fa-ars-sym" value="${esc(cfg.symbol)}" maxlength="12"></label>
@@ -325,17 +325,23 @@ function mountArsenal($) {
       </div>
       <h4>Progi broni – ${tok ? 'ile tokenów' : 'ile SOL'} gracz musi mieć (nic się nie pobiera; Glock-17 zawsze za darmo, 0 = broń dla każdego)</h4>
       <div class="fa-dmg">${info.guns.map((g) => `<label class="fa-dmf"><span>${esc(ARS_NAMES[g] || g)}</span><input class="fa-q" type="number" min="0" step="any" data-need="${g}" value="${cfg.need[g]}"></label>`).join('')}</div>
+      <h4>Skiny broni – ${tok ? 'ile tokenów' : 'ile SOL'} gracz musi mieć (zwykłe zawsze za darmo; serwer sprawdza próg przy wejściu do meczu)</h4>
+      <div class="fa-dmg"><label class="fa-dmf"><span>Średnie (tygrys, karbon, neon, chrom…) od</span><input class="fa-q" type="number" min="0" step="any" id="fa-ars-wsm" value="${(cfg.wskin || {}).mid ?? 5000000}"></label>
+        <label class="fa-dmf"><span>Legendarne (złoto, damast, lawa, galaktyka, hologram) od</span><input class="fa-q" type="number" min="0" step="any" id="fa-ars-wsl" value="${(cfg.wskin || {}).legend ?? 10000000}"></label></div>
       <h4>Progi skinów z kreatora – ${tok ? 'ile tokenów' : 'ile SOL'} gracz musi mieć (podstawowe kolorowe fasolki zawsze za darmo; puste pole = próg domyślny, 0 = skin dla każdego)</h4>
       <div class="fa-dmg"><label class="fa-dmf"><span><b>Próg domyślny</b></span><input class="fa-q" type="number" min="0" step="any" id="fa-ars-skdef" value="${cfg.skinDefault ?? 0}"></label>
         ${skinList.map((k) => `<label class="fa-dmf"><span>${esc(k.name || k.id)}</span><input class="fa-q" type="number" min="0" step="any" data-skin="${esc(k.id)}" value="${cfg.skinNeed && cfg.skinNeed[k.id] !== undefined ? cfg.skinNeed[k.id] : ''}" placeholder="${cfg.skinDefault ?? 0} (domyślny)"></label>`).join('') || '<p class="fa-empty">Brak skinów z kreatora (skins.json).</p>'}</div>`;
     $('fa-ars-sum').textContent = !cfg.enabled ? 'wyłączony – wszystkie bronie dla każdego' : !tok ? 'włączony · progi w SOL (saldo w grze)'
-      : cfg.mint ? `włączony · token ${cfg.symbol} · ${cfg.network} · RPC: ${info.rpc}` : 'włączony, ale bez mintu tokenu – nie działa';
+      : !cfg.mint ? 'włączony, ale bez mintu tokenu – nie działa'
+      : hold ? `włączony · ${cfg.symbol} na podpiętym portfelu albo SOL w grze po kursie (teraz 1 ${cfg.symbol} = ${info.priceSol ? info.priceSol.toPrecision(3) + ' SOL' : 'brak kursu'}) · RPC: ${info.rpc}`
+      : `włączony · token ${cfg.symbol} · ${cfg.network} · RPC: ${info.rpc}`;
     $('fa-ars-unit').addEventListener('change', () => { collect(); render(); });
   }
   function collect() {
     cfg.enabled = $('fa-ars-on').checked; cfg.unit = $('fa-ars-unit').value; cfg.mint = $('fa-ars-mint').value.trim(); cfg.symbol = $('fa-ars-sym').value.trim(); cfg.network = $('fa-ars-net').value; cfg.refresh = +$('fa-ars-ref').value;
     box.querySelectorAll('[data-need]').forEach((i) => { cfg.need[i.dataset.need] = +i.value; });
     cfg.skinDefault = +$('fa-ars-skdef').value || 0; cfg.skinNeed = {};
+    cfg.wskin = { mid: +$('fa-ars-wsm').value || 0, legend: +$('fa-ars-wsl').value || 0 };
     box.querySelectorAll('[data-skin]').forEach((i) => { if (i.value.trim() !== '') cfg.skinNeed[i.dataset.skin] = +i.value; });   // puste = próg domyślny
   }
   (async () => { try { info = await srvGet('/api/admin/arsenal'); cfg = JSON.parse(JSON.stringify(info.config));
@@ -445,12 +451,12 @@ function mountHouse($) {
     } catch (e) { if (e.code === 'admin2fa') return relockAdmin(); $('fa-house-sum').textContent = e.message; }
   }
   $('fa-house-sol').addEventListener('input', () => { all = false; });
-  $('fa-house-max').addEventListener('click', () => { if (!st) return; all = true; $('fa-house-sol').value = (st.available / 1e9).toFixed(9).replace(/.?0+$/, ''); });
+  $('fa-house-max').addEventListener('click', () => { if (!st) return; all = true; $('fa-house-sol').value = (st.available / 1e9).toFixed(9).replace(/\.?0+$/, ''); });
   go.addEventListener('click', async () => {
     const to = $('fa-house-to').value.trim(), amount = +$('fa-house-sol').value, code = $('fa-house-code').value.trim();
     if (!to) return (msg.textContent = 'Podaj adres portfela.');
     if (!all && !(amount > 0)) return (msg.textContent = 'Podaj kwotę albo kliknij „Cała nadwyżka”.');
-    if (!/^d{6}$/.test(code)) return (msg.textContent = 'Wpisz 6-cyfrowy kod 2FA.');
+    if (!/^\d{6}$/.test(code)) return (msg.textContent = 'Wpisz 6-cyfrowy kod 2FA.');
     const label = all ? 'całą nadwyżkę (' + sol(st ? st.available : 0) + ')' : amount + ' SOL';
     if (!confirm(`Wysłać ${label} ze skarbca na adres
 ${to}?
@@ -510,14 +516,21 @@ function mountDeathmatch($) {
   pull(); const iv = setInterval(pull, 5000); cleanup.push(() => clearInterval(iv));
 }
 function mountAnticheat($) {
-  const box = $('fa-ac'), all = $('fa-ac-all'), rp = mountReplay($);
+  const box = $('fa-ac'), all = $('fa-ac-all'), on = $('fa-ac-on'), rp = mountReplay($);
+  on.addEventListener('change', async () => {
+    const want = on.checked;
+    if (!confirm(want ? 'Włączyć antycheat? Podejrzane wygrane 1v1 będą czekać na Twoją decyzję, a oszukujący ruchem będą wyrzucani z meczu.' : 'Wyłączyć antycheat? Wszystkie wygrane 1v1 będą wypłacane od razu, nikt nie wyleci z meczu za ruch.')) { on.checked = !want; return; }
+    try { await srvPost('/api/admin/anticheat', { enabled: want }); last = ''; pull(); } catch (e) { if (e.code === 'admin2fa') return relockAdmin(); on.checked = !want; alert(e.message); }
+  });
   let data = null, last = '';
   const pull = async () => {
     try { const j = await srvGet('/api/admin/review' + (all.checked ? '?all=1' : '')), t = JSON.stringify(j); if (t === last) return; last = t; data = j; render(); }
     catch (e) { if (e.code === 'admin2fa') return relockAdmin(); box.innerHTML = `<p class="fa-empty">${esc(e.message)}</p>`; }
   };
   function render() {
-    $('fa-ac-sum').textContent = `${data.held} ${pl(data.held, 'czeka', 'czekają', 'czeka')} na decyzję · ryzyko od ${Math.round(data.holdRisk * 100)}% albo stawka od ${usd(data.reviewStake)}`;
+    on.checked = !!data.enabled;
+    $('fa-ac-sum').textContent = data.enabled ? `${data.held} ${pl(data.held, 'czeka', 'czekają', 'czeka')} na decyzję · ryzyko od ${Math.round(data.holdRisk * 100)}% albo stawka od ${usd(data.reviewStake)}`
+      : `wyłączony – wygrane wypłacane od razu, bez wyrzucania za ruch (ryzyko tylko informacyjnie)${data.held ? ` · ${data.held} ${pl(data.held, 'czeka', 'czekają', 'czeka')} z wcześniej` : ''}`;
     if (!data.rooms.length) { box.innerHTML = `<p class="fa-empty">Nic do sprawdzenia.${all.checked ? '' : ' Zaznacz „wszystkie mecze”, żeby zobaczyć ostatnie mecze.'}</p>`; return; }
     box.innerHTML = data.rooms.map(r => {
       const held = r.players.some(p => p.state === 'held');
@@ -658,7 +671,7 @@ function buildDashboard(db, close) {
       <div class="fa-card"><div class="fa-ch"><h3>Wypłaty do akceptacji</h3><small id="fa-wd-sum"></small></div><ul class="fa-list" id="fa-wd"><li class="fa-empty">Ładowanie…</li></ul></div>
       <div class="fa-card"><div class="fa-ch"><h3>Dziennik admina</h3><small>ostatnie 50 zdarzeń</small></div><ul class="fa-list" id="fa-audit" style="max-height:320px;overflow:auto"></ul></div>
     </section>
-    <section class="fa-card"><div class="fa-ch"><h3>Antycheat – mecze do sprawdzenia</h3><small id="fa-ac-sum"></small><label class="fa-chk"><input type="checkbox" id="fa-ac-all"> wszystkie mecze</label></div>
+    <section class="fa-card"><div class="fa-ch"><h3>Antycheat – mecze do sprawdzenia</h3><small id="fa-ac-sum"></small><label class="fa-chk" title="Włączony: wysokie ryzyko, częste mecze tej samej pary, konta powiązane i duże stawki wstrzymują wygraną 1v1 do decyzji admina, a ciągle odrzucany ruch wyrzuca z meczu. Wyłączony: wygrane od razu, bez wyrzucania (ruch przez ściany dalej jest cofany)."><input type="checkbox" id="fa-ac-on"> antycheat włączony</label><label class="fa-chk"><input type="checkbox" id="fa-ac-all"> wszystkie mecze</label></div>
       <p class="fa-msg" style="margin:0 0 12px">Wygrana czeka tutaj, gdy serwer ocenił ryzyko oszustwa zwycięzcy wysoko, konto jest pod obserwacją, ta sama para gra ze sobą za często,
         konta są powiązane albo stawka jest wysoka. <b>Wypłać</b> = pieniądze trafiają do zwycięzcy. <b>Odrzuć i zablokuj</b> = pula przechodzi na przeciwnika, a oszust traci grę o stawki i wypłaty.</p>
       <div id="fa-ac"><p class="fa-empty">Ładowanie…</p></div></section>

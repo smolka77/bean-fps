@@ -39,7 +39,7 @@ export const DEFAULTS = {
   weapons: {
     glock17: { name: 'Glock-17',     price: 0,    dmg: 20, head: 3,   rpm: 400, auto: false, mag: 17, reserve: 85,  reload: 1.75, pellets: 1, pelletSpread: 0,
                falloff: [22, 55, 0.6],  recoil: { pitch: 0.0065, yaw: 0.0028 }, spread: { hip: 0.006, ads: 0.002, move: 0.7, bloom: 0.12 } },
-    deagle:  { name: 'Desert Eagle', price: 500,  dmg: 33, head: 3,   rpm: 267, auto: false, mag: 7,  reserve: 35,  reload: 2.2,  pellets: 1, pelletSpread: 0,
+    deagle:  { name: 'Desert Eagle', price: 500,  dmg: 33, head: 3,   rpm: 60 / 1.1, auto: false, mag: 7,  reserve: 35,  reload: 2.2,  pellets: 1, pelletSpread: 0,
                falloff: [30, 70, 0.75], recoil: { pitch: 0.021, yaw: 0.006 },   spread: { hip: 0.009, ads: 0.0016, move: 1.0, bloom: 0.32 } },
     spas12:  { name: 'SPAS-12',      price: 900,  dmg: 10, head: 1.5, rpm: 72, auto: false, mag: 8,  reserve: 32,  reload: 2.6,  pellets: 9, pelletSpread: 0.052,
                falloff: [7, 26, 0.2],   recoil: { pitch: 0.045, yaw: 0.008 },   spread: { hip: 0.004, ads: 0.003, move: 0.4, bloom: 0.1 } },
@@ -208,7 +208,7 @@ export function navPath(map, fx, fz, tx, tz) {
 // ---------------- pokój ----------------
 const RW = 0.12;                                            // ile s po śmierci przeciwnik jeszcze jest w historii (żeby strzał oddany chwilę przed śmiercią się liczył)
 function newPlayer(pid, info, cfg) {
-  return { pid, uid: info.uid, nick: info.nick, skin: info.skin || '', bot: !!info.bot, gold: !!info.gold, p90: !!info.p90,
+  return { pid, uid: info.uid, nick: info.nick, skin: info.skin || '', bot: !!info.bot, gold: !!info.gold, p90: !!info.p90, wsk: info.wsk && Object.keys(info.wsk).length ? info.wsk : null,   // skiny broni (sprawdzone przez serwer)
     guns: Array.isArray(info.guns) ? new Set(info.guns) : null,     // Arsenał: bronie, które gracz może kupić (null = wszystkie)
     x: 0, y: 0, z: 0, yaw: 0, pitch: 0, cr: 0, sl: 0, ads: 0, w: WIDS.indexOf(PISTOL), run: 0, air: 0, legYaw: 0,
     hp: 100, armor: 0, helmet: false, alive: false, dead: true, deadAt: -99, life: 0, protUntil: 0, level: 0, lk: 0,
@@ -239,7 +239,7 @@ export const playerCount = (room) => room.p.size;
 export function addPlayer(room, info, now, out) {
   const p = newPlayer(++room.nextPid, info, room.cfg); room.p.set(p.pid, p);
   spawnPlayer(room, p, now, null);
-  out(-1, { t: 'joined', id: p.pid, nick: p.nick, skin: p.skin });
+  out(-1, { t: 'joined', id: p.pid, nick: p.nick, skin: p.skin, ...(p.wsk ? { wsk: p.wsk } : {}) });
   room.boardDirty = true;
   return p.pid;
 }
@@ -335,7 +335,7 @@ function onState(room, p, m, now, out) {
     if ((why === 'wisi w powietrzu' || why === 'za wysoko') && p.gx !== undefined) Object.assign(p, { x: p.gx, y: p.gy, z: p.gz, airSince: 0, lastGroundY: p.gy, trail: [] });
     if (now - p.lastFix > 0.25) { p.lastFix = now; out(p.pid, { t: 'fix', p: [p.x, p.y, p.z].map((q) => +q.toFixed(3)) }); }
     if (room.log.length < 400) room.log.push(`${p.nick}: ${why}`);
-    if (MECZ.SEVERE.has(why) && why !== 'nan') { p.viol.push(now); while (p.viol.length && now - p.viol[0] > 20) p.viol.shift(); if (p.viol.length >= 25) p.kicked = true; }
+    if (MECZ.SEVERE.has(why) && why !== 'nan') { p.viol.push(now); while (p.viol.length && now - p.viol[0] > 20) p.viol.shift(); if (p.viol.length >= 25 && MECZ.kickOn()) p.kicked = true; }
     p.lastT = now; return;
   }
   accept(p, s, now);
@@ -358,8 +358,10 @@ function shoot(room, p, m, now, out) {
   if (room.phase !== 'live' || !p.alive || p.dead || !W || !p.owned.has(wid)) return;
   const q = +m.q; if (!(q > p.lastQ)) return; p.lastQ = q;
   if (now - p.lastStT > 0.4) return;                              // bez świeżych paczek ruchu (lag switch) strzały nie przechodzą
-  p.tokens = Math.min(2, p.tokens + (now - p.tokT) * (W.rpm / 60)); p.tokT = now;
-  if (p.tokens < 0.95) return; p.tokens -= 1;
+  // szybkostrzelność: wolne bronie (Deagle, strzelba) bez zapasu – po przerwie nie da się oddać dwóch strzałów naraz; margines ~10% na opóźnienia sieci
+  const slow = W.rpm < 120;
+  p.tokens = Math.min(slow ? 1 : 2, p.tokens + (now - p.tokT) * (W.rpm / 60)); p.tokT = now;
+  if (p.tokens < (slow ? 0.9 : 0.95)) return; p.tokens -= 1;
   if (p.reloadW >= 0 && now >= p.reloadAt) finishReload(p, cfg);
   if (p.reloadW >= 0) return;
   const a = p.ammo[wid]; if (!a || a.mag <= 0) return; a.mag--;
@@ -534,5 +536,5 @@ export function tick(room, now, out) {
 export function startMessage(room, pid, now) {
   const p = room.p.get(pid);
   return { t: 'dm', you: pid, map: room.mapName, liveIn: 0, duration: 0, persistent: 1, cfg: publicConfig(room.cfg),
-    players: [...room.p.values()].map((q) => ({ id: q.pid, nick: q.nick, skin: q.skin })), ...invOf(p), ...(p.guns ? { guns: [...p.guns] } : {}) };
+    players: [...room.p.values()].map((q) => ({ id: q.pid, nick: q.nick, skin: q.skin, ...(q.wsk ? { wsk: q.wsk } : {}) })), ...invOf(p), ...(p.guns ? { guns: [...p.guns] } : {}) };
 }
