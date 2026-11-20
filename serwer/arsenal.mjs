@@ -19,6 +19,7 @@ export const DEFAULTS = {
   enabled: true, unit: 'sol', mint: '', symbol: 'TOKEN', network: 'mainnet-beta', refresh: 120,
   need: { deagle: 0.1, mp5k: 0.25, spas12: 0.5, akm: 1, m4a1: 1.5 },     // progi w jednostce `unit` (SOL albo tokeny; 'hold' – tokeny)
   skinDefault: 0, skinNeed: {},                                        // skiny z kreatora: próg domyślny (0 = każdy skin za darmo) i progi poszczególnych skinów (id -> ilość)
+  wskin: { mid: 5e6, legend: 1e7 },                                    // skiny broni: średnie od 5 mln, legendarne od 10 mln (jednostka jak progi broni – w trybie 'hold' tokeny)
 };
 const MIN_GAP = 10e3;                                                   // ręczne „Sprawdź saldo” (token) najwyżej co 10 s
 export const QUEUE_AGE = 10 * 60e3;                                     // kolejka: saldo tokenu starsze niż 10 min jest sprawdzane jeszcze raz
@@ -43,6 +44,7 @@ export function sanitize(src) {
     refresh: Math.max(30, Math.min(3600, Math.round(Number(s.refresh) || D.refresh))),
     need,
     skinDefault: amt(s.skinDefault, D.skinDefault),
+    wskin: { mid: amt(s.wskin && s.wskin.mid, D.wskin.mid), legend: amt(s.wskin && s.wskin.legend, D.wskin.legend) },
     skinNeed,
   };
 }
@@ -52,7 +54,9 @@ export const usesMint = (c) => !!c && (c.unit === 'token' || c.unit === 'hold');
 export const active = (c) => !!(c && c.enabled && (!usesMint(c) || c.mint));
 export const unitLabel = (c) => usesMint(c) ? c.symbol : 'SOL';
 export const publicConfig = (c) => ({ enabled: active(c), unit: c.unit, symbol: unitLabel(c), mint: usesMint(c) ? c.mint : '', network: c.network,
-  base: BASE, guns: GUNS, need: c.need, refresh: c.refresh, skinDefault: c.skinDefault, skinNeed: c.skinNeed });
+  base: BASE, guns: GUNS, need: c.need, refresh: c.refresh, skinDefault: c.skinDefault, skinNeed: c.skinNeed, wskin: c.wskin });
+// skiny broni: najwyższy dostępny próg (0 zwykłe, 1 średnie, 2 legendarne) przy danym saldzie; Arsenał wyłączony = wszystkie
+export const wskinRankWith = (c, amount) => !active(c) ? 2 : amount + 1e-9 >= c.wskin.legend ? 2 : amount + 1e-9 >= c.wskin.mid ? 1 : 0;
 // próg skina z kreatora (własny albo domyślny)
 export const skinNeedOf = (c, id) => (c.skinNeed && Object.prototype.hasOwnProperty.call(c.skinNeed, id) ? c.skinNeed[id] : c.skinDefault);
 // bronie gracza z danym saldem; null = Arsenał wyłączony (wszystkie bronie jak dawniej)
@@ -112,6 +116,7 @@ export function createArsenal({ getCfg, rpcUrl = '', solOf = () => 0, walletOf =
   }
   const gunsFor = (uid, extra = 0) => gunsWith(getCfg(), amountOf(uid, extra));
   // skin z kreatora: czy gracz trzyma dość (Arsenał wyłączony = każdy skin wolno)
+  const wskinRank = (uid, extra = 0) => wskinRankWith(getCfg(), amountOf(uid, extra));
   const skinOk = (uid, id, extra = 0) => { const c = getCfg(); return !active(c) || amountOf(uid, extra) + 1e-9 >= skinNeedOf(c, id); };
   function status(user) {
     const c = getCfg(), e = cache.get(user.id), tok = isToken(c), hold = isHold(c);
@@ -125,5 +130,5 @@ export function createArsenal({ getCfg, rpcUrl = '', solOf = () => 0, walletOf =
     }
     return out;
   }
-  return { refresh, isFresh, gunsFor, skinOk, status, amountOf, forget: (uid) => cache.delete(uid), refreshDelay: () => MIN_GAP };
+  return { refresh, isFresh, gunsFor, skinOk, wskinRank, status, amountOf, forget: (uid) => cache.delete(uid), refreshDelay: () => MIN_GAP };
 }

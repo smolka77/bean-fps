@@ -342,6 +342,7 @@ import {createRange} from './range.js';
 import {createDM} from './dm.js';            // tryb Deathmatch (stałe lobby do 20 graczy): HUD, WASTED, broń za zabójstwa
 import {WEAPON_IDS,WEAPON_STATS,PISTOL_ID,weaponAllowed,loadWeaponModels,createWeapon,applyParts,reloadPose,drawPose,magGrabPoint,pouchPoint,createShells,weaponSound,weaponSfx,cyclePose,EJECT_AT} from './weaponry.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {applyWeaponSkin,mySkin as myWSkin,mySkins,skinFor} from './weapon-skins.js';
 import {gunEnvironment} from './weapons/_env.js';   // odbicia dla broni w widoku z pierwszej osoby
 import {TIMELINES,ANCHORS,SETTLE,prepareTimeline,newInspectState,evalInspect,evalLeft} from './inspect.js';
 const weaponsLoading=loadWeaponModels();
@@ -726,6 +727,8 @@ function prepWeapon(inst){
   return inst;
 }
 const inv=WEAPON_IDS.map(id=>({id,inst:prepWeapon(createWeapon(id,{fx:true})),mag:WEAPON_STATS[id].mag,reserve:WEAPON_STATS[id].reserve}));
+// skiny broni gracza (Ekwipunek): wybrane i dostępne z salda; zmiana wyboru albo progu – od razu na broni w rękach
+const skinInv=()=>{for(const w of inv)applyWeaponSkin(w.inst,myWSkin(w.id))};skinInv();addEventListener('fasolka:wskin',skinInv);
 let curW=0,prevW=1,rifle=inv[0].inst;          // rifle = broń w rękach gracza (nazwa zostaje dla zgodności)
 const shells=createShells(scene);
 
@@ -790,9 +793,11 @@ function equipNow(i){                                       // broń od razu w r
   curW=i;rifle=inv[i].inst;attachRifle(player.view);
 }
 function setBotGun(e,id){
-  if(!e||!e.holder||(e.rifle&&e.rifle.id===id))return;
+  if(!e||!e.holder)return;
+  const ws=ON.active&&ON.opp?skinFor(ON.opp.wsk,id):'';                // 1v1 online: skin broni przeciwnika (sprawdzony przez serwer)
+  if(e.rifle&&e.rifle.id===id){if((e.rifle.group.userData.wskin||'')!==ws)applyWeaponSkin(e.rifle,ws);return}
   if(e.rifle)e.holder.remove(e.rifle.group);
-  const r=createWeapon(id,{fx:false});placeTP(r);e.holder.add(r.group);e.rifle=r;
+  const r=createWeapon(id,{fx:false});placeTP(r);applyWeaponSkin(r,ws);e.holder.add(r.group);e.rifle=r;
 }
 function setTeam(t){
   TEAM.me=t;const sl=slotList();
@@ -1890,7 +1895,7 @@ const lobby=createLobby({renderer,bean:lobbyBean,animate:lobbyAnimate,weaponArt:
     TEAM.guns=null;                                             // Arsenał: lista broni przychodzi od serwera w 'matched' (tylko 1v1 online)
     if(m==='bot'){BOT.on=true;matchLock();lobby.hide();ON.active=false;ON.opp=null;ON.seat=Math.random()<.5?0:1;match.start({stake:0});match.found(i18n('g.bot'));return}   // z botem: od razu „przeciwnik znaleziony”, mapę losuje mecz
     if(m==='1v1'){BOT.on=false;matchLock();lobby.hide();ON.active=false;match.start({stake:o.stake});    // 1v1: kolejka na serwerze, mapę losuje serwer
-      NET.queue({matchId:o.matchId,skin:mySkin}).catch(e=>netFail(e.message));return}
+      NET.queue({matchId:o.matchId,skin:mySkin,wsk:mySkins()}).catch(e=>netFail(e.message));return}
     setMode(m,null);lobby.hide();document.body.classList.remove('in-lobby');startPlay()},
   onSkin:s=>{mySkin=s.id||'';applySkin(me.userData.mats.skin,s);applySkin(me.userData.mats.body,s);applySkin(fpsSkin,s);me.userData.eyes.visible=lobbyBean.userData.eyes.visible=s.eyes!==false}});   // skin z lobby także na postaci w grze
 $('overlay').addEventListener('click',()=>setTimeout(()=>{setPauseText();if(duel.mapBanner&&oaza.active){duel.mapBanner=false;banner(i18n('mt.map')+': '+mapName(oaza.map.name).toUpperCase(),'#ff4fa8')}},0));

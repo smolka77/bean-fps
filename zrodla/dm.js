@@ -7,6 +7,7 @@ import { createDmUi, tx, SKULL_PATH } from './dm-ui.js';
 import { srvText } from './wallet.js';
 import { getLang } from './lobby-ui.js';
 import { makeGear, EMOTES } from './dm-scenes.js';
+import { applyWeaponSkin, skinFor, mySkins } from './weapon-skins.js';
 const EMOTE_IDS = ['', 'wave', 'dance', 'cheer'];
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -60,7 +61,7 @@ export function createDM(ctx) {
     const holder = new THREE.Group(); holder.position.copy(ctx.HOLDER_PIVOT); root.userData.torso.add(holder);
     attachGear(root);
     const skull = new THREE.Sprite(skullMat); skull.scale.setScalar(0.42); skull.position.y = 2.05; skull.visible = false; root.add(skull);
-    const p = { id: info.id, nick: info.nick, root, holder, skull, guns: {}, gun: null, gunId: '', buf: [], life: -1, lastSeen: -9, alive: true, dying: 0, fall: 0, phase: 0, left: false, flags: 0, flash: 0, meshes: [] };
+    const p = { id: info.id, nick: info.nick, wsk: info.wsk || null, root, holder, skull, guns: {}, gun: null, gunId: '', buf: [], life: -1, lastSeen: -9, alive: true, dying: 0, fall: 0, phase: 0, left: false, flags: 0, flash: 0, meshes: [] };
     root.traverse((o) => { if (o.isMesh && !o.userData.gear) { o.userData.dmId = info.id; p.meshes.push(o); } });
     setGun(p, ctx.PISTOL_ID);
     return p;
@@ -68,7 +69,7 @@ export function createDM(ctx) {
   function setGun(p, id) {
     if (p.gunId === id) return;
     if (p.gun) p.holder.remove(p.gun.group);
-    let g = p.guns[id]; if (!g) { g = p.guns[id] = ctx.createWeapon(id, { fx: false }); ctx.placeTP(g); }
+    let g = p.guns[id]; if (!g) { g = p.guns[id] = ctx.createWeapon(id, { fx: false }); ctx.placeTP(g); applyWeaponSkin(g, skinFor(p.wsk, id)); }   // skin broni przeciwnika (sprawdzony przez serwer)
     p.holder.add(g.group); p.gun = g; p.gunId = id;
   }
   function clearRemotes() { for (const p of S.players.values()) { scene.remove(p.root); } S.players.clear(); }
@@ -228,7 +229,7 @@ export function createDM(ctx) {
   async function join(tier, info) {
     if (S.active) return;
     S.active = true; S.phase = 'connecting'; S.tier = tier || null; S.info = info;
-    try { await net.connect(); net.send({ t: 'dmq', skin: ctx.skinId() || '' }); }
+    try { await net.connect(); net.send({ t: 'dmq', skin: ctx.skinId() || '', wsk: mySkins() }); }
     catch (e) { exit(false, (e && e.message) || 'offline'); }
   }
   function cancel() { if (S.phase === 'connecting') exit(false); }

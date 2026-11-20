@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { WEAPON_STATS, createWeapon } from './weaponry.js';
+import { WSKINS, WSKIN, TIER_RANK, applyWeaponSkin, chooseSkin, chosen, setWskinRank } from './weapon-skins.js';
 import { srvText } from './wallet.js';
 
 // ---- podgląd 3D broni: obracanie (przeciągnij), przybliżanie (kółko), reset (2× klik), płynne przejście przy zmianie broni ----
@@ -41,7 +42,7 @@ function createViewer(host, onInput = () => {}) {
     const inner = new THREE.Group(); inner.add(g); inner.scale.setScalar(k);
     const spin = new THREE.Group(); spin.add(inner);
     const pivot = new THREE.Group(); pivot.add(spin);
-    m = { pivot, spin }; models.set(id, m); return m;
+    m = { pivot, spin, g }; models.set(id, m); return m;
   }
   const DEF = { yaw: -0.3, pitch: 0.12 };
   const V = { yaw: DEF.yaw, pitch: DEF.pitch, vy: 0, vp: 0, zoom: 1, zoomT: 1, idle: 9, t: 0, drag: null, lastMove: 0 };
@@ -108,6 +109,7 @@ function createViewer(host, onInput = () => {}) {
     start() { if (!raf) { resize(); last = 0; raf = requestAnimationFrame(frame); } },
     stop() { if (raf) cancelAnimationFrame(raf); raf = 0; },
     setLocked(v) { cv.classList.toggle('lk', !!v); },
+    setSkin(id, sk) { const m = model(id); if ((m.g.userData.wskin || '') !== (sk || '')) applyWeaponSkin(m.g, sk); },
   };
 }
 
@@ -182,6 +184,18 @@ const GTXT = {
     g_have: 'Tienes el AKM dorado: es tuyo para siempre.', g_play: 'Juega una partida 1v1 para conseguirlo.', g_none: 'Ya se han repartido las 100 unidades.' },
 };
 for (const l in GTXT) Object.assign(TXT[l], GTXT[l]);
+// skiny broni: progi i stany (nazwy skinów są własne – jak w CS – i się nie tłumaczą)
+const WTXT = {
+  pl: { w_title: 'Skiny broni', w_free: 'Zwykłe', w_mid: 'Średnie', w_legend: 'Legendarne', w_freeP: 'za darmo', w_from: 'od {n} {s}', w_mln: '{n} mln',
+    w_on: 'Założony na tę broń', w_pick: 'Kliknij, żeby założyć', w_try: 'Podgląd – odblokujesz, trzymając {n} {s}', w_sol: '≈ {n} SOL' },
+  en: { w_title: 'Weapon skins', w_free: 'Standard', w_mid: 'Rare', w_legend: 'Legendary', w_freeP: 'free', w_from: 'from {n} {s}', w_mln: '{n}M',
+    w_on: 'Equipped on this gun', w_pick: 'Click to equip', w_try: 'Preview – hold {n} {s} to unlock', w_sol: '≈ {n} SOL' },
+  ru: { w_title: 'Скины оружия', w_free: 'Обычные', w_mid: 'Редкие', w_legend: 'Легендарные', w_freeP: 'бесплатно', w_from: 'от {n} {s}', w_mln: '{n} млн',
+    w_on: 'Надет на это оружие', w_pick: 'Нажми, чтобы надеть', w_try: 'Предпросмотр – откроется, если держать {n} {s}', w_sol: '≈ {n} SOL' },
+  es: { w_title: 'Skins de armas', w_free: 'Comunes', w_mid: 'Raros', w_legend: 'Legendarios', w_freeP: 'gratis', w_from: 'desde {n} {s}', w_mln: '{n} M',
+    w_on: 'Equipado en esta arma', w_pick: 'Haz clic para equipar', w_try: 'Vista previa – mantén {n} {s} para desbloquear', w_sol: '≈ {n} SOL' },
+};
+for (const l in WTXT) Object.assign(TXT[l], WTXT[l]);
 // tryb 'hold': token na podpiętym własnym portfelu albo SOL w grze o tej samej wartości (serwer: serwer/arsenal.mjs, /api/hold/*)
 const HTXT = {
   pl: { subHold: 'Na start masz pistolet. Podepnij portfel z {s} albo trzymaj tyle samo wartości w SOL w grze, a odblokujesz resztę broni – nic się nie pobiera.',
@@ -302,6 +316,18 @@ const CSS = `
 #lb-ui .ars-side{display:flex;flex-direction:column;gap:14px}
 #lb-ui .ars-card{background:rgba(9,4,13,.82);border:1px solid rgba(255,255,255,.12);padding:16px}
 #lb-ui .ars-card h3{margin:0;font:700 22px/1 'Barlow Condensed',sans-serif;letter-spacing:.04em;text-transform:uppercase}
+#lb-ui .ars-wsk h5{margin:12px 0 7px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;font:700 14px/1 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#d9d2e3}
+#lb-ui .ars-wsk h5 small{font:600 12px/1 'Barlow Condensed',sans-serif;letter-spacing:.04em;color:#a39aae;text-transform:none;text-align:right}
+#lb-ui .ars-wsk h5.mid{color:#7fd7ff}#lb-ui .ars-wsk h5.legend{color:#ffcf5a}
+#lb-ui .ars-wsk .sw{display:flex;flex-wrap:wrap;gap:7px}
+#lb-ui .ars-wsk .wsk{width:40px;height:40px;border:0;padding:0;border-radius:7px;cursor:pointer;position:relative;display:grid;place-items:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.2);transition:transform .12s}
+#lb-ui .ars-wsk .wsk:hover{transform:translateY(-2px)}
+#lb-ui .ars-wsk .wsk.on{box-shadow:0 0 0 2px #fff,0 0 14px rgba(255,255,255,.35)}
+#lb-ui .ars-wsk .wsk.try{box-shadow:0 0 0 2px #ff7ab8,0 0 14px rgba(255,122,184,.45)}
+#lb-ui .ars-wsk .wsk.lk::after{content:'';position:absolute;inset:0;border-radius:7px;background:rgba(5,2,8,.5)}
+#lb-ui .ars-wsk .wsk svg{position:relative;z-index:1;width:14px;height:14px;color:#fff}
+#lb-ui .ars-wsk .st{margin:12px 0 0;font:600 15px/1.3 'Barlow Condensed',sans-serif;color:#cfc7da}
+#lb-ui .ars-wsk .st b{color:#fff}#lb-ui .ars-wsk .st .ok{color:var(--cash)}#lb-ui .ars-wsk .st .lk{color:#ff7ab8}
 #lb-ui .ars-card h4{margin:4px 0 0;font:600 13px/1.2 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#a39aae}
 #lb-ui .ars-req{min-height:172px;box-sizing:border-box}   /* stała wysokość: przy zmianie broni układ nie podskakuje */
 #lb-ui .ars-req .need{display:flex;align-items:baseline;gap:8px;margin-top:12px;font:400 34px/1 Anton,Impact,sans-serif;color:#fff}
@@ -353,7 +379,7 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     <div class="ars-note" hidden></div>
     <div class="ars-body"><div class="ars-list" role="listbox"></div>
       <div class="ars-stage"><span class="big"></span><div class="ars-view" hidden></div><img class="ars-art" alt=""><span class="ars-noart" hidden></span><span class="ars-hint" hidden></span></div>
-      <div class="ars-side"><div class="ars-card ars-req"></div><div class="ars-card ars-stats"></div><p class="ars-modes"></p></div></div>
+      <div class="ars-side"><div class="ars-card ars-wsk"></div><div class="ars-card ars-req"></div><div class="ars-card ars-stats"></div><p class="ars-modes"></p></div></div>
     <div class="ars-ft"></div><span class="ars-keys"></span></div>`;
   root.appendChild(tile); root.appendChild(ov);
   const Q = (s) => ov.querySelector(s);
@@ -428,7 +454,34 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     render();
   }
 
+  // skiny broni: najwyższy dostępny próg z salda (jak serwer: Arsenał wyłączony = wszystkie)
+  const wsNeed = () => (s && s.wskin) || { mid: 5e6, legend: 1e7 };
+  const wsRank = () => { if (!s || !active()) return s ? 2 : 0; if (!acct()) return 0; const b = bal(), n = wsNeed(); return b + 1e-9 >= n.legend ? 2 : b + 1e-9 >= n.mid ? 1 : 0; };
+  let tryOn = null;                                                   // przymierzany (zablokowany) skin: { gun, id }
+  function renderWsk(id) {
+    const box = Q('.ars-wsk'), sym = s && s.symbol ? s.symbol : 'TOKEN', n = wsNeed(), rank = wsRank();
+    const mln = (v) => T('w_mln', { n: (v / 1e6).toLocaleString(loc(), { maximumFractionDigits: 2 }) });
+    const amount = (v) => (holdMode() || v >= 1e6 ? mln(v) : num(v));
+    const price = (tier) => { if (tier === 'free') return esc(T('w_freeP')); const v = n[tier], sol = pSol() ? ' · ' + T('w_sol', { n: numSol(v * pSol()) }) : '';
+      return esc(T('w_from', { n: amount(v), s: sym }) + sol); };
+    const cur = chosen(id), shown = tryOn && tryOn.gun === id ? tryOn.id : (TIER_RANK[(WSKIN[cur] || WSKIN['']).tier] <= rank ? cur : '');
+    box.innerHTML = '<h3>' + esc(T('w_title')) + '</h3>' + ['free', 'mid', 'legend'].map((tier) => '<h5 class="' + tier + '">' + esc(T('w_' + tier)) + '<small>' + price(tier) + '</small></h5><div class="sw">'
+      + WSKINS.filter((k) => k.tier === tier).map((k) => { const lk = TIER_RANK[tier] > rank;
+        return '<button type="button" class="wsk' + (lk ? ' lk' : '') + (k.id === shown ? (lk ? ' try' : ' on') : '') + '" data-ws="' + k.id + '" title="' + esc(k.name) + '" aria-label="' + esc(k.name) + '" style="background:' + k.sw + '">' + (lk ? IC.lock : '') + '</button>'; }).join('') + '</div>').join('');
+    const sk = WSKIN[shown] || WSKIN[''], lkS = TIER_RANK[sk.tier] > rank;
+    const st = lkS ? '<span class="lk">' + esc(T('w_try', { n: amount(n[sk.tier]), s: sym })) + '</span>' : shown === cur ? '<span class="ok">' + esc(T('w_on')) + '</span>' : esc(T('w_pick'));
+    box.insertAdjacentHTML('beforeend', '<p class="st"><b>' + esc(sk.name) + '</b> · ' + st + '</p>');
+    if (viewer) viewer.setSkin(id, shown);
+  }
+  // klik w próbkę: dostępny skin – zakładamy na tę broń (zapis), zablokowany – tylko przymierzamy na podglądzie
+  ov.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('[data-ws]'); if (!b) return;
+    const list = guns(), gun = list[Math.max(0, Math.min(list.length - 1, sel))], id = b.dataset.ws, sk = WSKIN[id]; if (!sk || !gun) return;
+    if (TIER_RANK[sk.tier] <= wsRank()) { tryOn = null; chooseSkin(gun, id); } else tryOn = { gun, id };
+    renderWsk(gun);
+  });
   function renderTile() {
+    setWskinRank(wsRank());
     const list = guns(), n = list.filter((id) => stateOf(id) !== 'lk').length;
     tile.querySelector('small').textContent = !active() ? 'GTASSAULT' : solMode() ? 'SOL' : '$' + String(s.symbol || '').replace(/^\$/, '');
     tile.querySelector('b').textContent = T('tile');
@@ -489,7 +542,8 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     }
     const changed = id !== shownId; shownId = id; shownSel = sel;
     const big = Q('.big'); big.className = 'big ' + st + (changed ? ' swap' : ''); if (changed) restart(big);
-    if (changed) restart(Q('.ars-side'));
+    if (changed) { restart(Q('.ars-side')); tryOn = null; }
+    renderWsk(id);
     big.innerHTML = id === GOLD ? goldLbl() : id === P90 ? p90Lbl() : st === 'ok' ? `${IC.check}${esc(T('open'))}` : st === 'lk' ? `${IC.lock}${esc(num(s.need[id]))} ${esc(sym)}` : st === 'bs' ? esc(T('base')) : esc(T('all'));
     // wymaganie: próg, pasek postępu, ile brakuje
     let req = `<h3>${esc(WEAPON_STATS[id].name)}</h3><h4>${esc(T(CAT[id] || 'c_rifle'))}</h4>`;
