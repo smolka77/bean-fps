@@ -703,7 +703,14 @@ const routes = {
           payout: Math.round(r.payout_lamports / 1e9 * r.price * 100) / 100, banned: !!r.banned, banReason: r.ban_reason || '', suspicion: r.suspicion || 0,
           matches: playedMatches(r.user_id), linked: linkedAccounts(r.user_id) })) };
     });
-    return { rooms, held: q("SELECT COUNT(*) n FROM matches WHERE state='held'").get().n, holdRisk: ANTY.HOLD_RISK, reviewStake: REVIEW_STAKE_USD };
+    return { rooms, held: q("SELECT COUNT(*) n FROM matches WHERE state='held'").get().n, holdRisk: ANTY.HOLD_RISK, reviewStake: REVIEW_STAKE_USD, enabled: acOn };
+  },
+  // antycheat: włącz / wyłącz (wstrzymywanie wygranych 1v1 i wyrzucanie za oszukiwanie ruchu)
+  'POST /api/admin/anticheat': async ({ body, req, ip }) => {
+    const adm = adminGate(req);
+    acOn = !!(body && body.enabled); cfgPut('anticheat', acOn ? '1' : '0'); MECZ.setKick(acOn);
+    audit(adm.username, ip, 'anticheat', acOn ? 'wł.' : 'wył.'); console.log(`[antycheat] ${acOn ? 'włączony' : 'wyłączony'} przez ${adm.username}`);
+    return { enabled: acOn };
   },
   // powtórka meczu (ruch obu graczy, strzały, rundy) + bryły mapy do rysowania
   'GET /api/admin/replay': async ({ req }) => {
@@ -1026,6 +1033,14 @@ function settleDuel(matchId, userId, won, forfeit, map, x = {}) {
     });
   } catch (e) { console.error('[1v1] rozliczenie', e); }
 }
+// Antycheat (przełącznik w panelu admina, klucz 'anticheat' w config; domyślnie wyłączony):
+//  włączony  – wygrana 1v1 czeka na admina przy wysokim ryzyku, koncie pod obserwacją, częstych meczach tej pary, kontach powiązanych
+//              i dużej stawce; gracz z ciągle odrzucanym ruchem wylatuje z meczu (1v1: walkower, Deathmatch: powrót do lobby),
+//  wyłączony – wygrane wypłacane od razu, nikt nie wylatuje za ruch (serwer dalej cofa ruch przez ściany i za szybki);
+//              ocena ryzyka i powtórki zostają jako informacja w panelu.
+let acOn = (() => { try { const r = q("SELECT value FROM config WHERE key='anticheat'").get(); return !!r && r.value === '1'; } catch { return false; } })();
+MECZ.setKick(acOn);
+console.log(`[antycheat] ${acOn ? 'włączony' : 'wyłączony – wygrane bez wstrzymywania, bez wyrzucania za ruch'}`);
 // po meczu: ocena ryzyka obu graczy, powód wstrzymania wypłaty zwycięzcy, powtórka na dysk
 function judgeRoom(room, winner, reason) {
   const g = room.game, key = Date.now().toString(36) + '-' + room.id;
@@ -1045,7 +1060,7 @@ function judgeRoom(room, winner, reason) {
     fs.writeFileSync(path.join(REPLAY_DIR, replay), zlib.gzipSync(JSON.stringify({ v: 1, key, t: Date.now(), map: room.map, stake: W.stake, reason, winner, score: g.score,
       players: room.p.map((p, s) => ({ uid: p.user.id, nick: p.nick, risk: ev[s].risk, flags: ev[s].flags, summary: ev[s].summary })), stats: stats.map(st => ({ ...st, rtts: undefined })), rec: g.rec })));
   } catch (e) { console.error('[powtórka]', e.message); replay = null; }
-  return { key, ev, hold, replay };
+  return { key, ev, hold: acOn ? hold : hold.filter((h) => h === 'konto zablokowane'), replay };   // antycheat wyłączony: bez wstrzymywania (poza zablokowanym kontem)
 }
 
 function leaveQueue(ws, refund) {

@@ -335,7 +335,7 @@ function onState(room, p, m, now, out) {
     if ((why === 'wisi w powietrzu' || why === 'za wysoko') && p.gx !== undefined) Object.assign(p, { x: p.gx, y: p.gy, z: p.gz, airSince: 0, lastGroundY: p.gy, trail: [] });
     if (now - p.lastFix > 0.25) { p.lastFix = now; out(p.pid, { t: 'fix', p: [p.x, p.y, p.z].map((q) => +q.toFixed(3)) }); }
     if (room.log.length < 400) room.log.push(`${p.nick}: ${why}`);
-    if (MECZ.SEVERE.has(why) && why !== 'nan') { p.viol.push(now); while (p.viol.length && now - p.viol[0] > 20) p.viol.shift(); if (p.viol.length >= 25) p.kicked = true; }
+    if (MECZ.SEVERE.has(why) && why !== 'nan') { p.viol.push(now); while (p.viol.length && now - p.viol[0] > 20) p.viol.shift(); if (p.viol.length >= 25 && MECZ.kickOn()) p.kicked = true; }
     p.lastT = now; return;
   }
   accept(p, s, now);

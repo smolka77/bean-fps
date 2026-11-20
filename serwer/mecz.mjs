@@ -285,11 +285,15 @@ function acceptMove(room, p, s, now) {
 // Ciężkie odrzucenia (teleport, latanie, przenikanie przez ściany, wyjście poza mapę) liczą się do wyrzucenia z meczu;
 // łagodne (wciśnięcie w stopień, odrobinę za wysoko) tylko cofają gracza – zdarzają się też uczciwym przez fizykę gry.
 const SEVERE = new Set(['nan', 'poza mapą', 'za szybko', 'za szybko w górę', 'przez ścianę', 'wisi w powietrzu']);
+// wyrzucanie za oszukiwanie ruchu (antycheat w panelu admina); wyłączone = ruch dalej jest poprawiany (fix), ale nikt nie wylatuje z meczu
+let KICK = true;
+export const setKick = (v) => { KICK = !!v; };
+export const kickOn = () => KICK;
 function violation(p, why, now) {
   if (!SEVERE.has(why)) return false;
   if (why !== 'nan') p.an.sevMoves++;                            // NaN to błąd silnika gry (zdarza się uczciwym), nie liczy się do ryzyka
   p.viol.push(now); while (p.viol.length && now - p.viol[0] > 20) p.viol.shift();
-  return p.viol.length >= 25;                                  // 25 ciężkich odrzuceń w 20 s = oszust
+  return KICK && p.viol.length >= 25;                          // 25 ciężkich odrzuceń w 20 s = oszust (gdy antycheat włączony)
 }
 
 // ---------------- strzał ----------------

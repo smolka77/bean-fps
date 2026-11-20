@@ -512,14 +512,21 @@ function mountDeathmatch($) {
   pull(); const iv = setInterval(pull, 5000); cleanup.push(() => clearInterval(iv));
 }
 function mountAnticheat($) {
-  const box = $('fa-ac'), all = $('fa-ac-all'), rp = mountReplay($);
+  const box = $('fa-ac'), all = $('fa-ac-all'), on = $('fa-ac-on'), rp = mountReplay($);
+  on.addEventListener('change', async () => {
+    const want = on.checked;
+    if (!confirm(want ? 'Włączyć antycheat? Podejrzane wygrane 1v1 będą czekać na Twoją decyzję, a oszukujący ruchem będą wyrzucani z meczu.' : 'Wyłączyć antycheat? Wszystkie wygrane 1v1 będą wypłacane od razu, nikt nie wyleci z meczu za ruch.')) { on.checked = !want; return; }
+    try { await srvPost('/api/admin/anticheat', { enabled: want }); last = ''; pull(); } catch (e) { if (e.code === 'admin2fa') return relockAdmin(); on.checked = !want; alert(e.message); }
+  });
   let data = null, last = '';
   const pull = async () => {
     try { const j = await srvGet('/api/admin/review' + (all.checked ? '?all=1' : '')), t = JSON.stringify(j); if (t === last) return; last = t; data = j; render(); }
     catch (e) { if (e.code === 'admin2fa') return relockAdmin(); box.innerHTML = `<p class="fa-empty">${esc(e.message)}</p>`; }
   };
   function render() {
-    $('fa-ac-sum').textContent = `${data.held} ${pl(data.held, 'czeka', 'czekają', 'czeka')} na decyzję · ryzyko od ${Math.round(data.holdRisk * 100)}% albo stawka od ${usd(data.reviewStake)}`;
+    on.checked = !!data.enabled;
+    $('fa-ac-sum').textContent = data.enabled ? `${data.held} ${pl(data.held, 'czeka', 'czekają', 'czeka')} na decyzję · ryzyko od ${Math.round(data.holdRisk * 100)}% albo stawka od ${usd(data.reviewStake)}`
+      : `wyłączony – wygrane wypłacane od razu, bez wyrzucania za ruch (ryzyko tylko informacyjnie)${data.held ? ` · ${data.held} ${pl(data.held, 'czeka', 'czekają', 'czeka')} z wcześniej` : ''}`;
     if (!data.rooms.length) { box.innerHTML = `<p class="fa-empty">Nic do sprawdzenia.${all.checked ? '' : ' Zaznacz „wszystkie mecze”, żeby zobaczyć ostatnie mecze.'}</p>`; return; }
     box.innerHTML = data.rooms.map(r => {
       const held = r.players.some(p => p.state === 'held');
@@ -660,7 +667,7 @@ function buildDashboard(db, close) {
       <div class="fa-card"><div class="fa-ch"><h3>Wypłaty do akceptacji</h3><small id="fa-wd-sum"></small></div><ul class="fa-list" id="fa-wd"><li class="fa-empty">Ładowanie…</li></ul></div>
       <div class="fa-card"><div class="fa-ch"><h3>Dziennik admina</h3><small>ostatnie 50 zdarzeń</small></div><ul class="fa-list" id="fa-audit" style="max-height:320px;overflow:auto"></ul></div>
     </section>
-    <section class="fa-card"><div class="fa-ch"><h3>Antycheat – mecze do sprawdzenia</h3><small id="fa-ac-sum"></small><label class="fa-chk"><input type="checkbox" id="fa-ac-all"> wszystkie mecze</label></div>
+    <section class="fa-card"><div class="fa-ch"><h3>Antycheat – mecze do sprawdzenia</h3><small id="fa-ac-sum"></small><label class="fa-chk" title="Włączony: wysokie ryzyko, częste mecze tej samej pary, konta powiązane i duże stawki wstrzymują wygraną 1v1 do decyzji admina, a ciągle odrzucany ruch wyrzuca z meczu. Wyłączony: wygrane od razu, bez wyrzucania (ruch przez ściany dalej jest cofany)."><input type="checkbox" id="fa-ac-on"> antycheat włączony</label><label class="fa-chk"><input type="checkbox" id="fa-ac-all"> wszystkie mecze</label></div>
       <p class="fa-msg" style="margin:0 0 12px">Wygrana czeka tutaj, gdy serwer ocenił ryzyko oszustwa zwycięzcy wysoko, konto jest pod obserwacją, ta sama para gra ze sobą za często,
         konta są powiązane albo stawka jest wysoka. <b>Wypłać</b> = pieniądze trafiają do zwycięzcy. <b>Odrzuć i zablokuj</b> = pula przechodzi na przeciwnika, a oszust traci grę o stawki i wypłaty.</p>
       <div id="fa-ac"><p class="fa-empty">Ładowanie…</p></div></section>
