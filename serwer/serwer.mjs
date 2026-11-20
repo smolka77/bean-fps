@@ -175,7 +175,23 @@ function totals(uid) {
 // W grze zastępuje karabin w 1v1 i AKM na drabince Deathmatch, w Strzelnicy jest w slocie 7 (statystyki: 34 obrażeń, 90 w głowę).
 db.exec('CREATE TABLE IF NOT EXISTS limited(item TEXT NOT NULL, user_id INTEGER NOT NULL, t INTEGER NOT NULL, PRIMARY KEY(item, user_id))');
 const GOLD_LIMIT = 100;
-const hasGold = (uid) => !!q("SELECT 1 FROM limited WHERE item='akmgold' AND user_id=?").get(uid);
+const hasItem = (uid, item) => !!q('SELECT 1 FROM limited WHERE item=? AND user_id=?').get(item, uid);
+const hasGold = (uid) => hasItem(uid, 'akmgold');
+const itemsOf = (uid) => q('SELECT item FROM limited WHERE user_id=? ORDER BY t').all(uid).map((r) => r.item);
+// P90: darmowa broń dla każdego, kto zagrał w Deathmatch (P90_PLAY_MS w lobby) – bez limitu sztuk
+const P90_PLAY_MS = 60e3;
+function grantP90(uid) {
+  if (hasItem(uid, 'p90')) return false;
+  q("INSERT INTO limited(item, user_id, t) VALUES('p90', ?, ?)").run(uid, Date.now());
+  console.log(`[P90] konto ${uid} dostało P90 za grę w Deathmatch`);
+  return true;
+}
+// gracze, którzy już wcześniej grali w Deathmatch (co najmniej minutę), dostają P90 od razu po wdrożeniu
+try {
+  const n = q(`INSERT OR IGNORE INTO limited(item, user_id, t) SELECT 'p90', e.user_id, ? FROM dm_entries e JOIN users u ON u.id=e.user_id
+    WHERE e.ended IS NOT NULL AND e.ended - e.t >= ? GROUP BY e.user_id`).run(Date.now(), P90_PLAY_MS).changes;
+  if (n) console.log(`[P90] ${n} kont z wcześniejszą grą w Deathmatch dostało P90`);
+} catch (e) { console.error('[P90] przyznanie wsteczne', e.message); }
 const goldCount = () => q("SELECT COUNT(*) n FROM limited WHERE item='akmgold'").get().n;
 function grantGold(uid) {                                              // wołane w transakcji rozliczenia meczu
   if (hasGold(uid) || goldCount() >= GOLD_LIMIT) return false;
@@ -186,7 +202,7 @@ function grantGold(uid) {                                              // wołan
 function publicUser(u) {
   return { username: u.username, email: u.email || '', avatar: u.avatar || '', createdAt: new Date(u.created).toISOString(), address: u.address, lamports: u.lamports, sol: u.lamports / LAMPORTS_PER_SOL,
     balance: toUsd(u.lamports), price: PRICE, cluster: CLUSTER, admin: false, banned: !!u.banned, stakeMax: stakeCap(u.id).cap,
-    limited: hasGold(u.id) ? ['akmgold'] : [], goldLeft: Math.max(0, GOLD_LIMIT - goldCount()),
+    limited: itemsOf(u.id), goldLeft: Math.max(0, GOLD_LIMIT - goldCount()),
     stats: { ...Object.fromEntries(STAT_KEYS.map(k => [k, 0])), ...JSON.parse(u.stats || '{}'), ...totals(u.id), lastActive: u.last_active || u.created } };
 }
 const histOf = (uid, n = 60) => q('SELECT t,type,lamports,usd,fee_usd,note,sig,status FROM txs WHERE user_id=? ORDER BY t DESC, id DESC LIMIT ?').all(uid, n)
@@ -1000,6 +1016,8 @@ function startRoom(a, b) {
   [a, b].forEach((pl, seat) => { pl.guns = arsenalGuns(pl.user.id, MECZ.WEAPON_IDS, pl.lam); if (pl.guns) MECZ.setGuns(room.game, seat, pl.guns); });
   // złoty AKM: posiadacz ma go zamiast karabinu drużyny (serwer meczu przyjmuje go tylko od niego)
   [a, b].forEach((pl, seat) => { if (hasGold(pl.user.id)) { MECZ.setGold(room.game, seat, true); if (pl.guns && !pl.guns.includes('akmgold')) pl.guns.push('akmgold'); } });
+  // P90 (za grę w Deathmatch): dodatkowa broń w 1v1
+  [a, b].forEach((pl, seat) => { if (hasItem(pl.user.id, 'p90')) { MECZ.setP90(room.game, seat, true); if (pl.guns && !pl.guns.includes('p90')) pl.guns.push('p90'); } });
   for (const pl of [a, b]) try { q('UPDATE matches SET map=? WHERE id=?').run(room.map, pl.matchId); } catch {}
   [a, b].forEach((pl, seat) => { const op = room.p[1 - seat]; wsSend(pl.ws, { t: 'matched', seat, map: room.map, opp: { nick: op.nick, skin: op.skin }, ...(pl.guns ? { guns: pl.guns } : {}) }); });
   console.log(`[1v1] pokój ${room.id}: ${a.nick} vs ${b.nick}, stawka $${a.stake}, mapa ${room.map}`);
@@ -1153,11 +1171,11 @@ function dmJoin(ws, user, m, arsChecked = false, xsChecked = false) {
   let room = dmLobby();
   if (!room) { try { room = dmOpenLobby(); } catch (er) { console.error('[dm] lobby', er); return wsSend(ws, { t: 'error', code: 'start', message: 'Nie udało się otworzyć lobby Deathmatch.' }); } }
   if (DM.playerCount(room.game) >= dmCfg.maxPlayers) dmBotRemove(room);   // komplet z botami: bot ustępuje miejsca graczowi
-  const e = { ws, user, nick: user.username, skin: arsenalSkin(user.id, String(m.skin || '').slice(0, 64)), room, pid: 0, entryId: 0 };   // skin z kreatora tylko powyżej progu Arsenału
+  const e = { ws, user, nick: user.username, skin: arsenalSkin(user.id, String(m.skin || '').slice(0, 64)), room, pid: 0, entryId: 0, at: Date.now(), p90: hasItem(user.id, 'p90') };   // skin z kreatora tylko powyżej progu Arsenału
   try { e.entryId = Number(q("INSERT INTO dm_entries(user_id,t,tier,entry_usd,lamports,price,state,room,map) VALUES(?,?,?,?,?,?,'playing',?,?)")
     .run(user.id, Date.now(), room.tier.id, 0, 0, 0, room.key, room.game.mapName).lastInsertRowid); } catch (er) { console.error('[dm] zapis wejścia', er); }
   const t = nowS();
-  e.pid = DM.addPlayer(room.game, { uid: user.id, nick: e.nick, skin: e.skin, gold: hasGold(user.id), guns: arsenalGuns(user.id, DM.DM_GUNS) }, t, room.out);   // pozostali dostają {t:'joined'} (nowy gracz jeszcze nie jest na liście)
+  e.pid = DM.addPlayer(room.game, { uid: user.id, nick: e.nick, skin: e.skin, gold: hasGold(user.id), p90: hasItem(user.id, 'p90'), guns: arsenalGuns(user.id, DM.DM_GUNS) }, t, room.out);   // pozostali dostają {t:'joined'} (nowy gracz jeszcze nie jest na liście)
   room.entries.set(e.pid, e); dmUsers.set(user.id, e); ws.dm = e;
   wsSend(ws, DM.startMessage(room.game, e.pid, t));
   console.log(`[dm] lobby ${room.key}: ${e.nick} wszedł (${dmCount()}/${dmCfg.maxPlayers})`);
@@ -1216,6 +1234,12 @@ setInterval(() => {
     // wyrzuceni przez serwer trybu (antycheat, za długo na ekranie śmierci)
     for (const r of room.game.removed.splice(0)) { const e = room.entries.get(r.pid); if (e) dmPlayerGone(e, r.why, r.stats); else room.bots.delete(r.pid); }
     if (dmRooms.has(room)) dmBalanceBots(room, t);
+    // P90 za grę w Deathmatch: po minucie w lobby konto dostaje go na zawsze (od następnego awansu na drabince zamiast MP5K)
+    if (room.game.tick % 20 === 0) for (const e of room.entries.values()) {
+      if (e.p90 || e.gone || Date.now() - (e.at || Date.now()) < P90_PLAY_MS) continue;
+      e.p90 = true;
+      try { if (grantP90(e.user.id)) { const p = room.game.p.get(e.pid); if (p) p.p90 = true; wsSend(e.ws, { t: 'unlock', item: 'p90' }); } } catch (er) { console.error('[P90]', er.message); }
+    }
   }
 }, 50);
 

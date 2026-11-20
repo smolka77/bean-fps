@@ -158,23 +158,31 @@ const TXT = {
     keys: 'W / S elegir · Esc cerrar', net: 'red', drag: 'Arrastra para girar · rueda: zoom · doble clic: restablecer' },
 };
 // złoty AKM: limitowana broń (pierwsze 100 kont z rozegranym meczem 1v1; serwer: konto.limited i konto.goldLeft)
-const GOLD = 'akmgold';
+const GOLD = 'akmgold', P90 = 'p90';
 const GTXT = {
-  pl: { g_cat: 'Limitowany · złoty karabin', g_own: 'Twój', g_left: 'Zostało {n}/100', g_out: 'Rozdane', g_max: 'Tylko 100 sztuk',
+  pl: { p_cat: 'Pistolet maszynowy · darmowy', p_own: 'Twój', p_get: 'Za grę w DM', p_info: 'Darmowa broń: dostajesz ją na zawsze po minucie gry w Deathmatch. Zastępuje MP5K na drabince Deathmatch, a w 1v1 masz ją jako dodatkową broń.',
+    p_have: 'Masz P90 – jest Twój na zawsze.', p_play: 'Zagraj minutę w Deathmatch, żeby go dostać (za darmo).',
+    g_cat: 'Limitowany · złoty karabin', g_own: 'Twój', g_left: 'Zostało {n}/100', g_out: 'Rozdane', g_max: 'Tylko 100 sztuk',
     g_info: 'Limitowana broń: dostaje ją na zawsze pierwsze 100 kont, które rozegrają mecz 1v1. Zastępuje karabin w 1v1 i AKM na drabince Deathmatch.',
     g_have: 'Masz złotego AKM – jest Twój na zawsze.', g_play: 'Rozegraj mecz 1v1, żeby go zdobyć.', g_none: 'Wszystkie 100 sztuk zostały już rozdane.' },
-  en: { g_cat: 'Limited · golden rifle', g_own: 'Yours', g_left: '{n}/100 left', g_out: 'All gone', g_max: 'Only 100 made',
+  en: { p_cat: 'Submachine gun · free', p_own: 'Yours', p_get: 'Play DM', p_info: 'Free gun: play Deathmatch for a minute and it is yours forever. It replaces the MP5K on the Deathmatch ladder and is an extra gun in 1v1.',
+    p_have: 'You own the P90 – it is yours forever.', p_play: 'Play Deathmatch for a minute to get it (free).',
+    g_cat: 'Limited · golden rifle', g_own: 'Yours', g_left: '{n}/100 left', g_out: 'All gone', g_max: 'Only 100 made',
     g_info: 'Limited gun: the first 100 accounts to play a 1v1 match get it forever. It replaces your rifle in 1v1 and the AKM on the Deathmatch ladder.',
     g_have: 'You own the Golden AKM – it is yours forever.', g_play: 'Play a 1v1 match to get it.', g_none: 'All 100 have already been given out.' },
-  ru: { g_cat: 'Лимитированный · золотой автомат', g_own: 'Твой', g_left: 'Осталось {n}/100', g_out: 'Разобраны', g_max: 'Всего 100 штук',
+  ru: { p_cat: 'Пистолет-пулемёт · бесплатно', p_own: 'Твой', p_get: 'Сыграй DM', p_info: 'Бесплатное оружие: сыграй минуту в Deathmatch – и оно твоё навсегда. Заменяет MP5K в лестнице Deathmatch, а в 1v1 это дополнительное оружие.',
+    p_have: 'У тебя есть P90 – он твой навсегда.', p_play: 'Сыграй минуту в Deathmatch, чтобы получить его (бесплатно).',
+    g_cat: 'Лимитированный · золотой автомат', g_own: 'Твой', g_left: 'Осталось {n}/100', g_out: 'Разобраны', g_max: 'Всего 100 штук',
     g_info: 'Лимитированное оружие: навсегда получают первые 100 аккаунтов, сыгравших матч 1v1. Заменяет винтовку в 1v1 и AKM в лестнице Deathmatch.',
     g_have: 'У тебя есть золотой AKM – он твой навсегда.', g_play: 'Сыграй матч 1v1, чтобы получить его.', g_none: 'Все 100 штук уже разобраны.' },
-  es: { g_cat: 'Limitada · fusil dorado', g_own: 'Tuyo', g_left: 'Quedan {n}/100', g_out: 'Agotado', g_max: 'Solo 100 unidades',
+  es: { p_cat: 'Subfusil · gratis', p_own: 'Tuyo', p_get: 'Juega DM', p_info: 'Arma gratis: juega un minuto de Deathmatch y es tuya para siempre. Sustituye al MP5K en la escalera de Deathmatch y en 1v1 es un arma extra.',
+    p_have: 'Tienes la P90: es tuya para siempre.', p_play: 'Juega un minuto de Deathmatch para conseguirla (gratis).',
+    g_cat: 'Limitada · fusil dorado', g_own: 'Tuyo', g_left: 'Quedan {n}/100', g_out: 'Agotado', g_max: 'Solo 100 unidades',
     g_info: 'Arma limitada: la reciben para siempre las primeras 100 cuentas que jueguen una partida 1v1. Sustituye a tu fusil en 1v1 y al AKM en la escalera de Deathmatch.',
     g_have: 'Tienes el AKM dorado: es tuyo para siempre.', g_play: 'Juega una partida 1v1 para conseguirlo.', g_none: 'Ya se han repartido las 100 unidades.' },
 };
 for (const l in GTXT) Object.assign(TXT[l], GTXT[l]);
-const CAT = { glock17: 'c_pistol', deagle: 'c_hand', mp5k: 'c_smg', spas12: 'c_shot', akm: 'c_rifle', m4a1: 'c_rifle' };
+const CAT = { glock17: 'c_pistol', deagle: 'c_hand', mp5k: 'c_smg', p90: 'c_smg', spas12: 'c_shot', akm: 'c_rifle', m4a1: 'c_rifle' };
 const ORDER = ['glock17', 'deagle', 'mp5k', 'spas12', 'akm', 'm4a1'];   // jak na serwerze: pistolet + bronie z progiem
 const IC = {
   gun: '<svg viewBox="0 0 64 32" fill="currentColor"><path d="M2 9h40l2-3h6v3h12v5H50l-2 3H36l-4 3v8h-9l2-11H2z"/></svg>',
@@ -324,8 +332,10 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
   const restart = (el) => { el.classList.remove('swap'); void el.offsetWidth; el.classList.add('swap'); };   // ponowne odpalenie animacji wejścia
   const W = () => wallet();
   const online = () => !!(W() && W().api);
-  const guns = () => [...(s && s.base ? [s.base, ...(s.guns || [])] : ORDER), GOLD].filter((id) => WEAPON_STATS[id]);
-  const ownGold = () => { const a = acct(); return !!(a && (a.limited || []).includes(GOLD)); };
+  const guns = () => [...(s && s.base ? [s.base, ...(s.guns || [])] : ORDER), P90, GOLD].filter((id) => WEAPON_STATS[id]);
+  const owns = (id) => { const a = acct(); return !!(a && (a.limited || []).includes(id)); };
+  const ownGold = () => owns(GOLD);
+  const p90Lbl = () => owns(P90) ? `${IC.check}${esc(T('p_own'))}` : esc(T('p_get'));
   const goldLeft = () => { const a = acct(); return a && typeof a.goldLeft === 'number' ? a.goldLeft : null; };
   const goldLbl = () => ownGold() ? `${IC.check}${esc(T('g_own'))}` : goldLeft() === 0 ? esc(T('g_out')) : goldLeft() == null ? esc(T('g_max')) : esc(T('g_left', { n: goldLeft() }));
   const active = () => !!(s && s.enabled);
@@ -335,6 +345,7 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
   const usdOf = (v) => s && s.price && solMode() ? '≈ $' + (v * s.price).toLocaleString(loc(), { maximumFractionDigits: v * s.price >= 100 ? 0 : 2 }) : '';
   const stateOf = (id) => {
     if (id === GOLD) return ownGold() ? 'ok' : 'lk';               // złoty AKM: tylko posiadacze, niezależnie od progów Ekwipunku
+    if (id === P90) return owns(P90) ? 'ok' : 'lk';                 // P90: za grę w Deathmatch, niezależnie od progów
     if (!active()) return 'all';
     if (id === s.base) return 'bs';
     return bal() + 1e-9 >= (s.need[id] ?? Infinity) ? 'ok' : 'lk';
@@ -393,7 +404,7 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     const note = Q('.ars-note'), msg = !online() ? T('offline') : err ? err : s && !s.enabled ? T('off') : '';
     note.hidden = !msg; note.textContent = msg; note.classList.toggle('err', !!err);
     // lista: przebudowa tylko po zmianie danych; zmiana wyboru = przesunięcie podświetlenia (płynne przejście w CSS)
-    const rows = list.map((g) => { const k = stateOf(g), lbl = g === GOLD ? goldLbl() : k === 'ok' ? `${IC.check}${esc(T('open'))}` : k === 'lk' ? `${IC.lock}${esc(num(s.need[g]))} ${esc(sym)}` : k === 'bs' ? esc(T('base')) : esc(T('all')); return [g, k, lbl]; });
+    const rows = list.map((g) => { const k = stateOf(g), lbl = g === GOLD ? goldLbl() : g === P90 ? p90Lbl() : k === 'ok' ? `${IC.check}${esc(T('open'))}` : k === 'lk' ? `${IC.lock}${esc(num(s.need[g]))} ${esc(sym)}` : k === 'bs' ? esc(T('base')) : esc(T('all')); return [g, k, lbl]; });
     const sig = getLang() + JSON.stringify(rows);
     if (sig !== listSig) { listSig = sig; Q('.ars-list').innerHTML = rows.map(([g, k, lbl], i) => `<button type="button" role="option" data-i="${i}" class="${k}"><span class="dot"></span><span>${esc(WEAPON_STATS[g].name)}</span><span class="st">${lbl}</span></button>`).join(''); }
     Q('.ars-list').querySelectorAll('button').forEach((b, i) => { b.classList.toggle('on', i === sel); b.setAttribute('aria-selected', String(i === sel)); });
@@ -412,10 +423,12 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     const changed = id !== shownId; shownId = id; shownSel = sel;
     const big = Q('.big'); big.className = 'big ' + st + (changed ? ' swap' : ''); if (changed) restart(big);
     if (changed) restart(Q('.ars-side'));
-    big.innerHTML = id === GOLD ? goldLbl() : st === 'ok' ? `${IC.check}${esc(T('open'))}` : st === 'lk' ? `${IC.lock}${esc(num(s.need[id]))} ${esc(sym)}` : st === 'bs' ? esc(T('base')) : esc(T('all'));
+    big.innerHTML = id === GOLD ? goldLbl() : id === P90 ? p90Lbl() : st === 'ok' ? `${IC.check}${esc(T('open'))}` : st === 'lk' ? `${IC.lock}${esc(num(s.need[id]))} ${esc(sym)}` : st === 'bs' ? esc(T('base')) : esc(T('all'));
     // wymaganie: próg, pasek postępu, ile brakuje
     let req = `<h3>${esc(WEAPON_STATS[id].name)}</h3><h4>${esc(T(CAT[id] || 'c_rifle'))}</h4>`;
-    if (id === GOLD) { req = `<h3>${esc(WEAPON_STATS[id].name)}</h3><h4>${esc(T('g_cat'))}</h4><p style="margin-top:12px">${esc(T('g_info'))}</p>`
+    if (id === P90) req = `<h3>${esc(WEAPON_STATS[id].name)}</h3><h4>${esc(T('p_cat'))}</h4><p style="margin-top:12px">${esc(T('p_info'))}</p>`
+      + (owns(P90) ? `<p class="ok">${esc(T('p_have'))}</p>` : `<p>${esc(acct() ? T('p_play') : T('login'))}</p>`);
+    else if (id === GOLD) { req = `<h3>${esc(WEAPON_STATS[id].name)}</h3><h4>${esc(T('g_cat'))}</h4><p style="margin-top:12px">${esc(T('g_info'))}</p>`
       + (ownGold() ? `<p class="ok">${esc(T('g_have'))}</p>` : goldLeft() === 0 ? `<p>${esc(T('g_none'))}</p>` : `<p>${esc(acct() ? T('g_play') : T('login'))}</p>`); }
     else if (st === 'ok' && !(s.need[id] > 0)) req += `<p class="ok" style="margin-top:12px">${esc(T('free'))}</p>`;   // próg 0: broń dla każdego
     else if (st === 'lk' || st === 'ok') {

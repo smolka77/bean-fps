@@ -6,13 +6,13 @@ import { weaponAudio } from './weapons/_audio.js';
 export { weaponAudio };
 
 // kolejność = indeksy w paczkach sieciowych (serwer: serwer/dm.mjs WIDS, pierwsze cztery także serwer/mecz.mjs)
-export const WEAPON_IDS = ['akm', 'm4a1', 'glock17', 'deagle', 'spas12', 'mp5k', 'akmgold'];
+export const WEAPON_IDS = ['akm', 'm4a1', 'glock17', 'deagle', 'spas12', 'mp5k', 'akmgold', 'p90'];
 export const PISTOL_ID = 'glock17';                  // pistolet startowy (Deathmatch)
 
 // Statystyki. recoil.pitch/yaw w radianach na strzał, spread w radianach (połowa kąta stożka). snd = klucz próbek w _audio.js.
 export const WEAPON_STATS = {
   // obrażenia (ciało / głowa) wspólne dla wszystkich trybów – te same liczby są w serwer/mecz.mjs (1v1) i serwer/dm.mjs (Deathmatch):
-  // AKM 25/75, AKM Gold 34/90, M4A1 25/75, Glock-17 20/60, Desert Eagle 33/99, SPAS-12 10/15 na śrucinę, MP5K 18/54
+  // AKM 25/75, AKM Gold 34/90, M4A1 25/75, Glock-17 20/60, Desert Eagle 33/99, SPAS-12 10/15 na śrucinę, MP5K 18/54, P90 17/51
   akm:     { name: 'AKM',          slot: 1, auto: true,  rpm: 600, dmg: 25, head: 3,   mag: 30, reserve: 90,  reload: 2.45, draw: .55,
              recoil: { pitch: .0125, yaw: .0045, kick: .045, rot: .06 }, spread: { hip: .0075, ads: .0016, move: 1.15, bloom: .14 }, snd: 'akm',
              fov: 52, relief: .085, recoilTravel: .055 },
@@ -35,10 +35,14 @@ export const WEAPON_STATS = {
 };
 // Złoty AKM: ta sama broń co AKM (dźwięki, animacje, odrzut), inny model i mocniejszy strzał (34 / 90); tylko dla wybranych graczy (restricted)
 WEAPON_STATS.akmgold = { ...WEAPON_STATS.akm, name: 'AKM Gold', slot: 7, restricted: true, dmg: 34, head: 90 / 34 };
+// P90: darmowa broń za grę w Deathmatch (serwer: konto.limited zawiera 'p90'); pistolet maszynowy z magazynkiem na 50 naboi
+WEAPON_STATS.p90 = { name: 'P90', slot: 8, auto: true, rpm: 900, dmg: 17, head: 3, mag: 50, reserve: 100, reload: 3.1, draw: .45, restricted: true,
+  recoil: { pitch: .006, yaw: .0035, kick: .028, rot: .045 }, spread: { hip: .0075, ads: .0022, move: .8, bloom: .09 }, snd: 'p90',
+  fov: 56, relief: .085, recoilTravel: 0 };
 
 // ---------------- dostęp do broni z ograniczeniami ----------------
 // Broń z restricted: true widać (w slotach, później w sklepie) tylko u graczy, którym dano do niej dostęp.
-// Dostęp daje serwer: konto.limited (np. ['akmgold'] – złoty AKM dla pierwszych 100 kont z meczem 1v1) albo admin. Lobby woła setWeaponAccess(weaponAccessFor(konto))
+// Dostęp daje serwer: konto.limited (np. ['akmgold'] – złoty AKM dla pierwszych 100 kont z meczem 1v1, 'p90' – za grę w Deathmatch) albo admin. Lobby woła setWeaponAccess(weaponAccessFor(konto))
 // przy każdej zmianie konta, a gra dostaje zdarzenie 'fasolka:weapon-access'.
 const ACCESS = new Set();
 export function weaponAccessFor(acct) {

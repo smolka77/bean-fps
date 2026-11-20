@@ -6,7 +6,7 @@
 const DATA = {};
 const DATA_READY = Promise.all([
   ['akm', import('./akm-snd.js')], ['m4a1', import('./m4a1-snd.js')], ['glock17', import('./glock17-snd.js')], ['deagle', import('./deagle-snd.js')],
-  ['spas12', import('./spas12-snd.js')], ['mp5k', import('./mp5k-snd.js')], ['common', import('./_wspolne-snd.js')],
+  ['spas12', import('./spas12-snd.js')], ['mp5k', import('./mp5k-snd.js')], ['p90', import('./p90-snd.js')], ['common', import('./_wspolne-snd.js')],
 ].map(([id, p]) => p.then((m) => { DATA[id] = m.default; }, (e) => console.warn('Dźwięki broni', id, e && e.message))));
 const banks = new WeakMap();
 const bytes = (b64) => { const s = atob(b64), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u.buffer; };

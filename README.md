@@ -86,6 +86,7 @@ Modele 3D (licencja [CC-BY 4.0](http://creativecommons.org/licenses/by/4.0/), zm
 | Desert Eagle | [Desert Eagle](https://sketchfab.com/3d-models/desert-eagle-4be942b4b2004a6c9cc47e2961b8e6fd) | [Bagason](https://sketchfab.com/Bagason) |
 | SPAS-12 | [Half-Life 2 RTX Shotgun (Spas-12)](https://sketchfab.com/3d-models/half-life-2-rtx-shotgun-spas-12-bc0dfd824ccb4d5ebf007c654b42d428) | [carrilloriscomatias](https://sketchfab.com/carrilloriscomatias) |
 | MP5K | [MP5K](https://sketchfab.com/3d-models/mp5k-b47fa4053c1e4cfabe91b0046689f8c9) | [Shorty_Digitan](https://sketchfab.com/Shorty_Digitan) |
+| P90 | [P90](https://sketchfab.com/3d-models/p90-82d8b9f1e02b48f9b012698dcfa3352b) | [Rotuma](https://sketchfab.com/Rotuma) |
 
 ## Struktura
 

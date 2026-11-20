@@ -193,6 +193,12 @@ export function createDM(ctx) {
     if (m.k === S.pid) { S.me.kills++; if (m.h) ui.notify(tx('head'), 'gold', false, 'head'); else ui.notify(tx('kill') + ' · ' + esc(nameOf(m.v)), ''); ctx.sfx('kill'); }
   });
   // zabójstwo: po 1, potem 2, potem 3… zabójstwach serwer daje następną broń z drabinki (pełny magazynek) – w rękach bez animacji
+  // serwer: konto dostało broń za grę (P90 po minucie w Deathmatch) – w drabince od następnego awansu, w lobby w Ekwipunku
+  on('unlock', (m) => {
+    if (m.item !== 'p90') return;
+    ui.notify(`${esc(tx('unlockP90'))}<small>${esc(tx('unlockP90s'))}</small>`, 'gold', true); ctx.sfx('buy');
+    dispatchEvent(new CustomEvent('fasolka:unlock', { detail: m.item }));
+  });
   on('upgrade', (m) => {
     S.me.owned = m.owned; ui.setNext(m.lk, m.need, m.top, m.locked);
     if (m.up && !player.dead) { ctx.upgrade(m.up); ui.notify(`${esc(tx(m.level >= S.cfg.guns.length - 1 ? 'maxGun' : 'upgrade'))}<small>${esc(gunName(m.up))}</small>`, 'gold', true); ctx.sfx('buy'); }

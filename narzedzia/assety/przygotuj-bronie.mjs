@@ -53,6 +53,10 @@ export const WEAPONS = {
     parts: { pump: { joint: [49] } } },                                                                                  // czółenko: kość „joint47” szkieletu
   mp5k: { src: 'mp5k.glb', rotY: 0, length: 0.325, origin: [0.0061, -0.025, 0.111], tex: 1024,
     parts: { mag: [-0.0161, -0.025, -0.171, 0.0139, 0.015, -0.146] } },
+  // FN P90 (bullpup): magazynek leży poziomo na górze komory; materiał w pliku źródłowym jest „przezroczysty” (BLEND) bez kanału alfa,
+  // a tekstura emisji jest czarna – opaque i noEmissive naprawiają to (inaczej w grze części broni prześwitywałyby przez siebie)
+  p90: { src: 'p90.glb', rotY: 0, length: 0.5, origin: [0, -0.065, -0.05], tex: 1024, opaque: true, noEmissive: true,
+    parts: { mag: [-0.04, 0.065, -0.01, 0.04, 0.11, 0.05] } },
 };
 
 // ---------------- macierze (kolumnowe, jak w glTF) ----------------
@@ -183,6 +187,10 @@ async function goldify(doc, G) {
 async function buildModel(id, cfg, io, opt) {
   const doc = await io.read(path.join(MODELE, cfg.src));
   if (cfg.gold) await goldify(doc, cfg.gold);
+  for (const m of doc.getRoot().listMaterials()) {
+    if (cfg.opaque) m.setAlphaMode('OPAQUE');
+    if (cfg.noEmissive) { m.setEmissiveTexture(null); m.setEmissiveFactor([0, 0, 0]); }
+  }
   const root = doc.getRoot(), buffer = root.listBuffers()[0] || doc.createBuffer();
   const prims = bake(doc), info = align(prims, cfg);
   const groups = { body: [] }, report = [];
@@ -264,6 +272,8 @@ export const SOUNDS = {
     shell: ['nova/nova_insertshell_01.wav', 'nova/nova_insertshell_02.wav', 'nova/nova_insertshell_03.wav', 'nova/nova_insertshell_04.wav'] },
   mp5k: { shot: ['mp5/mp5_01.wav'], far: ['mp7/mp7-1-distant.wav'], draw: 'mp5/mp5_draw.wav', magOut: 'mp5/mp5_clipout.wav', magIn: 'mp5/mp5_clipin.wav',
     bolt: 'mp5/mp5_slideback.wav', boltFwd: 'mp5/mp5_slideforward.wav' },
+  p90: { shot: ['p90/p90_01.wav', 'p90/p90_02.wav', 'p90/p90_03.wav'], far: ['p90/p90-1-distant.wav'], draw: 'p90/p90_draw.wav',
+    magOut: 'p90/p90_clipout.wav', magIn: 'p90/p90_clipin.wav', magHit: 'p90/p90_cliphit.wav', bolt: 'p90/p90_boltback.wav', boltFwd: 'p90/p90_boltforward.wav' },
   // wspólne: suchy spust, zmiana broni
   _wspolne: { dryPistol: 'clipempty_pistol.wav', dryRifle: 'clipempty_rifle.wav' },
 };

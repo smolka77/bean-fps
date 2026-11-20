@@ -36,6 +36,11 @@ export const ANCHORS = {
     guardF:  { p: [0, .03, -.222],   n: [0, -1, 0],   w: [-.45, -.75, .5] },
     guardFF: { p: [0, .066, -.25],   n: [0, -1, 0],   w: [-.45, -.75, .5] },
   },
+  p90: {                                                                        // spód przodu korpusu przed osłoną spustu
+    guard:   { p: [0, .02, -.12],    n: [0, -1, 0],   w: [-.45, -.75, .5] },
+    guardF:  { p: [0, .02, -.13],    n: [0, -1, 0],   w: [-.45, -.75, .5] },
+    guardFF: { p: [0, .03, -.15],    n: [0, -1, 0],   w: [-.45, -.75, .5] },
+  },
   spas12: {                                                                     // spód czółenka
     guard:   { p: [0, .045, -.47],   n: [0, -1, 0],   w: [-.45, -.75, .5] },
     guardF:  { p: [0, .045, -.51],   n: [0, -1, 0],   w: [-.45, -.75, .5] },
@@ -139,6 +144,7 @@ export const TIMELINES = {
 };
 // MP5K i SPAS-12: ten sam rytm co M4A1, lewa dłoń na kotwicach guard* danej broni (chwyt przedni / czółenko)
 TIMELINES.mp5k = { ...TIMELINES.m4a1 };
+TIMELINES.p90 = { ...TIMELINES.m4a1 };
 TIMELINES.akmgold = TIMELINES.akm;                                               // złoty AKM: ten sam model co AKM
 ANCHORS.akmgold = ANCHORS.akm;
 TIMELINES.spas12 = { ...TIMELINES.m4a1, spring: { w: 13, z: 0.82 } };          // cięższa: wolniejsza sprężyna

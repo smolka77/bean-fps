@@ -12,8 +12,9 @@ import { pathToFileURL } from 'node:url';
 // ---------------- stałe zgodne z grą (zrodla/index.html, weaponry.js) ----------------
 export const WEAPON_IDS = ['akm', 'm4a1', 'glock17', 'deagle'];          // 1v1: drużyna niebieska M4A1 + Desert Eagle, czerwona AKM + Glock-17
 // indeksy broni w paczkach ruchu = WEAPON_IDS gry (zrodla/weaponry.js); w 1v1 poza czterema podstawowymi tylko złoty AKM (indeks 6) u posiadacza
-const IDX = ['akm', 'm4a1', 'glock17', 'deagle', 'spas12', 'mp5k', 'akmgold'], GOLD_W = 6;
-const okW = (p, i) => (i >= 0 && i < WEAPON_IDS.length) || (i === GOLD_W && !!p.gold);
+// P90 (indeks 7) u gracza, który dostał go za grę w Deathmatch
+const IDX = ['akm', 'm4a1', 'glock17', 'deagle', 'spas12', 'mp5k', 'akmgold', 'p90'], GOLD_W = 6, P90_W = 7;
+const okW = (p, i) => (i >= 0 && i < WEAPON_IDS.length) || (i === GOLD_W && !!p.gold) || (i === P90_W && !!p.p90);
 export const WEAPONS = {
   akm: { rpm: 600, dmg: 25, head: 3, mag: 30, reserve: 90, reload: 2.45, spread: { hip: 0.0075, ads: 0.0016, move: 1.15, bloom: 0.14 } },
   m4a1: { rpm: 700, dmg: 25, head: 3, mag: 30, reserve: 90, reload: 2.3, spread: { hip: 0.0065, ads: 0.0011, move: 1.0, bloom: 0.11 } },
@@ -22,6 +23,8 @@ export const WEAPONS = {
 };
 // złoty AKM (limitowany, pierwsze 100 kont z meczem 1v1): jak AKM, ale 34 obrażeń i 90 w głowę – jak WEAPON_STATS.akmgold w grze
 WEAPONS.akmgold = { ...WEAPONS.akm, dmg: 34, head: 90 / 34 };
+// P90 (darmowy za grę w Deathmatch): jak WEAPON_STATS.p90 w grze
+WEAPONS.p90 = { rpm: 900, dmg: 17, head: 3, mag: 50, reserve: 100, reload: 3.1, spread: { hip: 0.0075, ads: 0.0022, move: 0.8, bloom: 0.09 } };
 const R = 0.3;                         // promień gracza w fizyce gry
 const CROUCH_DROP = 0.25;              // o tyle opada tułów w przysiadzie
 const EYE = (s) => s.y + 1.3 - s.cr * (CROUCH_DROP + 0.12) - 0.1 * (s.sl || 0);
@@ -153,11 +156,16 @@ function newPlayer() {
     an: { shots: 0, hits: 0, heads: 0, hitsOpen: 0, headsOpen: 0, reactions: [], flicks: 0, flickHeads: 0, snaps: 0, snapHeads: 0, trigger: [], sprays: [], mismatch: 0, noSamp: 0,
       samples: 0, noShotSamp: 0, spikes: 0, firstOn: 0, sweep: 0, shotsOn: 0, shotsSeen: 0, track: { n: 0, on: 0, on1: 0 }, gaps: 0, sevMoves: 0, rtts: [] } };
 }
-function refill(p) { p.ammo = {}; for (const id of [...WEAPON_IDS, ...(p.gold ? ['akmgold'] : [])]) p.ammo[id] = { mag: WEAPONS[id].mag, res: WEAPONS[id].reserve }; p.reloadW = -1; p.bloom = 0; }
+function refill(p) { p.ammo = {}; for (const id of [...WEAPON_IDS, ...(p.gold ? ['akmgold'] : []), ...(p.p90 ? ['p90'] : [])]) p.ammo[id] = { mag: WEAPONS[id].mag, res: WEAPONS[id].reserve }; p.reloadW = -1; p.bloom = 0; }
 // złoty AKM dla gracza na tym miejscu (serwer.mjs woła przed startem meczu)
 export function setGold(room, seat, on) {
   const p = room.p[seat]; p.gold = !!on; refill(p);
   if (p.gold && p.allowW && !p.allowW.includes(GOLD_W)) p.allowW.push(GOLD_W);
+}
+// P90 dla gracza na tym miejscu (serwer.mjs woła przed startem meczu)
+export function setP90(room, seat, on) {
+  const p = room.p[seat]; p.p90 = !!on; refill(p);
+  if (p.p90 && p.allowW && !p.allowW.includes(P90_W)) p.allowW.push(P90_W);
 }
 
 export function createRoom(mapName, now) {

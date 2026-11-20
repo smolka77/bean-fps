@@ -434,6 +434,7 @@ export function initLobbyUI(ctx) {
     ({ settings: () => openModal('lb-set'), wallet: () => openWallet(), tutorial: () => TUT.show(), auth: () => openModal('lb-auth'), logout: () => logout() })[b.dataset.act](); });
 
   // ---- Arsenał: bronie za trzymanie tokenu (arsenal.js; kafelek w lewym dolnym rogu) ----
+  addEventListener('fasolka:unlock', () => { if (W) W.refresh().catch(() => {}); });   // broń za grę (P90): konto z serwera od razu (Ekwipunek, Strzelnica)
   addEventListener('fasolka:skin-locked', e => { const d = e.detail || {}; toast(t('skin.locked', { s: d.name || '', n: d.need || '' }), 'err'); });   // skin z kreatora poniżej progu Arsenału
   const ARSX = createArsenal({ root: ui, getLang: () => LANG, toast, sfx: SFX, wallet: () => W, acct: () => acct, art: ctx.weaponArt || null, openAuth: () => openModal('lb-auth'), openWallet: () => openWallet() });
 

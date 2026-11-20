@@ -13,8 +13,9 @@
 import * as MECZ from './mecz.mjs';
 
 // kolejność jak WEAPON_IDS w grze (zrodla/weaponry.js) – w paczkach ruchu broń to indeks w tej liście
-export const WIDS = ['akm', 'm4a1', 'glock17', 'deagle', 'spas12', 'mp5k', 'akmgold'];   // akmgold: złoty AKM – limitowany (pierwsze 100 kont z meczem 1v1), u posiadacza zastępuje AKM na drabince
-export const GOLD = 'akmgold';
+export const WIDS = ['akm', 'm4a1', 'glock17', 'deagle', 'spas12', 'mp5k', 'akmgold', 'p90'];   // p90: darmowa za grę w Deathmatch, u posiadacza zastępuje MP5K na drabince
+// akmgold: złoty AKM – limitowany (pierwsze 100 kont z meczem 1v1), u posiadacza zastępuje AKM na drabince
+export const GOLD = 'akmgold', P90 = 'p90';
 export const DM_GUNS = ['glock17', 'deagle', 'spas12', 'mp5k', 'akm', 'm4a1'];   // drabinka broni: start z pierwszą, każde zabójstwo = następna
 export const PISTOL = 'glock17';
 
@@ -48,6 +49,9 @@ export const DEFAULTS = {
                falloff: [30, 80, 0.7],  recoil: { pitch: 0.0125, yaw: 0.0045 }, spread: { hip: 0.0075, ads: 0.0016, move: 1.15, bloom: 0.14 } },
     m4a1:    { name: 'M4A1',         price: 1900, dmg: 25, head: 3,   rpm: 700, auto: true,  mag: 30, reserve: 120, reload: 2.3,  pellets: 1, pelletSpread: 0,
                falloff: [35, 90, 0.72], recoil: { pitch: 0.0092, yaw: 0.0032 }, spread: { hip: 0.0065, ads: 0.0011, move: 1.0, bloom: 0.11 } },
+    // P90 (darmowy za grę w Deathmatch): pistolet maszynowy jak MP5K, ale magazynek 50 i trochę słabszy strzał (17 / 51)
+    p90:     { name: 'P90',          price: 0,    dmg: 17, head: 3,   rpm: 900, auto: true,  mag: 50, reserve: 100, reload: 3.1,  pellets: 1, pelletSpread: 0,
+               falloff: [18, 45, 0.6],  recoil: { pitch: 0.006, yaw: 0.0035 },  spread: { hip: 0.0075, ads: 0.0022, move: 0.8, bloom: 0.09 } },
     // złoty AKM (limitowany): jak AKM, ale 34 obrażeń i 90 w głowę (headshot zabija jednym strzałem) – jak WEAPON_STATS.akmgold w grze
     akmgold: { name: 'AKM Gold',     price: 0,    dmg: 34, head: 90 / 34, rpm: 600, auto: true, mag: 30, reserve: 120, reload: 2.45, pellets: 1, pelletSpread: 0,
                falloff: [30, 80, 0.7],  recoil: { pitch: 0.0125, yaw: 0.0045 }, spread: { hip: 0.0075, ads: 0.0016, move: 1.15, bloom: 0.14 } },
@@ -83,7 +87,7 @@ export function sanitizeConfig(src = {}) {
     o.armor[k] = { name: String(a.name || d.name).slice(0, 32), price: Math.round(num(a.price, 0, 100000, d.price)), hp: Math.round(num(a.hp, 1, 500, d.hp)) };
     if (k === 'helmet') o.armor[k].headMult = num(a.headMult, 0, 1, d.headMult); }
   o.weapons = {};
-  for (const id of [...DM_GUNS, GOLD]) {
+  for (const id of [...DM_GUNS, GOLD, P90]) {
     const w = (s.weapons || {})[id] || {}, d = D.weapons[id], f = Array.isArray(w.falloff) ? w.falloff : d.falloff;
     o.weapons[id] = {
       name: String(w.name || d.name).slice(0, 24), price: id === PISTOL ? 0 : Math.round(num(w.price, 0, 100000, d.price)),
@@ -204,7 +208,7 @@ export function navPath(map, fx, fz, tx, tz) {
 // ---------------- pokój ----------------
 const RW = 0.12;                                            // ile s po śmierci przeciwnik jeszcze jest w historii (żeby strzał oddany chwilę przed śmiercią się liczył)
 function newPlayer(pid, info, cfg) {
-  return { pid, uid: info.uid, nick: info.nick, skin: info.skin || '', bot: !!info.bot, gold: !!info.gold,
+  return { pid, uid: info.uid, nick: info.nick, skin: info.skin || '', bot: !!info.bot, gold: !!info.gold, p90: !!info.p90,
     guns: Array.isArray(info.guns) ? new Set(info.guns) : null,     // Arsenał: bronie, które gracz może kupić (null = wszystkie)
     x: 0, y: 0, z: 0, yaw: 0, pitch: 0, cr: 0, sl: 0, ads: 0, w: WIDS.indexOf(PISTOL), run: 0, air: 0, legYaw: 0,
     hp: 100, armor: 0, helmet: false, alive: false, dead: true, deadAt: -99, life: 0, protUntil: 0, level: 0, lk: 0,
@@ -216,10 +220,10 @@ function newPlayer(pid, info, cfg) {
 // drabinka: kolejna broń za coraz więcej zabójstw – 1. awans za 1 zabójstwo, 2. za kolejne 2, 3. za kolejne 3 itd. (lk = zabójstwa od ostatniego awansu)
 // Ekwipunek: drabinka pomija bronie, których gracz nie ma odblokowanych (p.guns; null = wszystkie)
 // Ekwipunek: drabinka pomija bronie bez progu; złoty AKM (zamiast AKM) posiadacz ma zawsze, bez względu na saldo
-const nextLevel = (p) => { let nl = p.level + 1; while (nl < DM_GUNS.length && p.guns && !p.guns.has(DM_GUNS[nl]) && !(DM_GUNS[nl] === 'akm' && p.gold)) nl++; return nl; };
+const nextLevel = (p) => { let nl = p.level + 1; while (nl < DM_GUNS.length && p.guns && !p.guns.has(DM_GUNS[nl]) && !(DM_GUNS[nl] === 'akm' && p.gold) && !(DM_GUNS[nl] === 'mp5k' && p.p90)) nl++; return nl; };
 const killsNeed = (p) => p.level + 1;
 // broń gracza na danym poziomie drabinki: posiadacz złotego AKM dostaje go zamiast zwykłego AKM
-const gunOf = (p, level = p.level) => { const g = DM_GUNS[Math.min(DM_GUNS.length - 1, Math.max(0, level))] || PISTOL; return g === 'akm' && p.gold ? GOLD : g; };
+const gunOf = (p, level = p.level) => { const g = DM_GUNS[Math.min(DM_GUNS.length - 1, Math.max(0, level))] || PISTOL; return g === 'akm' && p.gold ? GOLD : g === 'mp5k' && p.p90 ? P90 : g; };
 const ownedFor = (level, p) => new Set([PISTOL, gunOf(p, level)]);
 function refillOwned(p, cfg) { p.ammo = {}; for (const id of p.owned) p.ammo[id] = { mag: cfg.weapons[id].mag, res: cfg.weapons[id].reserve }; p.reloadW = -1; p.bloom = 0; }
 
@@ -297,7 +301,7 @@ function spawnPlayer(room, p, now, out, initial = false) {
   const msg = { t: 'spawn', life: p.life, p: [s.x, s.y, s.z].map((v) => +v.toFixed(3)), yaw: +s.yaw.toFixed(3), prot: room.cfg.spawnProtect, ...invOf(p) };
   if (out) out(p.pid, msg); else p.pendingSpawn = msg;
 }
-const invOf = (p) => ({ money: p.money, owned: [...DM_GUNS, GOLD].filter((g) => p.owned.has(g)), gun: gunOf(p), level: p.level,
+const invOf = (p) => ({ money: p.money, owned: [...DM_GUNS, GOLD, P90].filter((g) => p.owned.has(g)), gun: gunOf(p), level: p.level,
   lk: p.lk || 0, need: killsNeed(p), top: nextLevel(p) >= DM_GUNS.length ? 1 : 0, locked: nextLevel(p) >= DM_GUNS.length && p.level < DM_GUNS.length - 1 ? 1 : 0,   // postęp do następnej broni (HUD); locked = dalsze bronie zablokowane Ekwipunkiem
   armor: p.armor, helmet: p.helmet, hp: p.hp });
 
