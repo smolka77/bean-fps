@@ -5,7 +5,7 @@
 // Niebo, mgła, światło, padający śnieg i góry na horyzoncie: themeSnow w zrodla/klimaty.js.
 import * as THREE from 'three';
 import { Kit, M4, V3, between, jitter, rng, mats } from './klimaty.js';
-import { HX, HZ, LAND, LAKE, RIDGE, STEPS, IGLOO, CABIN, CABIN_WALLS, HUT, BOAT, ICE_BLOCKS, OBJECTS, localBoxes, baseY } from './iglo-data.js';
+import { HX, HZ, LAND, LAKE, RIDGE, STEPS, SHORE_STEPS, IGLOO, CABIN, CABIN_WALLS, HUT, BOAT, ICE_BLOCKS, OBJECTS, localBoxes, baseY } from './iglo-data.js';
 
 const PI = Math.PI, UP = V3(0, 1, 0);
 const MZ = new THREE.Matrix4().makeScale(1, 1, -1);                 // odbicie strony A na stronę B
@@ -288,6 +288,8 @@ function ridge(A, rand) {
   rockFace(H, D, x0, z1, x1, z1, 0, 1, LAND, top, rand);         // od jeziora
   for (const [a, c, b, d] of STEPS) blockWall(H, a, LAND, c, b, 1.0, d, rand, { course: 0.5, len: 0.8, cols: ['#eef4fa', '#e6eef6', '#f3f7fb'] });
   for (const [a, c, b, d] of STEPS) D.box(b - a + 0.04, 0.05, d - c + 0.04, '#f6f9fc', M4((a + b) / 2, 1.01, (c + d) / 2));
+  // stopnie ze śniegu przy brzegu jeziora (z lodu na ląd)
+  for (const [a, b] of SHORE_STEPS) { blockWall(H, a, 0, -LAKE, b, 0.25, -LAKE + 0.6, rand, { course: 0.25, len: 0.6, cols: ['#eef4fa', '#e6eef6', '#f3f7fb'] }); D.box(b - a + 0.04, 0.04, 0.64, '#f6f9fc', M4((a + b) / 2, 0.26, -LAKE + 0.3)); }
 }
 
 // ======================================================================================================

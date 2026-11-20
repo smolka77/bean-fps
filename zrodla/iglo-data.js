@@ -25,6 +25,11 @@ const both = (x0, y0, z0, x1, y1, z1) => { box(x0, y0, z0, x1, y1, z1); box(x0, 
 // ---------------- teren: dwa brzegi ze śniegiem, między nimi lód ----------------
 both(-HX, 0, -HZ, HX, LAND, -LAKE);
 
+// stopnie ze śniegu przy brzegu (0,25 m – w połowie wysokości brzegu) tam, gdzie dochodzą ścieżki: przy przejściu w murku, od chaty i spod grani.
+// Gracz wchodzi na brzeg i bez nich (0,5 m), ale Deathmatch (odradzanie, drogi botów) przechodzi tylko po stopniach do 0,35 m.
+export const SHORE_STEPS = [[-0.9, 0.9], [5.3, 7.1], [-14.3, -12.5]];                       // [x0, x1] strony A, z od −7 do −6,4 (B = odbicie)
+for (const [x0, x1] of SHORE_STEPS) both(x0, 0, -LAKE, x1, 0.25, -LAKE + 0.6);
+
 // ---------------- grań (zachód): płaskowyż 1,5 m ze stopniami ze śniegu z trzech stron ----------------
 both(RIDGE.x0, 0, RIDGE.z0, RIDGE.x1, RIDGE.top, RIDGE.z1);
 export const STEPS = [                                                                       // stopnie 1,0 m (strona A, B = odbicie)
