@@ -35,6 +35,8 @@ const T = {
     coinSolT: 'Ekwipunek – bronie za saldo', coinSolL: 'Na start masz pistolet. Trzymaj SOL na saldzie w grze, a odblokujesz resztę broni (1v1 i Deathmatch).',
     coinTokT: 'Coin {sym} – bronie za trzymanie', coinTokL: 'Na start masz pistolet. Trzymaj {sym} na swoim adresie w grze, a odblokujesz resztę broni (1v1 i Deathmatch).',
     coinNone: 'Nic się nie pobiera – liczy się samo saldo', coinDrop: 'Gdy saldo spadnie poniżej progu, broń znów się zablokuje', coinCa: 'CA: <code>{ca}</code>', coinNeed: '{gun}: od {n} {u}',
+coinHoldT: 'Coin {sym} – bronie za trzymanie', coinHoldL: 'Na start masz pistolet. Podepnij swój portfel z {sym} albo trzymaj tyle samo wartości w SOL w grze, a odblokujesz resztę broni (1v1 i Deathmatch).',
+    coinHoldW: '<b>Portfel</b>: Ekwipunek → „Podepnij portfel” (Phantom, Solflare) – podpis nic nie kosztuje, tokeny zostają u Ciebie', coinHoldS: '<b>Bez portfela</b>: liczy się SOL w grze po bieżącym kursie {sym}',
     coinOffT: 'Ekwipunek', coinOffL: 'Teraz wszystkie bronie są dostępne dla każdego. Gdy włączymy Ekwipunek, część broni odblokujesz za trzymanie SOL lub coina – nic nie będzie pobierane.' },
   en: { skip: 'Skip', back: 'Back', next: 'Next', go: 'Let’s play!', menu: 'How to play', step: '{i} / {n}',
     s: [
@@ -56,6 +58,8 @@ const T = {
     coinSolT: 'Inventory – guns for your balance', coinSolL: 'You start with a pistol. Keep SOL in your in-game balance to unlock the other guns (1v1 and Deathmatch).',
     coinTokT: '{sym} coin – guns for holding', coinTokL: 'You start with a pistol. Hold {sym} on your in-game address to unlock the other guns (1v1 and Deathmatch).',
     coinNone: 'Nothing is charged – only the balance counts', coinDrop: 'If your balance drops below a threshold, that gun locks again', coinCa: 'CA: <code>{ca}</code>', coinNeed: '{gun}: from {n} {u}',
+coinHoldT: '{sym} coin – guns for holding', coinHoldL: 'You start with a pistol. Link your wallet holding {sym}, or keep the same value in SOL in the game, to unlock the other guns (1v1 and Deathmatch).',
+    coinHoldW: '<b>Wallet</b>: Inventory → “Link wallet” (Phantom, Solflare) – signing is free and the tokens stay with you', coinHoldS: '<b>No wallet</b>: your in-game SOL counts at the current {sym} price',
     coinOffT: 'Inventory', coinOffL: 'Right now every gun is available to everyone. When Inventory is on, some guns unlock for holding SOL or the coin – nothing is ever charged.' },
   ru: { skip: 'Пропустить', back: 'Назад', next: 'Далее', go: 'Играем!', menu: 'Как играть', step: '{i} / {n}',
     s: [
@@ -77,6 +81,8 @@ const T = {
     coinSolT: 'Инвентарь – оружие за баланс', coinSolL: 'На старте у тебя пистолет. Держи SOL на игровом балансе – и откроешь остальное оружие (1v1 и Deathmatch).',
     coinTokT: 'Монета {sym} – оружие за удержание', coinTokL: 'На старте у тебя пистолет. Держи {sym} на своём игровом адресе – и откроешь остальное оружие (1v1 и Deathmatch).',
     coinNone: 'Ничего не списывается – важен только баланс', coinDrop: 'Если баланс упадёт ниже порога, оружие снова заблокируется', coinCa: 'CA: <code>{ca}</code>', coinNeed: '{gun}: от {n} {u}',
+coinHoldT: 'Монета {sym} – оружие за удержание', coinHoldL: 'На старте у тебя пистолет. Подключи свой кошелёк с {sym} или держи столько же по стоимости в SOL в игре – и откроешь остальное оружие (1v1 и Deathmatch).',
+    coinHoldW: '<b>Кошелёк</b>: Инвентарь → «Подключить кошелёк» (Phantom, Solflare) – подпись бесплатна, токены остаются у тебя', coinHoldS: '<b>Без кошелька</b>: считается SOL в игре по текущему курсу {sym}',
     coinOffT: 'Инвентарь', coinOffL: 'Сейчас всё оружие доступно всем. Когда включим Инвентарь, часть оружия откроется за удержание SOL или монеты – ничего не будет списываться.' },
   es: { skip: 'Saltar', back: 'Atrás', next: 'Siguiente', go: '¡A jugar!', menu: 'Cómo jugar', step: '{i} / {n}',
     s: [
@@ -98,6 +104,8 @@ const T = {
     coinSolT: 'Inventario – armas por tu saldo', coinSolL: 'Empiezas con una pistola. Mantén SOL en tu saldo del juego y desbloquea el resto de armas (1v1 y Deathmatch).',
     coinTokT: 'Moneda {sym} – armas por mantenerla', coinTokL: 'Empiezas con una pistola. Guarda {sym} en tu dirección del juego y desbloquea el resto de armas (1v1 y Deathmatch).',
     coinNone: 'No se cobra nada: solo cuenta el saldo', coinDrop: 'Si el saldo baja del umbral, el arma se vuelve a bloquear', coinCa: 'CA: <code>{ca}</code>', coinNeed: '{gun}: desde {n} {u}',
+coinHoldT: 'Moneda {sym} – armas por mantenerla', coinHoldL: 'Empiezas con una pistola. Conecta tu cartera con {sym} o guarda el mismo valor en SOL en el juego y desbloquea el resto de armas (1v1 y Deathmatch).',
+    coinHoldW: '<b>Cartera</b>: Inventario → «Conectar cartera» (Phantom, Solflare): firmar es gratis y los tokens se quedan contigo', coinHoldS: '<b>Sin cartera</b>: cuenta tu SOL del juego al precio actual de {sym}',
     coinOffT: 'Inventario', coinOffL: 'Ahora todas las armas están disponibles para todos. Cuando activemos el Inventario, algunas armas se desbloquearán por mantener SOL o la moneda: nunca se cobrará nada.' },
 };
 
@@ -142,11 +150,12 @@ export function createTutorial({ getLang, api }) {
   function coinSlide(t) {
     const a = info && info.ars;
     if (!a || !a.enabled) return [t.coinOffT, t.coinOffL, info && info.ca ? [t.coinCa.replace('{ca}', esc(info.ca))] : []];
-    const tok = a.unit === 'token', sym = esc(a.symbol || 'TOKEN'), u = tok ? sym : 'SOL';
+    const tok = a.unit === 'token', hold = a.unit === 'hold', sym = esc(a.symbol || 'TOKEN'), u = tok || hold ? sym : 'SOL';
     const needs = Object.entries(a.need || {}).filter(([, n]) => +n > 0).sort((x, y) => x[1] - y[1]).slice(0, 3)
       .map(([g, n]) => t.coinNeed.replace('{gun}', GUN[g] || g).replace('{n}', String(+n)).replace('{u}', u));
-    const list = [t.coinNone, ...needs, t.coinDrop];
-    if (tok && info.ca) list.push(t.coinCa.replace('{ca}', esc(info.ca)));
+    const list = [...(hold ? [t.coinHoldW, t.coinHoldS.replace('{sym}', sym)] : []), t.coinNone, ...needs, t.coinDrop];
+    if ((tok || hold) && info.ca) list.push(t.coinCa.replace('{ca}', esc(info.ca)));
+    if (hold) return [t.coinHoldT.replace('{sym}', sym), t.coinHoldL.replace(/\{sym\}/g, sym), list];   // portfel z tokenem albo SOL w grze po kursie
     return [(tok ? t.coinTokT : t.coinSolT).replace('{sym}', sym), (tok ? t.coinTokL : t.coinSolL).replace(/\{sym\}/g, sym), list];
   }
   async function show() {

@@ -182,6 +182,33 @@ const GTXT = {
     g_have: 'Tienes el AKM dorado: es tuyo para siempre.', g_play: 'Juega una partida 1v1 para conseguirlo.', g_none: 'Ya se han repartido las 100 unidades.' },
 };
 for (const l in GTXT) Object.assign(TXT[l], GTXT[l]);
+// tryb 'hold': token na podpiętym własnym portfelu albo SOL w grze o tej samej wartości (serwer: serwer/arsenal.mjs, /api/hold/*)
+const HTXT = {
+  pl: { subHold: 'Na start masz pistolet. Podepnij portfel z {s} albo trzymaj tyle samo wartości w SOL w grze, a odblokujesz resztę broni – nic się nie pobiera.',
+    howHold: 'Dwie drogi, liczy się lepsza: podepnij swój portfel (Phantom, Solflare) z tokenem {s} – tokeny zostają u Ciebie – albo bez portfela trzymaj SOL w grze o tej samej wartości (po bieżącym kursie {s}).',
+    opt1: 'Portfel z {s}', opt2: 'Albo SOL w grze', link: 'Podepnij portfel', unlink: 'Odepnij', linking: 'Podpisz w portfelu…', linkOk: 'Portfel podpięty', unlinkOk: 'Portfel odpięty',
+    noWallet: 'Nie wykryto portfela Solana (Phantom, Solflare) w tej przeglądarce', rejected: 'Anulowano w portfelu', orSol: 'albo {n} SOL w grze', fromWallet: 'portfel {a}', fromSol: 'z {n} SOL w grze',
+    ca: 'CA tokenu', noPrice: 'Brak kursu {s} – SOL w grze chwilowo nie odblokowuje broni. Spróbuj za chwilę.', signFree: 'Podpis nic nie kosztuje i nie wysyła transakcji.' },
+  en: { subHold: 'You start with a pistol. Link a wallet holding {s}, or keep the same value in SOL in the game, to unlock the other guns – nothing is charged.',
+    howHold: 'Two ways, the better one counts: link your own wallet (Phantom, Solflare) holding {s} – the tokens stay with you – or, without a wallet, keep SOL in the game worth the same (at the current {s} price).',
+    opt1: 'Wallet with {s}', opt2: 'Or SOL in the game', link: 'Link wallet', unlink: 'Unlink', linking: 'Sign in your wallet…', linkOk: 'Wallet linked', unlinkOk: 'Wallet unlinked',
+    noWallet: 'No Solana wallet (Phantom, Solflare) found in this browser', rejected: 'Cancelled in the wallet', orSol: 'or {n} SOL in the game', fromWallet: 'wallet {a}', fromSol: 'from {n} SOL in the game',
+    ca: 'Token CA', noPrice: 'No {s} price right now – SOL in the game does not unlock guns for the moment. Try again shortly.', signFree: 'Signing is free and sends no transaction.' },
+  ru: { subHold: 'На старте у тебя пистолет. Подключи кошелёк с {s} или держи столько же по стоимости в SOL в игре – и откроешь остальное оружие. Ничего не списывается.',
+    howHold: 'Два пути, считается лучший: подключи свой кошелёк (Phantom, Solflare) с токеном {s} – токены остаются у тебя – или без кошелька держи SOL в игре на ту же сумму (по текущему курсу {s}).',
+    opt1: 'Кошелёк с {s}', opt2: 'Или SOL в игре', link: 'Подключить кошелёк', unlink: 'Отключить', linking: 'Подпиши в кошельке…', linkOk: 'Кошелёк подключён', unlinkOk: 'Кошелёк отключён',
+    noWallet: 'В этом браузере не найден кошелёк Solana (Phantom, Solflare)', rejected: 'Отменено в кошельке', orSol: 'или {n} SOL в игре', fromWallet: 'кошелёк {a}', fromSol: 'из {n} SOL в игре',
+    ca: 'CA токена', noPrice: 'Нет курса {s} – SOL в игре пока не открывает оружие. Попробуй чуть позже.', signFree: 'Подпись бесплатна и не отправляет транзакцию.' },
+  es: { subHold: 'Empiezas con una pistola. Conecta una cartera con {s} o guarda el mismo valor en SOL en el juego y desbloquea el resto de armas: no se cobra nada.',
+    howHold: 'Dos caminos, cuenta el mejor: conecta tu propia cartera (Phantom, Solflare) con el token {s} – los tokens se quedan contigo – o, sin cartera, guarda SOL en el juego por el mismo valor (al precio actual de {s}).',
+    opt1: 'Cartera con {s}', opt2: 'O SOL en el juego', link: 'Conectar cartera', unlink: 'Desconectar', linking: 'Firma en tu cartera…', linkOk: 'Cartera conectada', unlinkOk: 'Cartera desconectada',
+    noWallet: 'No se encontró una cartera de Solana (Phantom, Solflare) en este navegador', rejected: 'Cancelado en la cartera', orSol: 'o {n} SOL en el juego', fromWallet: 'cartera {a}', fromSol: 'de {n} SOL en el juego',
+    ca: 'CA del token', noPrice: 'Sin precio de {s} ahora mismo: el SOL del juego no desbloquea armas por el momento. Inténtalo en un rato.', signFree: 'Firmar es gratis y no envía ninguna transacción.' },
+};
+for (const l in HTXT) Object.assign(TXT[l], HTXT[l]);
+// portfel Solana w przeglądarce (Phantom, Solflare, Backpack) – musi umieć podpisać wiadomość
+const solProvider = () => { const w = typeof window !== 'undefined' ? window : {}; return [w.phantom && w.phantom.solana, w.solflare, w.backpack, w.solana].find((p) => p && typeof p.connect === 'function' && typeof p.signMessage === 'function') || null; };
+const short = (a) => (a ? a.slice(0, 4) + '…' + a.slice(-4) : '');
 const CAT = { glock17: 'c_pistol', deagle: 'c_hand', mp5k: 'c_smg', p90: 'c_smg', spas12: 'c_shot', akm: 'c_rifle', m4a1: 'c_rifle' };
 const ORDER = ['glock17', 'deagle', 'mp5k', 'spas12', 'akm', 'm4a1'];   // jak na serwerze: pistolet + bronie z progiem
 const IC = {
@@ -292,6 +319,12 @@ const CSS = `
 #lb-ui .ars-addr{display:flex;align-items:center;gap:10px}
 #lb-ui .ars-addr small{display:block;font:700 11px/1 'Barlow Condensed',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#a39aae}
 #lb-ui .ars-addr code{display:block;margin-top:5px;font:600 14px/1 ui-monospace,Menlo,Consolas,monospace;color:#fff;word-break:break-all}
+#lb-ui .ars-opts{display:flex;flex-direction:column;gap:10px;min-width:300px}
+#lb-ui .ars-opts .ars-addr{justify-content:space-between;padding:10px 12px;background:rgba(255,255,255,.05)}
+#lb-ui .ars-addr em{display:block;margin-top:5px;font-style:normal;font-size:13px;color:#cfc6d8}
+#lb-ui .ars-ft p.ca{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:#a39aae}#lb-ui .ars-ft p.ca code{font:600 12px ui-monospace,Menlo,Consolas,monospace;color:#fff;word-break:break-all}
+#lb-ui .ars-ft p.ca .ars-btn{height:26px;padding:0 8px}
+#lb-ui .ars-req p.alt{margin:6px 0 0;font-size:13px;color:#a39aae}
 #lb-ui .ars-keys{position:absolute;right:max(28px,env(safe-area-inset-right));bottom:6px;font-size:11px;color:#6f6680;letter-spacing:.06em}
 @media (max-width:1100px){#lb-ui .ars-body{grid-template-columns:minmax(220px,320px) 1fr}#lb-ui .ars-side{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr}}
 @media (max-width:760px){
@@ -305,7 +338,7 @@ const CSS = `
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, wallet = () => null, acct = () => null, art = null, openAuth = () => {}, openWallet = () => {} }) {
-  const T = (k, v) => { let s = (TXT[getLang()] || TXT.en)[k] ?? TXT.en[k] ?? k; if (v) for (const n in v) s = s.replace('{' + n + '}', v[n]); return s; };
+  const T = (k, v) => { let s = (TXT[getLang()] || TXT.en)[k] ?? TXT.en[k] ?? k; if (v) for (const n in v) s = s.split('{' + n + '}').join(v[n]); return s; };
   const loc = () => ({ pl: 'pl-PL', en: 'en-US', ru: 'ru-RU', es: 'es-ES' })[getLang()] || 'en-US';
   const num = (v) => (+v || 0).toLocaleString(loc(), { maximumFractionDigits: v >= 100 ? 0 : 2 });
   if (!document.getElementById('lb-ars-css')) { const st = document.createElement('style'); st.id = 'lb-ars-css'; st.textContent = CSS; document.head.appendChild(st); }
@@ -339,10 +372,18 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
   const goldLeft = () => { const a = acct(); return a && typeof a.goldLeft === 'number' ? a.goldLeft : null; };
   const goldLbl = () => ownGold() ? `${IC.check}${esc(T('g_own'))}` : goldLeft() === 0 ? esc(T('g_out')) : goldLeft() == null ? esc(T('g_max')) : esc(T('g_left', { n: goldLeft() }));
   const active = () => !!(s && s.enabled);
-  const solMode = () => !!(s && s.unit !== 'token');
+  const holdMode = () => !!(s && s.unit === 'hold');
+  const solMode = () => !!(s && s.unit !== 'token' && s.unit !== 'hold');
+  const pSol = () => (holdMode() && s.priceSol > 0 ? s.priceSol : 0);   // ile SOL kosztuje 1 token
+  // tryb 'hold': tokeny na podpiętym portfelu i SOL w grze (na żywo z portfela w grze) przeliczony na tokeny – liczy się większe
+  const holdParts = () => { const a = acct(), sol = a && typeof a.sol === 'number' ? a.sol : (s.sol || 0), p = pSol();
+    const solTok = p ? sol / p : (s.solTok || 0), wallet = s.wallet ? (s.walletBalance || 0) : 0;
+    return { sol, solTok, wallet, linked: !!s.wallet, source: s.wallet && wallet >= solTok ? 'wallet' : 'sol', amount: Math.max(wallet, solTok) }; };
   // saldo: w trybie SOL – na żywo z portfela w grze (po wpłacie od razu), w trybie tokenu – z serwera
-  const bal = () => { const a = acct(); if (solMode() && a && typeof a.sol === 'number') return a.sol; return a ? (s && s.balance) || 0 : 0; };
-  const usdOf = (v) => s && s.price && solMode() ? '≈ $' + (v * s.price).toLocaleString(loc(), { maximumFractionDigits: v * s.price >= 100 ? 0 : 2 }) : '';
+  const bal = () => { const a = acct(); if (!a) return 0; if (holdMode()) return holdParts().amount; if (solMode() && typeof a.sol === 'number') return a.sol; return (s && s.balance) || 0; };
+  const numSol = (v) => (+v || 0).toLocaleString(loc(), { maximumFractionDigits: v >= 10 ? 2 : v >= 0.01 ? 4 : 6 });
+  const usdOf = (v) => { const sol = holdMode() ? v * pSol() : solMode() ? v : 0, u = s && s.price ? sol * s.price : 0;
+    return u > 0 ? '≈ $' + u.toLocaleString(loc(), { maximumFractionDigits: u >= 100 ? 0 : 2 }) : ''; };
   const stateOf = (id) => {
     if (id === GOLD) return ownGold() ? 'ok' : 'lk';               // złoty AKM: tylko posiadacze, niezależnie od progów Ekwipunku
     if (id === P90) return owns(P90) ? 'ok' : 'lk';                 // P90: za grę w Deathmatch, niezależnie od progów
@@ -350,9 +391,9 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     if (id === s.base) return 'bs';
     return bal() + 1e-9 >= (s.need[id] ?? Infinity) ? 'ok' : 'lk';
   };
-  async function call(method, p) {
+  async function call(method, p, body) {
     const w = W(); if (!w || !w.api) throw new Error('offline');
-    const r = await fetch(w.api + '/api' + p, { method, headers: { 'Content-Type': 'application/json', ...(w.token && w.token !== 'local' ? { Authorization: 'Bearer ' + w.token } : {}) } });
+    const r = await fetch(w.api + '/api' + p, { method, headers: { 'Content-Type': 'application/json', ...(w.token && w.token !== 'local' ? { Authorization: 'Bearer ' + w.token } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
     let j = {}; try { j = await r.json(); } catch {}
     if (!r.ok) throw new Error(j.message ? srvText(j.message, getLang()) : 'HTTP ' + r.status);
     return j;
@@ -360,9 +401,31 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
   async function load(force) {
     if (!online()) { s = null; render(); return; }
     if (busy) return; busy = true; err = ''; renderBal();
-    try { s = await call(force ? 'POST' : 'GET', force && acct() ? '/arsenal/refresh' : '/arsenal'); lastFetch = Date.now(); if (s.error) err = T('err'); }
+    try { s = await call(force ? 'POST' : 'GET', force && acct() ? '/arsenal/refresh' : '/arsenal'); lastFetch = Date.now(); if (s.error) err = errText(s.error); }
     catch (e) { err = T('err'); }
     busy = false; render();
+  }
+  const errText = (m) => (/kursu tokenu/.test(m) ? T('noPrice', { s: s && s.symbol ? s.symbol : 'TOKEN' }) : T('err'));
+  // podpięcie własnego portfela: kod od serwera -> podpis wiadomości w portfelu (bez transakcji) -> serwer sprawdza podpis
+  let linking = false;
+  async function linkWallet() {
+    if (linking) return; const p = solProvider(); if (!p) { toast(T('noWallet'), 'err'); return; }
+    linking = true; render();
+    try {
+      const c = await p.connect(), pk = (c && c.publicKey) || p.publicKey; const address = pk && pk.toString();
+      if (!address) throw new Error(T('rejected'));
+      const { message } = await call('POST', '/hold/nonce');
+      let r; try { r = await p.signMessage(new TextEncoder().encode(message), 'utf8'); } catch { throw new Error(T('rejected')); }
+      const sig = r && r.signature ? r.signature : r; if (!sig || !sig.length) throw new Error(T('rejected'));
+      const j = await call('POST', '/hold/link', { address, message, signature: btoa(String.fromCharCode(...new Uint8Array(sig))) });
+      s = j; err = s.error ? errText(s.error) : ''; lastFetch = Date.now(); const a = acct(); if (a) a.holdWallet = address; toast(T('linkOk'), 'ok');
+    } catch (e) { toast(e && e.message ? e.message : T('err'), 'err'); }
+    linking = false; render();
+  }
+  async function unlinkWallet() {
+    try { s = await call('POST', '/hold/unlink'); err = s.error ? errText(s.error) : ''; const a = acct(); if (a) a.holdWallet = ''; toast(T('unlinkOk'), 'ok'); }
+    catch (e) { toast(e && e.message ? e.message : T('err'), 'err'); }
+    render();
   }
 
   function renderTile() {
@@ -377,9 +440,13 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     Q('.bl').textContent = T('balance');
     const loggedIn = !!acct();
     Q('.v').innerHTML = active() && loggedIn ? `${solMode() ? IC.sol : IC.token}${esc(num(bal()))}<i>${esc(sym)}</i>` : '<i>—</i>';
-    const rb = Q('.ref'); rb.hidden = solMode(); rb.disabled = busy || !online() || !loggedIn || !active(); rb.querySelector('span').textContent = busy ? T('checking') : T('refresh');
+    const rb = Q('.ref'); rb.hidden = solMode() || (holdMode() && !s.wallet); rb.disabled = busy || !online() || !loggedIn || !active(); rb.querySelector('span').textContent = busy ? T('checking') : T('refresh');
     const ago = s && s.checkedAt ? Math.max(0, Math.round((Date.now() - s.checkedAt) / 1000)) : -1;
-    Q('.ago').textContent = !active() || !loggedIn ? '' : solMode() ? usdOf(bal()) : ago < 0 ? '' : ago < 20 ? T('now') : T('ago', { t: ago < 120 ? ago + ' s' : Math.round(ago / 60) + ' min' });
+    const agoTxt = ago < 0 ? '' : ago < 20 ? T('now') : T('ago', { t: ago < 120 ? ago + ' s' : Math.round(ago / 60) + ' min' });
+    if (holdMode() && active() && loggedIn) { const h = holdParts();   // skąd saldo: portfel (i kiedy sprawdzony) albo SOL w grze (i ile to dolarów)
+      Q('.ago').textContent = h.source === 'wallet' ? T('fromWallet', { a: short(s.wallet) }) + (agoTxt ? ' · ' + agoTxt : '') : T('fromSol', { n: numSol(h.sol) }) + (usdOf(h.amount) ? ' · ' + usdOf(h.amount) : '');
+      return; }
+    Q('.ago').textContent = !active() || !loggedIn ? '' : solMode() ? usdOf(bal()) : agoTxt;
   }
   function statRows(id) {
     const w = WEAPON_STATS[id], pel = w.pellets || 1;
@@ -398,7 +465,7 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     dispatchEvent(new CustomEvent('fasolka:arsenal', { detail: { lock: skinLock } }));
     if (ov.hidden) return;
     const list = guns(); sel = Math.max(0, Math.min(list.length - 1, sel)); const id = list[sel], st = stateOf(id), sym = s && s.symbol ? s.symbol : 'TOKEN';
-    Q('h2').innerHTML = `<b>${esc(T('title'))}</b>`; Q('.sub').textContent = T(solMode() || !s ? 'subSol' : 'sub');
+    Q('h2').innerHTML = `<b>${esc(T('title'))}</b>`; Q('.sub').textContent = T(holdMode() ? 'subHold' : solMode() || !s ? 'subSol' : 'sub', { s: sym });
     Q('.ars-x').setAttribute('aria-label', T('close')); Q('.ars-keys').textContent = T('keys');
     renderBal();
     const note = Q('.ars-note'), msg = !online() ? T('offline') : err ? err : s && !s.enabled ? T('off') : '';
@@ -433,7 +500,9 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     else if (st === 'ok' && !(s.need[id] > 0)) req += `<p class="ok" style="margin-top:12px">${esc(T('free'))}</p>`;   // próg 0: broń dla każdego
     else if (st === 'lk' || st === 'ok') {
       const need = s.need[id] || 0, b = bal(), k = need > 0 ? Math.min(1, b / need) : 1, usd = usdOf(need);
-      req += `<div class="need"><small>${esc(T('need'))}</small>${esc(num(need))}<i>${esc(sym)}</i>${usd ? `<small>${esc(usd)}</small>` : ''}</div><div class="bar${k >= 1 ? ' full' : ''}"><b style="width:${(k * 100).toFixed(1)}%"></b></div>`
+      req += `<div class="need"><small>${esc(T('need'))}</small>${esc(num(need))}<i>${esc(sym)}</i>${usd ? `<small>${esc(usd)}</small>` : ''}</div>`
+        + (holdMode() && pSol() ? `<p class="alt">${esc(T('orSol', { n: numSol(need * pSol()) }))}</p>` : '')   // ta sama wartość w SOL (po bieżącym kursie)
+        + `<div class="bar${k >= 1 ? ' full' : ''}"><b style="width:${(k * 100).toFixed(1)}%"></b></div>`
         + (st === 'ok' ? `<p class="ok">${esc(T('have'))}</p>` : acct() ? `<p>${esc(T('missing', { n: num(Math.max(0, need - b)) + ' ' + sym }))}</p>` : `<p>${esc(T('login'))}</p>`);
     } else if (st === 'bs') req += `<p class="ok" style="margin-top:12px">${esc(T('haveBase'))}</p>`;
     Q('.ars-req').innerHTML = req;
@@ -446,6 +515,12 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     const ft = Q('.ars-ft');
     if (!active()) ft.innerHTML = `<div><b>${esc(T('how'))}</b><p>${esc(T(solMode() || !s ? 'howSol' : 'howTxt', { s: sym }))}</p></div>`;
     else if (!acct()) ft.innerHTML = `<div><b>${esc(T('how'))}</b><p>${esc(T('login'))}</p></div><button type="button" class="ars-btn pri" data-a="login">${esc(T('loginBtn'))}</button>`;
+    else if (holdMode()) {   // dwie drogi: własny portfel z tokenem albo SOL w grze o tej samej wartości
+      const wbtn = s.wallet ? `<div class="ars-addr"><div><small>${esc(T('opt1', { s: sym }))}</small><code>${esc(short(s.wallet))} · ${esc(num(s.walletBalance || 0))} ${esc(sym)}</code></div><button type="button" class="ars-btn" data-a="unlink">${esc(T('unlink'))}</button></div>`
+        : `<div class="ars-addr"><div><small>${esc(T('opt1', { s: sym }))}</small><em>${esc(T('signFree'))}</em></div><button type="button" class="ars-btn pri" data-a="link"${linking ? ' disabled' : ''}>${IC.token}<span>${esc(T(linking ? 'linking' : 'link'))}</span></button></div>`;
+      ft.innerHTML = `<div><b>${esc(T('how'))}</b><p>${esc(T('howHold', { s: sym }))}</p>${s.mint ? `<p class="ca">${esc(T('ca'))}: <code>${esc(s.mint)}</code> <button type="button" class="ars-btn" data-a="copyca">${IC.copy}</button></p>` : ''}</div>
+        <div class="ars-opts">${wbtn}<div class="ars-addr"><div><small>${esc(T('opt2'))}</small><em>${esc(numSol(holdParts().sol))} SOL</em></div><button type="button" class="ars-btn" data-a="deposit">${IC.sol}<span>${esc(T('deposit'))}</span></button></div></div>`;
+    }
     else if (solMode()) ft.innerHTML = `<div><b>${esc(T('how'))}</b><p>${esc(T('howSol'))}</p></div><button type="button" class="ars-btn pri" data-a="deposit">${IC.sol}<span>${esc(T('deposit'))}</span></button>`;
     else ft.innerHTML = `<div><b>${esc(T('how'))}</b><p>${esc(T('howTxt', { s: sym }))}${s.network && s.network !== 'mainnet-beta' ? ' (' + esc(T('net')) + ': ' + esc(s.network) + ')' : ''}</p></div>
       <div class="ars-addr"><div><small>${esc(T('addr'))}</small><code>${esc(s.address || '—')}</code></div>${s.address ? `<button type="button" class="ars-btn" data-a="copy">${IC.copy}<span>${esc(T('copy'))}</span></button>` : ''}</div>`;
@@ -469,6 +544,9 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     if (b.dataset.a === 'login') { close(); openAuth(); return; }
     if (b.dataset.a === 'deposit') { close(); openWallet(); return; }
     if (b.dataset.a === 'copy' && s && s.address) { (navigator.clipboard ? navigator.clipboard.writeText(s.address) : Promise.reject()).then(() => toast(T('copied'), 'ok')).catch(() => {}); }
+    if (b.dataset.a === 'copyca' && s && s.mint) { (navigator.clipboard ? navigator.clipboard.writeText(s.mint) : Promise.reject()).then(() => toast(T('copied'), 'ok')).catch(() => {}); }
+    if (b.dataset.a === 'link') return linkWallet();
+    if (b.dataset.a === 'unlink') return unlinkWallet();
   });
   addEventListener('keydown', (e) => {
     if (ov.hidden || e.ctrlKey || e.metaKey || e.altKey) return;

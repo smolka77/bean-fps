@@ -314,9 +314,9 @@ const ARS_NAMES = { deagle: 'Desert Eagle', mp5k: 'MP5K', spas12: 'SPAS-12', akm
 function mountArsenal($) {
   const box = $('fa-ars'), msg = $('fa-ars-msg'); let cfg = null, info = null, skinList = [];   // skinList: skiny z kreatora (skins.json) – mają progi
   function render() {
-    const tok = cfg.unit === 'token';
+    const tok = cfg.unit === 'token' || cfg.unit === 'hold', hold = cfg.unit === 'hold';
     box.innerHTML = `<div class="fa-row" style="gap:14px;margin:0 0 10px"><label class="fa-chk"><input type="checkbox" id="fa-ars-on" ${cfg.enabled ? 'checked' : ''}> Ekwipunek włączony</label>
-        <label class="fa-dmf" style="min-width:280px"><span>Odblokowanie za</span><select class="fa-q" id="fa-ars-unit"><option value="sol" ${tok ? '' : 'selected'}>saldo SOL w grze (nic się nie pobiera)</option><option value="token" ${tok ? 'selected' : ''}>token SPL na adresie gracza</option></select></label></div>
+        <label class="fa-dmf" style="min-width:280px"><span>Odblokowanie za</span><select class="fa-q" id="fa-ars-unit"><option value="sol" ${tok ? '' : 'selected'}>saldo SOL w grze (nic się nie pobiera)</option><option value="token" ${cfg.unit === 'token' ? 'selected' : ''}>token SPL na adresie gracza w grze</option><option value="hold" ${hold ? 'selected' : ''}>token na podpiętym portfelu gracza albo SOL w grze po kursie tokenu</option></select></label></div>
       <div class="fa-dmg" ${tok ? '' : 'style="display:none"'}>
         <label class="fa-dmf" style="grid-column:span 2"><span>Adres mintu tokenu (Solana)</span><input class="fa-q" id="fa-ars-mint" value="${esc(cfg.mint)}" placeholder="np. 7xKX…pump" spellcheck="false"></label>
         <label class="fa-dmf"><span>Nazwa tokenu (np. BEAN)</span><input class="fa-q" id="fa-ars-sym" value="${esc(cfg.symbol)}" maxlength="12"></label>
@@ -329,7 +329,9 @@ function mountArsenal($) {
       <div class="fa-dmg"><label class="fa-dmf"><span><b>Próg domyślny</b></span><input class="fa-q" type="number" min="0" step="any" id="fa-ars-skdef" value="${cfg.skinDefault ?? 0}"></label>
         ${skinList.map((k) => `<label class="fa-dmf"><span>${esc(k.name || k.id)}</span><input class="fa-q" type="number" min="0" step="any" data-skin="${esc(k.id)}" value="${cfg.skinNeed && cfg.skinNeed[k.id] !== undefined ? cfg.skinNeed[k.id] : ''}" placeholder="${cfg.skinDefault ?? 0} (domyślny)"></label>`).join('') || '<p class="fa-empty">Brak skinów z kreatora (skins.json).</p>'}</div>`;
     $('fa-ars-sum').textContent = !cfg.enabled ? 'wyłączony – wszystkie bronie dla każdego' : !tok ? 'włączony · progi w SOL (saldo w grze)'
-      : cfg.mint ? `włączony · token ${cfg.symbol} · ${cfg.network} · RPC: ${info.rpc}` : 'włączony, ale bez mintu tokenu – nie działa';
+      : !cfg.mint ? 'włączony, ale bez mintu tokenu – nie działa'
+      : hold ? `włączony · ${cfg.symbol} na podpiętym portfelu albo SOL w grze po kursie (teraz 1 ${cfg.symbol} = ${info.priceSol ? info.priceSol.toPrecision(3) + ' SOL' : 'brak kursu'}) · RPC: ${info.rpc}`
+      : `włączony · token ${cfg.symbol} · ${cfg.network} · RPC: ${info.rpc}`;
     $('fa-ars-unit').addEventListener('change', () => { collect(); render(); });
   }
   function collect() {
