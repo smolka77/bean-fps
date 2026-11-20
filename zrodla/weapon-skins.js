@@ -51,37 +51,58 @@ float wsN(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
              mix(mix(wsH(i + vec3(0,0,1)), wsH(i + vec3(1,0,1)), f.x), mix(wsH(i + vec3(0,1,1)), wsH(i + vec3(1,1,1)), f.x), f.y), f.z); }
 float wsF(vec3 p){ return wsN(p) * .5 + wsN(p * 2.03 + 7.1) * .3 + wsN(p * 4.1 + 3.7) * .2; }
 vec3 wsHsv(float h, float s, float v){ vec3 k = clamp(abs(mod(h * 6. + vec3(0., 4., 2.), 6.) - 3.) - 1., 0., 1.); return v * mix(vec3(1.), k, s); }`;
-// kolor wzoru w punkcie p (układ modelu broni, metry); e = świecenie wzoru
+// kolor wzoru w punkcie p (układ modelu broni, metry); e = świecenie wzoru.
+// Animacje: zwykłe (uTier 0) stoją, średnie (1) mają subtelny ruch i delikatny błysk co kilka sekund,
+// legendarne (2) – mocne efekty: przebiegające błyski, iskry, płynące warstwy, pulsowanie, spadające gwiazdy, skan hologramu.
 const PATTERN = `
+// błysk przesuwający się wzdłuż broni: speed – ile przejść na sekundę, w – szerokość pasa
+float wsSweep(vec3 p, float speed, float w){ float x = fract(p.z * 1.6 + p.y * 1.1 - uTime * speed) - .5; return pow(max(0., 1. - abs(x) / w), 3.); }
 vec3 wsPattern(vec3 p, vec3 n, out vec3 e, out float rgh){
-  e = vec3(0.); rgh = uRough;
-  if (uPat < 1.5) return uC1;
-  if (uPat < 2.5) { float v = wsF(p * 16.); return v < .44 ? uC1 : (v < .58 ? uC2 : uC3); }                       // kamuflaż
-  if (uPat < 3.5) { vec3 q = floor(p * 70.); float v = wsF(q * .23); return v < .45 ? uC1 : (v < .6 ? uC2 : uC3); }  // cyfrowy
-  if (uPat < 4.5) { float s = sin(p.z * 46. + wsF(p * 9.) * 5.5 + p.y * 12.); return mix(uC1, uC2, smoothstep(.35, .55, s)); }   // tygrys
-  if (uPat < 5.5) {                                                                                                // karbon: splot skośny
+  e = vec3(0.); rgh = uRough; vec3 c;
+  if (uPat < 1.5) c = uC1;
+  else if (uPat < 2.5) {                                                                                           // kamuflaż (Vice Camo: plamy powoli płyną)
+    vec3 q = p; if (uTier > .5) q += vec3(sin(uTime * .35) * .006, 0., uTime * .004);
+    float v = wsF(q * 16.); c = v < .44 ? uC1 : (v < .58 ? uC2 : uC3); }
+  else if (uPat < 3.5) { vec3 q = floor(p * 70.); float v = wsF(q * .23); c = v < .45 ? uC1 : (v < .6 ? uC2 : uC3); }   // cyfrowy
+  else if (uPat < 4.5) { float s = sin(p.z * 46. + wsF(p * 9.) * 5.5 + p.y * 12. + sin(uTime * .8) * .35);      // tygrys: pasy lekko falują
+    c = mix(uC1, uC2, smoothstep(.35, .55, s)); }
+  else if (uPat < 5.5) {                                                                                           // karbon: splot skośny, połysk przesuwa się po włóknach
     vec2 uv = abs(n.x) > .6 ? p.zy : (abs(n.y) > .6 ? p.xz : p.xy); uv *= 140.;
-    vec2 c = floor(uv), f = fract(uv); float dir = mod(c.x + c.y, 2.);
+    vec2 cc = floor(uv), f = fract(uv); float dir = mod(cc.x + cc.y, 2.);
     float fib = dir < .5 ? sin(f.x * 3.1416) : sin(f.y * 3.1416);
-    rgh = mix(.38, .16, fib); return mix(uC1, uC2, fib); }
-  if (uPat < 6.5) { float t = clamp(p.z * 1.6 + .5 + p.y * .8, 0., 1.); vec3 c = mix(uC1, uC2, t);               // neon Miami
-    float line = smoothstep(.96, 1., sin(p.z * 60.) * .5 + .5) * .7; e = c * (uEmit + line); return c; }
-  if (uPat < 7.5) return uC1;                                                                                      // chrom
-  if (uPat < 8.5) { float g = wsF(p * 38.); float eng = smoothstep(.03, .0, abs(fract(g * 6.) - .5) - .44);       // złoto z grawerem
-    rgh = mix(uRough, .55, eng); return mix(uC1, uC2, eng * .85 + wsN(p * 60.) * .12); }
-  if (uPat < 9.5) { float b = sin(p.z * 170. + wsF(p * 16.) * 10. + p.y * 70.);                                    // damast: cienkie, falujące warstwy stali
-    return mix(uC2, uC1, smoothstep(-.5, .9, b) * .75 + .15); }
-  if (uPat < 10.5) {                                                                                               // lawa: sieć świecących żył w skale
-    float v1 = 1. - abs(wsN(p * 9. + vec3(0., uTime * .1, uTime * .04)) * 2. - 1.), v2 = 1. - abs(wsN(p * 22. + 3.1) * 2. - 1.);
-    float crack = smoothstep(.86, .97, max(v1, v2 * .97)); float pulse = .75 + .25 * sin(uTime * 2.6 + p.z * 20.);
-    e = uC2 * crack * uEmit * pulse; rgh = mix(uRough, .3, crack); return mix(uC1 * (.7 + wsN(p * 40.) * .8), uC2 * .6, crack); }
-  if (uPat < 11.5) { float neb = wsF(p * 7. + vec3(uTime * .03, 0., 0.));                                          // galaktyka: mgławica i gwiazdy
-    vec3 c = mix(uC1, uC2, smoothstep(.35, .7, neb)); c = mix(c, uC3, smoothstep(.62, .85, wsF(p * 11. + 4.)));
-    vec3 cell = floor(p * 260.); float st = step(.993, wsH(cell)); float tw = .5 + .5 * sin(uTime * 4. + wsH(cell + 1.) * 40.);
-    e = vec3(1.) * st * tw * uEmit + c * .12; return c + st * .6; }
-  // hologram: tęcza płynąca po broni
-  float h = fract(p.z * 2.4 + p.y * 3. + wsF(p * 6.) * .6 + uTime * .12);
-  vec3 c = wsHsv(h, .55, .95); e = c * uEmit * .35; return c;
+    float sh = .5 + .5 * sin(uv.x * .08 + uv.y * .05 - uTime * 1.2);
+    rgh = mix(.38, .14, fib * (.7 + .3 * sh)); c = mix(uC1, uC2, fib * (.8 + .35 * sh)); }
+  else if (uPat < 6.5) { float t = clamp(p.z * 1.6 + .5 + p.y * .8 + sin(uTime * .5) * .18, 0., 1.); c = mix(uC1, uC2, t);   // neon Miami: kolory się przelewają
+    float line = smoothstep(.96, 1., sin(p.z * 60. - uTime * 1.5) * .5 + .5) * .7; e = c * (uEmit * (.8 + .2 * sin(uTime * 2.)) + line); }
+  else if (uPat < 7.5) { c = uC1; float sw = wsSweep(p, .22, .16); rgh = mix(uRough, .02, sw); e = vec3(.9, .95, 1.) * sw * .35; }   // chrom: przesuwający się odblask
+  else if (uPat < 8.5) {                                                                                           // złoto: grawer, mocny przebiegający błysk, migoczące iskry, delikatna poświata
+    float g = wsF(p * 38.); float eng = smoothstep(.03, .0, abs(fract(g * 6.) - .5) - .44);
+    rgh = mix(uRough, .55, eng); c = mix(uC1, uC2, eng * .85 + wsN(p * 60.) * .12);
+    float sw = wsSweep(p, .45, .2); vec3 cell = floor(p * 170.);
+    float sp = step(.985, wsH(cell)) * pow(max(0., sin(uTime * 3.5 + wsH(cell + 2.) * 40.)), 10.);
+    e = uC1 * (sw * 2.2 + (.25 + .15 * sin(uTime * 1.8)) * .25 * (1. - eng)) + vec3(1., .92, .7) * sp * 5.; rgh = mix(rgh, .05, sw); }
+  else if (uPat < 9.5) {                                                                                           // damast: warstwy stali płyną, zimny błysk przebiega po krawędziach
+    float b = sin(p.z * 170. + wsF(p * 16. + vec3(0., 0., uTime * .08)) * 10. + p.y * 70. - uTime * 2.5);
+    c = mix(uC2, uC1, smoothstep(-.5, .9, b) * .75 + .15);
+    float sw = wsSweep(p, .35, .22); e = vec3(.55, .75, 1.) * (sw * 1.6 * smoothstep(.2, .9, b) + .06 * (.5 + .5 * sin(uTime * 2. + p.z * 30.))); rgh = mix(uRough, .08, sw); }
+  else if (uPat < 10.5) {                                                                                          // lawa: płynące żyły, mocne pulsowanie, iskry
+    float v1 = 1. - abs(wsN(p * 9. + vec3(0., uTime * .22, uTime * .1)) * 2. - 1.), v2 = 1. - abs(wsN(p * 22. + 3.1 + vec3(uTime * .05)) * 2. - 1.);
+    float crack = smoothstep(.86, .97, max(v1, v2 * .97)); float pulse = .55 + .45 * sin(uTime * 3.2 + p.z * 24.);
+    vec3 ec = floor(p * 110. + vec3(0., uTime * 1.5, 0.)); float ember = step(.993, wsH(ec)) * (.5 + .5 * sin(uTime * 9. + wsH(ec + 3.) * 20.));
+    e = uC2 * crack * uEmit * pulse * 1.3 + vec3(1., .55, .15) * ember * 3.; rgh = mix(uRough, .3, crack);
+    c = mix(uC1 * (.7 + wsN(p * 40.) * .8), uC2 * .6, crack); }
+  else if (uPat < 11.5) {                                                                                          // galaktyka: dryfująca mgławica, migające gwiazdy, spadające gwiazdy
+    float neb = wsF(p * 7. + vec3(uTime * .09, uTime * .05, 0.));
+    c = mix(uC1, uC2, smoothstep(.35, .7, neb)); c = mix(c, uC3, smoothstep(.62, .85, wsF(p * 11. + 4. + vec3(0., 0., uTime * .06))));
+    vec3 cell = floor(p * 260.); float st = step(.992, wsH(cell)); float tw = pow(.5 + .5 * sin(uTime * 6. + wsH(cell + 1.) * 40.), 3.);
+    float sy = fract(floor(uTime * .5) * .37) - .5; float streak = smoothstep(.012, .0, abs(p.y - sy * .2)) * wsSweep(p, .5, .07);
+    e = vec3(1.) * st * tw * uEmit * 1.4 + c * (.15 + .1 * sin(uTime * 1.3)) + vec3(1., .9, 1.) * streak * 4.; c += st * .6; }
+  else {                                                                                                           // hologram: szybka tęcza, linie skanu, zakłócenia
+    float h = fract(p.z * 2.4 + p.y * 3. + wsF(p * 6.) * .6 + uTime * .35); c = wsHsv(h, .6, .95);
+    float scan = step(.9, fract(p.y * 90. - uTime * 3.)); float glitch = step(.97, wsH(vec3(floor(uTime * 12.), 0., 0.)));
+    e = c * uEmit * (.45 + scan * 1.4 + glitch * 1.5); }
+  if (uTier > .5 && uTier < 1.5 && abs(uPat - 7.) > .5) e += vec3(1., .96, .9) * wsSweep(p, .16, .08) * .11;   // średnie: delikatny błysk co kilka sekund
+  return c;
 }`;
 
 const TIME = { value: 0 };                        // wspólny czas animowanych skinów (aktualizowany przy rysowaniu)
@@ -94,13 +115,13 @@ function skinned(base, sk) {
   mat = base.clone();
   const col = (i) => new THREE.Color((sk.c && (sk.c[i] || sk.c[0])) || '#ffffff');
   const U = { uPat: { value: sk.pat }, uC1: { value: col(0) }, uC2: { value: col(1) }, uC3: { value: col(2) },
-    uMetal: { value: sk.metal ?? 0.3 }, uRough: { value: sk.rough ?? 0.5 }, uEmit: { value: sk.emit || 0 }, uTime: TIME };
+    uMetal: { value: sk.metal ?? 0.3 }, uRough: { value: sk.rough ?? 0.5 }, uEmit: { value: sk.emit || 0 }, uTier: { value: TIER_RANK[sk.tier] || 0 }, uTime: TIME };
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = 'varying vec3 vWsPos;\nvarying vec3 vWsN;\n' + sh.vertexShader
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWsPos = position;')
       .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nvWsN = objectNormal;');
-    sh.fragmentShader = 'uniform float uPat, uMetal, uRough, uEmit, uTime;\nuniform vec3 uC1, uC2, uC3;\nvarying vec3 vWsPos;\nvarying vec3 vWsN;\n' + NOISE + PATTERN + '\n' + sh.fragmentShader
+    sh.fragmentShader = 'uniform float uPat, uMetal, uRough, uEmit, uTier, uTime;\nuniform vec3 uC1, uC2, uC3;\nvarying vec3 vWsPos;\nvarying vec3 vWsN;\n' + NOISE + PATTERN + '\n' + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         vec3 wsBase = diffuseColor.rgb;
         float wsMx = max(wsBase.r, max(wsBase.g, wsBase.b)), wsMn = min(wsBase.r, min(wsBase.g, wsBase.b));
@@ -134,7 +155,7 @@ export function applyWeaponSkin(inst, id) {
     if (!skinnable(base)) return;
     o.userData.wsBase = base;
     o.material = sk.pat ? skinned(base, sk) : base;
-    o.onBeforeRender = sk.anim ? tick : THREE.Mesh.prototype.onBeforeRender;
+    o.onBeforeRender = sk.tier !== 'free' ? tick : THREE.Mesh.prototype.onBeforeRender;   // średnie i legendarne są animowane
   });
   root.userData.wskin = sk.id;
 }

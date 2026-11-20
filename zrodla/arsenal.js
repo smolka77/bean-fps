@@ -196,6 +196,13 @@ const WTXT = {
     w_on: 'Equipado en esta arma', w_pick: 'Haz clic para equipar', w_try: 'Vista previa – mantén {n} {s} para desbloquear', w_sol: '≈ {n} SOL' },
 };
 for (const l in WTXT) Object.assign(TXT[l], WTXT[l]);
+const WTXT2 = {
+  pl: { t_guns: 'Bronie', t_skins: 'Skiny broni', w_eq: 'Założony', w_ok: 'Odblokowane', w_need: 'Brakuje {n} {s}', w_login: 'Zaloguj się', w_tier_free: 'Zwykły', w_tier_mid: 'Rzadki', w_tier_legend: 'Legendarny' },
+  en: { t_guns: 'Weapons', t_skins: 'Weapon skins', w_eq: 'Equipped', w_ok: 'Unlocked', w_need: '{n} {s} to go', w_login: 'Log in', w_tier_free: 'Standard', w_tier_mid: 'Rare', w_tier_legend: 'Legendary' },
+  ru: { t_guns: 'Оружие', t_skins: 'Скины оружия', w_eq: 'Надет', w_ok: 'Открыто', w_need: 'Не хватает {n} {s}', w_login: 'Войди', w_tier_free: 'Обычный', w_tier_mid: 'Редкий', w_tier_legend: 'Легендарный' },
+  es: { t_guns: 'Armas', t_skins: 'Skins de armas', w_eq: 'Equipado', w_ok: 'Desbloqueado', w_need: 'Faltan {n} {s}', w_login: 'Inicia sesión', w_tier_free: 'Común', w_tier_mid: 'Raro', w_tier_legend: 'Legendario' },
+};
+for (const l in WTXT2) Object.assign(TXT[l], WTXT2[l]);
 // tryb 'hold': token na podpiętym własnym portfelu albo SOL w grze o tej samej wartości (serwer: serwer/arsenal.mjs, /api/hold/*)
 const HTXT = {
   pl: { subHold: 'Na start masz pistolet. Podepnij portfel z {s} albo trzymaj tyle samo wartości w SOL w grze, a odblokujesz resztę broni – nic się nie pobiera.',
@@ -316,18 +323,50 @@ const CSS = `
 #lb-ui .ars-side{display:flex;flex-direction:column;gap:14px}
 #lb-ui .ars-card{background:rgba(9,4,13,.82);border:1px solid rgba(255,255,255,.12);padding:16px}
 #lb-ui .ars-card h3{margin:0;font:700 22px/1 'Barlow Condensed',sans-serif;letter-spacing:.04em;text-transform:uppercase}
-#lb-ui .ars-wsk h5{margin:12px 0 7px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;font:700 14px/1 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#d9d2e3}
-#lb-ui .ars-wsk h5 small{font:600 12px/1 'Barlow Condensed',sans-serif;letter-spacing:.04em;color:#a39aae;text-transform:none;text-align:right}
-#lb-ui .ars-wsk h5.mid{color:#7fd7ff}#lb-ui .ars-wsk h5.legend{color:#ffcf5a}
-#lb-ui .ars-wsk .sw{display:flex;flex-wrap:wrap;gap:7px}
-#lb-ui .ars-wsk .wsk{width:40px;height:40px;border:0;padding:0;border-radius:7px;cursor:pointer;position:relative;display:grid;place-items:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.2);transition:transform .12s}
-#lb-ui .ars-wsk .wsk:hover{transform:translateY(-2px)}
-#lb-ui .ars-wsk .wsk.on{box-shadow:0 0 0 2px #fff,0 0 14px rgba(255,255,255,.35)}
-#lb-ui .ars-wsk .wsk.try{box-shadow:0 0 0 2px #ff7ab8,0 0 14px rgba(255,122,184,.45)}
-#lb-ui .ars-wsk .wsk.lk::after{content:'';position:absolute;inset:0;border-radius:7px;background:rgba(5,2,8,.5)}
-#lb-ui .ars-wsk .wsk svg{position:relative;z-index:1;width:14px;height:14px;color:#fff}
-#lb-ui .ars-wsk .st{margin:12px 0 0;font:600 15px/1.3 'Barlow Condensed',sans-serif;color:#cfc7da}
-#lb-ui .ars-wsk .st b{color:#fff}#lb-ui .ars-wsk .st .ok{color:var(--cash)}#lb-ui .ars-wsk .st .lk{color:#ff7ab8}
+#lb-ui .ars-tabs{display:flex;gap:4px;border-bottom:1px solid rgba(255,255,255,.12);margin-top:-4px}
+#lb-ui .ars-tabs .tab{position:relative;display:flex;align-items:center;gap:10px;height:48px;padding:0 22px;border:0;background:transparent;color:#a39aae;cursor:pointer;font:700 19px/1 'Barlow Condensed',sans-serif;letter-spacing:.12em;text-transform:uppercase;transition:color .15s}
+#lb-ui .ars-tabs .tab:hover{color:#fff}#lb-ui .ars-tabs .tab.on{color:#fff}
+#lb-ui .ars-tabs .tab::after{content:'';position:absolute;left:14px;right:14px;bottom:-1px;height:3px;background:var(--vc,#ff2e93);transform:scaleX(0);transition:transform .2s}
+#lb-ui .ars-tabs .tab.on::after{transform:none}
+#lb-ui .ars-tabs .tab svg{width:26px;height:14px;opacity:.8}
+#lb-ui .ars-tabs .tab i{font-style:normal;font:700 12px/1 'Barlow Condensed',sans-serif;letter-spacing:.06em;padding:4px 7px;background:rgba(255,255,255,.1);color:#fff}
+#lb-ui .ars-tabs .tab .new{background:linear-gradient(90deg,#ffe28a,#ffb21f);color:#1a1004}
+#lb-ui .ars-skins{display:none}
+#lb-ui .ars-in.sk .ars-side{display:none}
+#lb-ui .ars-in.sk .ars-body{grid-template-columns:minmax(230px,340px) 1fr;grid-template-areas:"list stage" "list skins";align-content:start}
+#lb-ui .ars-in.sk .ars-list{grid-area:list}#lb-ui .ars-in.sk .ars-stage{grid-area:stage;min-height:0}#lb-ui .ars-in.sk .ars-view{height:clamp(190px,30vh,330px)}
+#lb-ui .ars-in.sk .ars-skins{grid-area:skins;display:flex;flex-direction:column;gap:22px}
+#lb-ui .ars-list .st .ws{color:#d9d2e3}#lb-ui .ars-list .st .ws.mid{color:#7fd7ff}#lb-ui .ars-list .st .ws.legend{color:#ffcf5a}
+#lb-ui .ars-list button.on .st .ws{color:#0b0610}
+#lb-ui .wst header{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 14px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.08)}
+#lb-ui .wst h3{margin:0;font:400 28px/1 Anton,Impact,sans-serif;letter-spacing:.03em;text-transform:uppercase;color:#ece7f2}
+#lb-ui .wst.mid h3{color:#7fd7ff}
+#lb-ui .wst.legend h3{background:linear-gradient(90deg,#fff0b0,#ffc23a 55%,#ff9a1f);-webkit-background-clip:text;background-clip:text;color:transparent}
+#lb-ui .wst .pr{font:700 16px/1 'Barlow Condensed',sans-serif;letter-spacing:.05em;color:#cfc6d8}
+#lb-ui .wst .stt{margin-left:auto;display:flex;align-items:center;gap:6px;font:700 14px/1 'Barlow Condensed',sans-serif;letter-spacing:.08em;text-transform:uppercase}
+#lb-ui .wst .stt svg{width:14px;height:14px}#lb-ui .wst .stt.ok{color:var(--cash)}#lb-ui .wst .stt.lk{color:#ff7ab8}
+#lb-ui .wst .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:12px}
+#lb-ui .wsc{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:10px 12px 14px;border:0;cursor:pointer;text-align:left;color:#fff;overflow:hidden;
+  background:radial-gradient(120% 90% at 50% 18%,rgba(255,255,255,.07),transparent 62%),#15111b;box-shadow:inset 0 0 0 1px rgba(255,255,255,.09);transition:transform .15s,box-shadow .15s}
+#lb-ui .wsc.mid{background:radial-gradient(120% 90% at 50% 18%,rgba(42,214,255,.2),transparent 62%),#0b1520}
+#lb-ui .wsc.legend{background:radial-gradient(120% 90% at 50% 18%,rgba(255,190,50,.26),transparent 62%),#1a1209}
+#lb-ui .wsc::after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;background:#5f566b}
+#lb-ui .wsc.mid::after{background:#2ad6ff}#lb-ui .wsc.legend::after{background:linear-gradient(90deg,#fff0b0,#ffc23a,#ff9a1f)}
+#lb-ui .wsc:hover{transform:translateY(-3px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
+#lb-ui .wsc .art{width:100%;aspect-ratio:16/7;display:grid;place-items:center;transition:filter .2s}
+#lb-ui .wsc img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 8px 10px rgba(0,0,0,.55));opacity:0;transition:opacity .3s}
+#lb-ui .wsc img.ready{opacity:1}
+#lb-ui .wsc b{font:700 19px/1.05 'Barlow Condensed',sans-serif;letter-spacing:.05em;text-transform:uppercase}
+#lb-ui .wsc small{font:600 13px/1 'Barlow Condensed',sans-serif;letter-spacing:.06em;color:#a39aae;text-transform:uppercase}
+#lb-ui .wsc.mid small{color:#8fdcff}#lb-ui .wsc.legend small{color:#ffd77a}
+#lb-ui .wsc.lk .art{filter:saturate(.5) brightness(.6)}#lb-ui .wsc.lk small{color:#ff7ab8}
+#lb-ui .wsc .lock{position:absolute;top:8px;right:8px;width:28px;height:28px;display:grid;place-items:center;background:rgba(5,2,8,.72);color:#ff7ab8}
+#lb-ui .wsc .lock svg{width:14px;height:14px}
+#lb-ui .wsc .eq{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--cash);color:#0b0610;font:700 12px/1 'Barlow Condensed',sans-serif;letter-spacing:.12em;text-transform:uppercase}
+#lb-ui .wsc .eq svg{width:12px;height:12px}
+#lb-ui .wsc.on{box-shadow:inset 0 0 0 2px #fff,0 0 22px rgba(255,255,255,.16)}
+#lb-ui .wsc.try{box-shadow:inset 0 0 0 2px #ff7ab8,0 0 22px rgba(255,122,184,.28)}
+@media (max-width:760px){#lb-ui .ars-in.sk .ars-body{grid-template-columns:1fr;grid-template-areas:"stage" "list" "skins"}#lb-ui .wst .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}#lb-ui .ars-tabs .tab{padding:0 12px;font-size:16px}}
 #lb-ui .ars-card h4{margin:4px 0 0;font:600 13px/1.2 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#a39aae}
 #lb-ui .ars-req{min-height:172px;box-sizing:border-box}   /* stała wysokość: przy zmianie broni układ nie podskakuje */
 #lb-ui .ars-req .need{display:flex;align-items:baseline;gap:8px;margin-top:12px;font:400 34px/1 Anton,Impact,sans-serif;color:#fff}
@@ -376,10 +415,11 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     <div class="ars-hd"><div><h2></h2><p class="sub"></p></div>
       <div class="ars-bal"><small class="bl"></small><div class="v"></div><div class="row"><em class="ago"></em><button type="button" class="ars-btn ref">${IC.ref}<span></span></button></div></div>
       <button type="button" class="ars-btn ars-x" aria-label="">${IC.x}</button></div>
+    <div class="ars-tabs" role="tablist"><button type="button" class="tab on" role="tab" data-tab="guns"></button><button type="button" class="tab" role="tab" data-tab="skins"></button></div>
     <div class="ars-note" hidden></div>
     <div class="ars-body"><div class="ars-list" role="listbox"></div>
       <div class="ars-stage"><span class="big"></span><div class="ars-view" hidden></div><img class="ars-art" alt=""><span class="ars-noart" hidden></span><span class="ars-hint" hidden></span></div>
-      <div class="ars-side"><div class="ars-card ars-wsk"></div><div class="ars-card ars-req"></div><div class="ars-card ars-stats"></div><p class="ars-modes"></p></div></div>
+      <div class="ars-side"><div class="ars-card ars-req"></div><div class="ars-card ars-stats"></div><p class="ars-modes"></p></div><div class="ars-skins"></div></div>
     <div class="ars-ft"></div><span class="ars-keys"></span></div>`;
   root.appendChild(tile); root.appendChild(ov);
   const Q = (s) => ov.querySelector(s);
@@ -458,27 +498,78 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
   const wsNeed = () => (s && s.wskin) || { mid: 5e6, legend: 1e7 };
   const wsRank = () => { if (!s || !active()) return s ? 2 : 0; if (!acct()) return 0; const b = bal(), n = wsNeed(); return b + 1e-9 >= n.legend ? 2 : b + 1e-9 >= n.mid ? 1 : 0; };
   let tryOn = null;                                                   // przymierzany (zablokowany) skin: { gun, id }
-  function renderWsk(id) {
-    const box = Q('.ars-wsk'), sym = s && s.symbol ? s.symbol : 'TOKEN', n = wsNeed(), rank = wsRank();
-    const mln = (v) => T('w_mln', { n: (v / 1e6).toLocaleString(loc(), { maximumFractionDigits: 2 }) });
-    const amount = (v) => (holdMode() || v >= 1e6 ? mln(v) : num(v));
-    const price = (tier) => { if (tier === 'free') return esc(T('w_freeP')); const v = n[tier], sol = pSol() ? ' · ' + T('w_sol', { n: numSol(v * pSol()) }) : '';
-      return esc(T('w_from', { n: amount(v), s: sym }) + sol); };
-    const cur = chosen(id), shown = tryOn && tryOn.gun === id ? tryOn.id : (TIER_RANK[(WSKIN[cur] || WSKIN['']).tier] <= rank ? cur : '');
-    box.innerHTML = '<h3>' + esc(T('w_title')) + '</h3>' + ['free', 'mid', 'legend'].map((tier) => '<h5 class="' + tier + '">' + esc(T('w_' + tier)) + '<small>' + price(tier) + '</small></h5><div class="sw">'
-      + WSKINS.filter((k) => k.tier === tier).map((k) => { const lk = TIER_RANK[tier] > rank;
-        return '<button type="button" class="wsk' + (lk ? ' lk' : '') + (k.id === shown ? (lk ? ' try' : ' on') : '') + '" data-ws="' + k.id + '" title="' + esc(k.name) + '" aria-label="' + esc(k.name) + '" style="background:' + k.sw + '">' + (lk ? IC.lock : '') + '</button>'; }).join('') + '</div>').join('');
-    const sk = WSKIN[shown] || WSKIN[''], lkS = TIER_RANK[sk.tier] > rank;
-    const st = lkS ? '<span class="lk">' + esc(T('w_try', { n: amount(n[sk.tier]), s: sym })) + '</span>' : shown === cur ? '<span class="ok">' + esc(T('w_on')) + '</span>' : esc(T('w_pick'));
-    box.insertAdjacentHTML('beforeend', '<p class="st"><b>' + esc(sk.name) + '</b> · ' + st + '</p>');
-    if (viewer) viewer.setSkin(id, shown);
+  let tab = 'guns', skSig = '';
+  // skin założony na broń (zablokowany po spadku salda = fabryczny)
+  const eqSkin = (gun) => { const c = chosen(gun); return TIER_RANK[(WSKIN[c] || WSKIN['']).tier] <= wsRank() ? c : ''; };
+  const wsAmount = (v) => (holdMode() || v >= 1e6 ? T('w_mln', { n: (v / 1e6).toLocaleString(loc(), { maximumFractionDigits: 2 }) }) : num(v));
+  // ikony skinów: wybrana broń wyrenderowana w każdym skinie (osobny mały renderer, jedna ikona na klatkę, zapamiętane)
+  const ICONS = new Map(), iconQ = []; let iconR, iconBusy = false;
+  function iconRenderer() {
+    if (iconR !== undefined) return iconR;
+    try {
+      const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); r.setPixelRatio(1); r.setSize(384, 168, false); r.setClearColor(0x000000, 0);
+      r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.12;
+      const sc = new THREE.Scene(), pm = new THREE.PMREMGenerator(r); sc.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; pm.dispose(); sc.environmentIntensity = 0.9;
+      sc.add(new THREE.HemisphereLight(0xffffff, 0x302040, 1.1));
+      const key = new THREE.DirectionalLight(0xffffff, 2.4); key.position.set(3, 4, 3); sc.add(key);
+      const rim = new THREE.DirectionalLight(0xff6ab4, 1.2); rim.position.set(-3, 2, -3); sc.add(rim);
+      const cam = new THREE.PerspectiveCamera(22, 384 / 168, 0.05, 20); cam.position.set(1.42, 0.16, 0.2); cam.lookAt(0, 0, 0);
+      iconR = { r, sc, cam, guns: new Map() };
+    } catch { iconR = null; }
+    return iconR;
   }
-  // klik w próbkę: dostępny skin – zakładamy na tę broń (zapis), zablokowany – tylko przymierzamy na podglądzie
+  function iconGun(R, gun) {
+    let h = R.guns.get(gun); if (h) return h;
+    const w = createWeapon(gun, { fx: false }), g = w.group; g.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(g), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3()); g.position.sub(c);
+    h = new THREE.Group(); h.add(g); h.rotation.set(0.1, -0.3, 0); const len = Math.max(size.x, size.z, 1e-3); h.scale.setScalar((PISTOLS.has(gun) ? 0.66 : 1) / len);
+    h.userData.w = w; R.guns.set(gun, h); return h;
+  }
+  function iconFor(gun, sk, cb) { const key = gun + ':' + sk; if (ICONS.has(key)) return cb(ICONS.get(key)); iconQ.push({ key, gun, sk, cb }); pumpIcons(); }
+  function pumpIcons() {
+    if (iconBusy || !iconQ.length) return; iconBusy = true;
+    setTimeout(() => {   // timer, nie requestAnimationFrame: ikony robią się też, gdy karta jest w tle
+      iconBusy = false; const job = iconQ.shift(); if (!job) return;
+      if (!ICONS.has(job.key)) {
+        const R = iconRenderer(); let url = '';
+        if (R) { const h = iconGun(R, job.gun); R.sc.add(h); applyWeaponSkin(h.userData.w, job.sk); R.r.render(R.sc, R.cam); url = R.r.domElement.toDataURL('image/png'); R.sc.remove(h); }
+        ICONS.set(job.key, url);
+      }
+      job.cb(ICONS.get(job.key)); pumpIcons();
+    }, 16);
+  }
+  // zakładka „Skiny broni”: trzy sekcje kart (ikona broni w skinie, nazwa, poziom albo cena), stan założenia i kłódki
+  function renderSkins(id, big) {
+    const box = Q('.ars-skins'), sym = s && s.symbol ? s.symbol : 'TOKEN', n = wsNeed(), rank = wsRank(), cur = eqSkin(id);
+    const shown = tryOn && tryOn.gun === id ? tryOn.id : cur;
+    const sig = [getLang(), id, rank, cur, shown, n.mid, n.legend, pSol(), acct() ? 1 : 0, Math.floor(bal())].join('|');
+    if (sig !== skSig) {
+      skSig = sig; const b = bal();
+      box.innerHTML = ['free', 'mid', 'legend'].map((tier) => {
+        const open = TIER_RANK[tier] <= rank, v = n[tier] || 0;
+        const price = tier === 'free' ? T('w_freeP') : T('w_from', { n: wsAmount(v), s: sym }) + (pSol() ? ' · ' + T('w_sol', { n: numSol(v * pSol()) }) : '');
+        const stt = open ? '<span class="stt ok">' + IC.check + esc(T('w_ok')) + '</span>' : '<span class="stt lk">' + IC.lock + esc(acct() ? T('w_need', { n: wsAmount(Math.max(0, v - b)), s: sym }) : T('w_login')) + '</span>';
+        return '<section class="wst ' + tier + '"><header><h3>' + esc(T('w_' + tier)) + '</h3><span class="pr">' + esc(price) + '</span>' + stt + '</header><div class="grid">'
+          + WSKINS.filter((k) => k.tier === tier).map((k) => {
+            const lk = !open, on = !lk && k.id === cur, tr = k.id === shown && !on;
+            const lab = lk ? wsAmount(v) + ' ' + sym : T('w_tier_' + tier);   // założony: plakietka w rogu karty
+            return '<button type="button" class="wsc ' + tier + (lk ? ' lk' : '') + (on ? ' on' : '') + (tr ? ' try' : '') + '" data-ws="' + k.id + '" aria-label="' + esc(k.name) + '">'
+              + '<span class="art"><img alt="" data-icon="' + k.id + '"></span><b>' + esc(k.name) + '</b><small>' + esc(lab) + '</small>'
+              + (lk ? '<span class="lock">' + IC.lock + '</span>' : '') + (on ? '<span class="eq">' + IC.check + esc(T('w_eq')) + '</span>' : '') + '</button>';
+          }).join('') + '</div></section>';
+      }).join('');
+      box.querySelectorAll('img[data-icon]').forEach((img) => iconFor(id, img.dataset.icon, (url) => { if (url && img.isConnected) { img.src = url; img.classList.add('ready'); } }));
+    }
+    const sk = WSKIN[shown] || WSKIN[''], lkS = TIER_RANK[sk.tier] > rank;
+    big.className = 'big ' + (lkS ? 'lk' : 'ok'); big.innerHTML = (lkS ? IC.lock : IC.check) + esc(sk.name);
+    if (viewer) { viewer.setSkin(id, shown); viewer.setLocked(false); }
+  }
+  // klik w kartę skina: dostępny – zakładamy na tę broń (zapis), zablokowany – przymierzamy na podglądzie 3D
   ov.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('[data-ws]'); if (!b) return;
     const list = guns(), gun = list[Math.max(0, Math.min(list.length - 1, sel))], id = b.dataset.ws, sk = WSKIN[id]; if (!sk || !gun) return;
     if (TIER_RANK[sk.tier] <= wsRank()) { tryOn = null; chooseSkin(gun, id); } else tryOn = { gun, id };
-    renderWsk(gun);
+    sfx.click && sfx.click(); render();
   });
   function renderTile() {
     setWskinRank(wsRank());
@@ -521,11 +612,16 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     Q('h2').innerHTML = `<b>${esc(T('title'))}</b>`; Q('.sub').textContent = T(holdMode() ? 'subHold' : solMode() || !s ? 'subSol' : 'sub', { s: sym });
     Q('.ars-x').setAttribute('aria-label', T('close')); Q('.ars-keys').textContent = T('keys');
     renderBal();
+    Q('.ars-in').classList.toggle('sk', tab === 'skins');
+    const nOpen = WSKINS.filter((k) => TIER_RANK[k.tier] <= wsRank()).length;
+    Q('.ars-tabs').innerHTML = '<button type="button" class="tab' + (tab === 'guns' ? ' on' : '') + '" role="tab" data-tab="guns">' + IC.gun + '<span>' + esc(T('t_guns')) + '</span></button>'
+      + '<button type="button" class="tab' + (tab === 'skins' ? ' on' : '') + '" role="tab" data-tab="skins"><span>' + esc(T('t_skins')) + '</span><i>' + nOpen + ' / ' + WSKINS.length + '</i></button>';
     const note = Q('.ars-note'), msg = !online() ? T('offline') : err ? err : s && !s.enabled ? T('off') : '';
     note.hidden = !msg; note.textContent = msg; note.classList.toggle('err', !!err);
     // lista: przebudowa tylko po zmianie danych; zmiana wyboru = przesunięcie podświetlenia (płynne przejście w CSS)
-    const rows = list.map((g) => { const k = stateOf(g), lbl = g === GOLD ? goldLbl() : g === P90 ? p90Lbl() : k === 'ok' ? `${IC.check}${esc(T('open'))}` : k === 'lk' ? `${IC.lock}${esc(num(s.need[g]))} ${esc(sym)}` : k === 'bs' ? esc(T('base')) : esc(T('all')); return [g, k, lbl]; });
-    const sig = getLang() + JSON.stringify(rows);
+    const wsLbl = (g) => { const k = WSKIN[eqSkin(g)] || WSKIN['']; return '<span class="ws ' + k.tier + '">' + esc(k.name) + '</span>'; };   // zakładka skinów: założony skin
+    const rows = list.map((g) => { const k = stateOf(g), lbl = tab === 'skins' ? wsLbl(g) : g === GOLD ? goldLbl() : g === P90 ? p90Lbl() : k === 'ok' ? `${IC.check}${esc(T('open'))}` : k === 'lk' ? `${IC.lock}${esc(num(s.need[g]))} ${esc(sym)}` : k === 'bs' ? esc(T('base')) : esc(T('all')); return [g, k, lbl]; });
+    const sig = getLang() + tab + JSON.stringify(rows);
     if (sig !== listSig) { listSig = sig; Q('.ars-list').innerHTML = rows.map(([g, k, lbl], i) => `<button type="button" role="option" data-i="${i}" class="${k}"><span class="dot"></span><span>${esc(WEAPON_STATS[g].name)}</span><span class="st">${lbl}</span></button>`).join(''); }
     Q('.ars-list').querySelectorAll('button').forEach((b, i) => { b.classList.toggle('on', i === sel); b.setAttribute('aria-selected', String(i === sel)); });
     // broń: podgląd 3D (obracanie) albo – bez WebGL – kolorowe zdjęcie
@@ -543,8 +639,8 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
     const changed = id !== shownId; shownId = id; shownSel = sel;
     const big = Q('.big'); big.className = 'big ' + st + (changed ? ' swap' : ''); if (changed) restart(big);
     if (changed) { restart(Q('.ars-side')); tryOn = null; }
-    renderWsk(id);
     big.innerHTML = id === GOLD ? goldLbl() : id === P90 ? p90Lbl() : st === 'ok' ? `${IC.check}${esc(T('open'))}` : st === 'lk' ? `${IC.lock}${esc(num(s.need[id]))} ${esc(sym)}` : st === 'bs' ? esc(T('base')) : esc(T('all'));
+    if (tab === 'skins') renderSkins(id, big); else if (viewer) viewer.setSkin(id, eqSkin(id));   // broń na podglądzie w założonym skinie
     // wymaganie: próg, pasek postępu, ile brakuje
     let req = `<h3>${esc(WEAPON_STATS[id].name)}</h3><h4>${esc(T(CAT[id] || 'c_rifle'))}</h4>`;
     if (id === P90) req = `<h3>${esc(WEAPON_STATS[id].name)}</h3><h4>${esc(T('p_cat'))}</h4><p style="margin-top:12px">${esc(T('p_info'))}</p>`
@@ -592,6 +688,7 @@ export function createArsenal({ root, getLang, toast = () => {}, sfx = {}, walle
   tile.addEventListener('click', open);
   ov.addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.tab) { if (tab !== b.dataset.tab) { tab = b.dataset.tab; tryOn = null; sfx.click && sfx.click(); render(); } return; }
     if (b.dataset.i) { sel = +b.dataset.i; sfx.click && sfx.click(); render(); return; }
     if (b.classList.contains('ars-x')) return close();
     if (b.classList.contains('ref')) return load(true);
