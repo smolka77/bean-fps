@@ -255,7 +255,7 @@ export function createDM(ctx) {
     try {
       const pos = camera.getWorldPosition(new THREE.Vector3()), fwd = camera.getWorldDirection(new THREE.Vector3());
       g.position.copy(pos).addScaledVector(fwd, 3); g.lookAt(pos);
-      (S.cfg.guns || []).forEach((id, i) => { const w = ctx.createWeapon(id, { fx: false }); ctx.placeTP(w); w.group.position.x += (i - 2.5) * 0.45; g.add(w.group); });
+      [...(S.cfg.guns || []), 'akmgold'].forEach((id, i) => { const w = ctx.createWeapon(id, { fx: false }); ctx.placeTP(w); w.group.position.x += (i - 2.5) * 0.45; g.add(w.group); });
       scene.add(g);
       let i = 0; for (const p of S.players.values()) { saved.push([p.root, p.root.visible, p.root.position.clone()]); p.root.visible = true; p.root.position.copy(g.position).addScaledVector(fwd, 1 + (i++ % 4) * 0.5); }
       scene.updateMatrixWorld(true);

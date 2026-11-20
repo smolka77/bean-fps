@@ -269,7 +269,8 @@ export function createWallet({ api, root, getLang, toast, onChange, local = null
   }
   function setSession(tok) { if (local) return; token = tok; try { tok ? localStorage.setItem('bl-token', tok) : localStorage.removeItem('bl-token'); } catch {} if (!tok) { acct = null; hist = []; earn = null; emit(); } }
   const toLobby = () => acct && { username: acct.username, email: acct.email || '', avatar: acct.avatar || '', createdAt: acct.createdAt, balance: acct.balance, wallet: acct.address, address: acct.address, sol: acct.sol, lamports: acct.lamports,
-    price: acct.price, cluster: acct.cluster, admin: acct.admin, stats: acct.stats, history: hist };
+    price: acct.price, cluster: acct.cluster, admin: acct.admin, stats: acct.stats, history: hist,
+    limited: acct.limited || [], goldLeft: acct.goldLeft };          // broń limitowana (złoty AKM) i ile sztuk zostało
   function emit() { if (!local) onChange(toLobby()); render(); }
   function take(j) { if (j.account) acct = j.account; if (j.history) hist = j.history; emit(); return toLobby(); }
 

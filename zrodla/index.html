@@ -775,13 +775,15 @@ function refillAll(){
 //      w Strzelnicy bez drużyn – wszystkie bronie ----
 const TEAM={me:null,guns:null};                            // 0 = niebieska, 1 = czerwona, null = bez drużyn; guns = Arsenał (1v1 online)
 const TEAM_GUNS=[['m4a1','deagle'],['akm','glock17']];
-const ARS_ORDER=['m4a1','akm','deagle','glock17'];        // Arsenał w 1v1: pistolet + bronie odblokowane tokenem (lista od serwera), karabin w ręku na start
+const ARS_ORDER=['akmgold','m4a1','akm','deagle','glock17'];        // Arsenał w 1v1: pistolet + bronie odblokowane tokenem (lista od serwera), karabin w ręku na start
 let DMX=null;                                              // tryb Deathmatch (createDM niżej); bronie w slotach = Glock + broń z drabinki (za zabójstwa)
-const DM_ORDER=['glock17','deagle','spas12','mp5k','akm','m4a1'];
+const DM_ORDER=['glock17','deagle','spas12','mp5k','akm','akmgold','m4a1'];
 function slotList(){
   if(DMX&&DMX.active&&MODE==='dm')return DM_ORDER.filter(id=>DMX.owned.includes(id)).map(id=>inv.findIndex(w=>w.id===id)).filter(i=>i>=0);
   if(TEAM.me!=null&&TEAM.guns)return ARS_ORDER.filter(id=>TEAM.guns.includes(id)).map(id=>inv.findIndex(w=>w.id===id)).filter(i=>i>=0);
-  return TEAM.me==null?inv.map((_,i)=>i).filter(i=>weaponAllowed(inv[i].id)):TEAM_GUNS[TEAM.me].map(id=>inv.findIndex(w=>w.id===id)).filter(i=>i>=0)}   // Strzelnica: bronie z ograniczonym dostępem tylko dla uprawnionych
+  return TEAM.me==null?inv.map((_,i)=>i).filter(i=>weaponAllowed(inv[i].id)):teamGuns(TEAM.me).map(id=>inv.findIndex(w=>w.id===id)).filter(i=>i>=0)}   // Strzelnica: bronie z ograniczonym dostępem tylko dla uprawnionych
+// 1v1: posiadacz złotego AKM (limitowany) ma go zamiast karabinu swojej drużyny
+function teamGuns(t){return TEAM_GUNS[t].map(id=>(id==='akm'||id==='m4a1')&&weaponAllowed('akmgold')?'akmgold':id)}
 addEventListener('fasolka:weapon-access',()=>{try{const sl=slotList();if(!sl.includes(curW)&&gun.switchTo<0&&sl.length)equipNow(sl[0]);setHud()}catch(e){}});   // konto zmieniło dostęp (lobby może to zgłosić, zanim gra wystartuje)
 function equipNow(i){                                       // broń od razu w rękach (start meczu), bez animacji wyjmowania
   cancelInspect(true);gun.switching=0;gun.switchTo=-1;gun.swapped=false;gun.reloading=0;gun.reloadClick=false;gun.autoReload=0;
