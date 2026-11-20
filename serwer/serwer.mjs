@@ -967,6 +967,24 @@ const DUEL_MAPS = ['Oaza', 'Magazyn', 'Baza', 'Iglo'];
 await MECZ.loadMaps(GAME_DIR, DUEL_MAPS);                       // kolizje map z plików gry (zrodla/*-data.js): serwer sam liczy ruch i strzały
 for (const n of DM.DEFAULTS.maps) if (!DUEL_MAPS.includes(n)) { try { await MECZ.loadMaps(GAME_DIR, [n]); } catch (e) { console.warn(`[dm] mapa ${n} niedostępna:`, e.message); } }   // mapy tylko do Deathmatch
 const dmMapsReady = (list) => { const ok = list.filter((n) => MECZ.mapByName(n)); return ok.length ? ok : DUEL_MAPS; };
+// rotacja map bez powtórek (1v1 i Deathmatch osobno): każda mapa wypada raz, zanim któraś się powtórzy, w losowej kolejności,
+// i ta sama mapa nie wypada dwa razy z rzędu na styku tur. Po starcie serwera najpierw najnowsza mapa (ostatnia na liście),
+// żeby nowa mapa od razu trafiała do gry, a nie czekała na szczęśliwe losowanie.
+function mapRotation() {
+  let bag = [], last = null, fresh = true;
+  return (list) => {
+    bag = bag.filter((m) => list.includes(m));
+    if (!bag.length) {
+      bag = list.slice();
+      for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+      if (fresh && bag.length > 1) { const nw = list[list.length - 1]; bag = [nw, ...bag.filter((m) => m !== nw)]; }
+      else if (bag.length > 1 && bag[0] === last) [bag[0], bag[1]] = [bag[1], bag[0]];
+      fresh = false;
+    }
+    return (last = bag.shift());
+  };
+}
+const nextDuelMap = mapRotation(), nextDmMap = mapRotation();
 const rooms = new Set();
 // czy opłacony mecz właśnie czeka w kolejce albo trwa (wtedy rozlicza go wyłącznie serwer meczu)
 const duelActive = matchId => mmQueue.some(x => x.matchId === matchId) || [...rooms].some(r => !r.over && r.p.some(p => p.matchId === matchId));
@@ -1076,7 +1094,7 @@ function leaveQueue(ws, refund) {
   return true;
 }
 function startRoom(a, b) {
-  const map = DUEL_MAPS[Math.floor(Math.random() * DUEL_MAPS.length)];
+  const map = nextDuelMap(DUEL_MAPS);
   const room = { id: ++roomSeq, p: [a, b], score: [0, 0], map, ready: [false, false], over: false, game: MECZ.createRoom(map, nowS()) };
   room.out = (seat, m) => { if (seat < 0) room.p.forEach((pl) => wsSend(pl.ws, m)); else wsSend(room.p[seat].ws, m); };
   rooms.add(room);
@@ -1229,7 +1247,7 @@ const dmLobby = () => [...dmRooms][0] || null;
 const dmCount = () => { const r = dmLobby(); return r ? DM.playerCount(r.game) : 0; };          // razem z botami (tyle widać w lobby)
 const dmHumans = () => { const r = dmLobby(); return r ? r.entries.size : 0; };                 // tylko prawdziwi gracze
 function dmOpenLobby() {
-  const maps = dmMapsReady(dmCfg.maps), map = maps[Math.floor(Math.random() * maps.length)];
+  const maps = dmMapsReady(dmCfg.maps), map = nextDmMap(maps);
   const key = Date.now().toString(36) + '-d' + (++dmSeq);
   const room = { id: dmSeq, key, tier: dmCfg.tiers[0], entries: new Map(), bots: new Map(), botT: 0, game: DM.createRoom(dmCfg, map, nowS()) };
   room.out = (pid, msg) => {

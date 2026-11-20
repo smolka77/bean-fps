@@ -422,10 +422,20 @@ export function createMatch(g) {
     },
   };
 
+  // rotacja map bez powtórek (gra z botem): każda mapa raz, zanim któraś się powtórzy; ta sama nie wypada dwa razy z rzędu
+  let mapBag = [], lastMap = -1;
+  const nextMapIdx = (ready) => {
+    mapBag = mapBag.filter(i => ready.includes(i));
+    if (!mapBag.length) {
+      mapBag = ready.slice(); for (let i = mapBag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [mapBag[i], mapBag[j]] = [mapBag[j], mapBag[i]]; }
+      if (mapBag.length > 1 && mapBag[0] === lastMap) [mapBag[0], mapBag[1]] = [mapBag[1], mapBag[0]];
+    }
+    return (lastMap = mapBag.shift());
+  };
   function startRoulette() {
     const maps = g.maps(), n = maps.length, ready = maps.map((m, i) => m.ready ? i : -1).filter(i => i >= 0);
     if (!ready.length) { S.mapIdx = -1; S.mapName = 'Arena'; drawDone = 0; return; }   // żadna mapa się nie wczytała: arena zastępcza
-    const chosen = ready[Math.floor(Math.random() * ready.length)];
+    const chosen = nextMapIdx(ready);
     S.mapIdx = chosen; S.mapName = maps[chosen].name;
     let cur = Math.floor(Math.random() * n); const steps = [];
     const total = n * Math.max(2, Math.ceil(9 / n)) + ((chosen - cur + n) % n);
