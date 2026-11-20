@@ -15,7 +15,7 @@ export const UNITS = ['sol', 'token'];
 export const DEFAULTS = {
   enabled: true, unit: 'sol', mint: '', symbol: 'TOKEN', network: 'mainnet-beta', refresh: 120,
   need: { deagle: 0.1, mp5k: 0.25, spas12: 0.5, akm: 1, m4a1: 1.5 },     // progi w jednostce `unit` (SOL albo tokeny)
-  skinDefault: 0.1, skinNeed: {},                                      // skiny z kreatora: próg domyślny i progi poszczególnych skinów (id -> ilość)
+  skinDefault: 0, skinNeed: {},                                        // skiny z kreatora: próg domyślny (0 = każdy skin za darmo) i progi poszczególnych skinów (id -> ilość)
 };
 const MIN_GAP = 10e3;                                                   // ręczne „Sprawdź saldo” (token) najwyżej co 10 s
 export const QUEUE_AGE = 10 * 60e3;                                     // kolejka: saldo tokenu starsze niż 10 min jest sprawdzane jeszcze raz
