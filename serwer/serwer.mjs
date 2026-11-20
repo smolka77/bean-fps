@@ -902,7 +902,7 @@ function serveCover(res) {
 // graczy z tą samą stawką, losuje mapę, a potem przekazuje między nimi stan (ruch, strzały, trafienia). Rundy liczy serwer
 // (z meldunków 'dead' gracza, który zginął) i to on rozlicza stawki obu graczy po meczu. Wyjście z kolejki = zwrot stawki,
 // zerwanie połączenia w trakcie meczu = wygrana przeciwnika.
-const DUEL_MAPS = ['Oaza', 'Magazyn', 'Baza'];
+const DUEL_MAPS = ['Oaza', 'Magazyn', 'Baza', 'Iglo'];
 await MECZ.loadMaps(GAME_DIR, DUEL_MAPS);                       // kolizje map z plików gry (zrodla/*-data.js): serwer sam liczy ruch i strzały
 for (const n of DM.DEFAULTS.maps) if (!DUEL_MAPS.includes(n)) { try { await MECZ.loadMaps(GAME_DIR, [n]); } catch (e) { console.warn(`[dm] mapa ${n} niedostępna:`, e.message); } }   // mapy tylko do Deathmatch
 const dmMapsReady = (list) => { const ok = list.filter((n) => MECZ.mapByName(n)); return ok.length ? ok : DUEL_MAPS; };

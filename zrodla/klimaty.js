@@ -2,6 +2,8 @@
 //  • Baza → „Salon”: salon luksusowych aut wieczorem (zachód słońca, ulica z ruchem, kamienice z neonami, palmy, reflektory na niebie)
 //  • Oaza → „Bagno”: złote, wilgotne popołudnie nad przystanią na bagnie (woda, mgiełka, panorama miasta, ptaki, helikopter, aligatory);
 //    sama mapa (sklepik na palach, pomosty, hydroplany, drzewa) jest budowana w kodzie: zrodla/bagno-scena.js + dane w zrodla/oaza-data.js
+//  • Iglo → „Igloo”: mroźne, słoneczne popołudnie nad zamarzniętym jeziorem (góry, padający śnieg, kruki);
+//    mapa (iglo, chaty, łódź w lodzie, grań) jest budowana w kodzie: zrodla/iglo-scena.js + dane w zrodla/iglo-data.js
 // Styl fasolki: low poly, płaskie kolory, cieniowanie płaskie. Dekoracje leżą poza polem gry (albo płasko na ziemi), kule ich nie widzą.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -605,7 +607,73 @@ function themeYachts(M, root) {
     },
   };
 }
-const THEMES = { Baza: themeDealer, Oaza: themeBayou, Magazyn: themeYachts };
+// ======================================================================================================
+//                 ICE → IGLOO (zimowy obóz nad zamarzniętym jeziorem, mroźne słoneczne popołudnie)
+// ======================================================================================================
+// Mapa i kolizje: iglo-data.js, grafika: iglo-scena.js. Tu otoczenie: zimowe niebo z cienkimi chmurami, słońce z zachodu
+// (z boku dla obu stron – nikt nie patrzy w słońce), ośnieżone góry na horyzoncie, padający śnieg i kruki.
+function themeSnow(M, root) {
+  const rand = rng(2077);
+  const sunOff = V3(-26, 21, 0);
+  const FOG = '#dce7f2';
+  const sky = skyTexture({
+    stops: [[90, '#2f6fc4'], [55, '#4b8ad6'], [30, '#82b2e6'], [14, '#b5d0ee'], [6, '#d9e6f2'], [2, '#efe6e0'], [0, FOG], [-6, '#c9d6e2'], [-90, '#8c9cb0']],
+    sun: { dir: sunOff.clone().normalize(), r: 24, disc: '#fffaf0', glow: [[560, 'rgba(255,226,190,.26)'], [220, 'rgba(255,236,206,.42)'], [90, 'rgba(255,250,236,.95)']] },
+    paint: (x, W, H, px, wrap) => {
+      const r = rng(77);
+      for (let i = 0; i < 38; i++) {                          // cienkie, rozciągnięte chmury (mroźne niebo)
+        const el = 7 + r() * 30, cy = elevY(H, el), cx = r() * W, len = (90 + r() * 220) * (1 - el / 60), th = 3 + r() * 7;
+        wrap((o) => { for (let k = 0; k < 4; k++) { x.fillStyle = `rgba(255,255,255,${0.16 + r() * 0.18})`; x.beginPath(); x.ellipse(cx + o + (k - 1.5) * len * 0.35, cy + (r() - 0.5) * th, len * (0.35 + r() * 0.25), th * (0.6 + r() * 0.5), 0, 0, Math.PI * 2); x.fill(); } });
+      }
+      const y0 = elevY(H, 7), y1 = elevY(H, -1), g = x.createLinearGradient(0, y0, 0, y1);   // mroźna mgiełka nad horyzontem
+      g.addColorStop(0, 'rgba(236,242,248,0)'); g.addColorStop(1, 'rgba(236,242,248,.85)'); x.fillStyle = g; x.fillRect(0, y0, W, y1 - y0);
+    },
+  });
+  // ---- góry na horyzoncie: szaroniebieskie stożki ze śnieżnymi czapami (we mgle) ----
+  const far = new Kit(), MT = ['#8ea4c0', '#7f96b4', '#97accb', '#869cb9'];
+  for (let i = 0; i < 40; i++) {
+    const a = (i / 40) * Math.PI * 2 + (rand() - 0.5) * 0.12, d = 205 + rand() * 60, h = 34 + rand() * 58, rr = h * (0.95 + rand() * 0.55), x = Math.cos(a) * d, z = Math.sin(a) * d, ry = rand() * 6;
+    far.add(new THREE.ConeGeometry(rr, h, 7, 1), MT[i % MT.length], M4(x, h / 2 - 8, z, 0, ry));
+    far.add(new THREE.ConeGeometry(rr * 0.4 * 1.04, h * 0.4, 7, 1), '#f2f6fb', M4(x, h - 8 - h * 0.2 + 0.4, z, 0, ry));
+    if (rand() < 0.5) { const h2 = h * (0.5 + rand() * 0.3), a2 = a + (rand() - 0.5) * 0.08, d2 = d - 15 - rand() * 15, x2 = Math.cos(a2) * d2, z2 = Math.sin(a2) * d2;
+      far.add(new THREE.ConeGeometry(h2, h2, 6, 1), MT[(i + 1) % MT.length], M4(x2, h2 / 2 - 8, z2, 0, ry + 1)); far.add(new THREE.ConeGeometry(h2 * 0.36, h2 * 0.36, 6, 1), '#eef3f9', M4(x2, h2 - 8 - h2 * 0.18 + 0.3, z2, 0, ry + 1)); }
+  }
+  far.meshes(false).forEach((m) => { m.userData.deco = true; root.add(m); });
+  // ---- padający śnieg: płatki krążą w pudełku nad polem gry (ruch w shaderze, bez pracy procesora) ----
+  const N = 5000, pos = new Float32Array(N * 3), seed = new Float32Array(N);
+  for (let i = 0; i < N; i++) { pos[i * 3] = (rand() * 2 - 1) * 45; pos[i * 3 + 1] = rand() * 28; pos[i * 3 + 2] = (rand() * 2 - 1) * 50; seed[i] = rand() * 6.283; }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+  geo.boundingSphere = new THREE.Sphere(V3(0, 14, 0), 80);
+  const cv = document.createElement('canvas'); cv.width = cv.height = 32; const cx = cv.getContext('2d'), rg = cx.createRadialGradient(16, 16, 0, 16, 16, 16);
+  rg.addColorStop(0, 'rgba(255,255,255,1)'); rg.addColorStop(0.45, 'rgba(255,255,255,.85)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); cx.fillStyle = rg; cx.fillRect(0, 0, 32, 32);
+  const flake = new THREE.CanvasTexture(cv); flake.colorSpace = THREE.SRGBColorSpace;
+  const uT = { value: 0 };
+  const mat = new THREE.PointsMaterial({ color: '#ffffff', size: 0.12, map: flake, transparent: true, opacity: 0.95, depthWrite: false, sizeAttenuation: true });
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uT = uT;
+    sh.vertexShader = 'uniform float uT;\nattribute float aSeed;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      transformed.y = mod(position.y - uT * (0.8 + 0.6 * fract(aSeed * 3.7)), 28.0);
+      transformed.x = mod(position.x + 45.0 + uT * 0.4 + sin(uT * 0.7 + aSeed) * 0.7, 90.0) - 45.0;
+      transformed.z += cos(uT * 0.5 + aSeed * 1.3) * 0.6;`);
+  };
+  mat.customProgramCacheKey = () => 'bean-snowfall';
+  const snow = new THREE.Points(geo, mat); snow.frustumCulled = false; snow.renderOrder = 3; root.add(snow);
+  // ---- kruki krążące nad lasem ----
+  const ravens = birds(7, rand, '#23232a');
+  ravens.forEach((b) => { b.scale.setScalar(1.4); root.add(b); });
+  const T = {
+    sky, fog: FOG, near: 40, far: 320,
+    hemi: ['#d8e8ff', '#9db0c6', 1.05], sun: ['#ffe8cc', 2.45], sunOff, env: sky, envI: 0.5,
+    update(t) {
+      uT.value = t;
+      ravens.forEach((b, i) => { const u = b.userData, a = u.a + t * 0.1 * u.s; b.position.set(40 * Math.cos(a) * u.r + (i % 2 ? 30 : -30), 22 + u.h, 50 * Math.sin(a) * u.r); b.rotation.y = -a; b.scale.set(1.4, 1.4 * Math.sin(t * 6 + u.ph), 1.4); });
+    },
+  };
+  T.update(0);
+  return T;
+}
+
+const THEMES = { Baza: themeDealer, Oaza: themeBayou, Magazyn: themeYachts, Iglo: themeSnow };
 
 // klocki low poly wspólne z mapami budowanymi w kodzie (zrodla/bagno-scena.js)
 export { Kit, M4, V3, between, jitter, rng, mats, addPalm, addRushes, addLily, neonSign };

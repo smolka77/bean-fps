@@ -268,7 +268,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const pipsHtml = n => Array.from({ length: ROUNDS_TO_WIN }, (_, i) => `<u class="${i < n ? 'f' : ''}"></u>`).join('');
 const rand = (a, b) => a + Math.random() * (b - a);
 // tło karty mapy, zanim gotowa jest miniatura z silnika
-const MAP_TINT = { oaza: ['#b9c97a', '#3f5a2e'], magazyn: ['#7fc4f0', '#1d5a9a'], baza: ['#ff7ac8', '#5a2a8a'] };
+const MAP_TINT = { oaza: ['#b9c97a', '#3f5a2e'], magazyn: ['#7fc4f0', '#1d5a9a'], baza: ['#ff7ac8', '#5a2a8a'], iglo: ['#e6f2fb', '#5f8fbf'] };
 function mapFallback(name) {
   const k = name.toLowerCase(), c = MAP_TINT[k] || ['#7fb0ff', '#2a4a8a'];
   return `linear-gradient(160deg,${c[0]},${c[1]})`;
