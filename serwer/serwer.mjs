@@ -612,10 +612,12 @@ const routes = {
   'POST /api/admin/house/withdraw': async ({ body, req, ip }) => {
     const adm = adminGate(req);
     if (limited('house:' + adm.id, 5, 10 * 60e3)) throw new E('rate', 'Za dużo prób – odczekaj chwilę', 429);
+    // 2FA: najpierw tylko sprawdzamy kod; zużywamy go dopiero tuż przed przelewem (wcześniej kod przepadał, gdy wypłata
+    // odpadła na kwocie czy adresie, a ponowne kliknięcie z tym samym kodem kończyło się mylącym „Zły kod 2FA”)
     const a = q('SELECT * FROM admins WHERE id=?').get(adm.id);
-    const step = a && a.totp ? OCH.totpCheck(a.totp, body.code, a.totp_step) : 0;
-    if (!step) throw new E('code', 'Zły kod 2FA', 400);
-    q('UPDATE admins SET totp_step=? WHERE id=?').run(step, a.id);   // ten sam kod nie zadziała drugi raz
+    const step = a && a.totp ? OCH.totpCheck(a.totp, body.code, 0) : 0;
+    if (!step) throw new E('code', 'Zły kod 2FA – wpisz aktualny kod z aplikacji (konto BEANLADEN)', 400);
+    if (step <= (a.totp_step || 0)) throw new E('code', 'Ten kod 2FA został już użyty – poczekaj na następny (zmienia się co 30 s)', 400);
     let to; try { to = new PublicKey(String(body.to || '').trim()); } catch { throw new E('addr', 'Nieprawidłowy adres Solana'); }
     if (!PublicKey.isOnCurve(to.toBytes())) throw new E('addr', 'To nie jest adres portfela (adres programu lub konta pochodnego)');
     if (to.equals(TREASURY.publicKey)) throw new E('addr', 'To adres samego skarbca');
@@ -624,9 +626,13 @@ const routes = {
     houseBusy = true;
     try {
       let st; try { st = await houseState(); } catch { throw new E('rpc', 'Nie udało się odczytać salda skarbca – spróbuj za chwilę', 503); }
-      const lam = body.all ? st.available : Math.floor(+body.sol * LAMPORTS_PER_SOL);
+      let lam = body.all ? st.available : Math.floor(+body.sol * LAMPORTS_PER_SOL);
+      // nadwyżka zmienia się o ułamki (opłaty sieci, salda graczy), a panel pokazuje ją zaokrągloną: drobną różnicę przycinamy do nadwyżki
+      if (!body.all && lam > st.available && lam - st.available <= 1_000_000) lam = st.available;
       if (!(lam >= 100000)) throw new E('amount', body.all ? 'Nie ma nadwyżki do wypłaty' : 'Najmniejsza wypłata: 0,0001 SOL');
-      if (lam > st.available) throw new E('amount', `Do wypłaty jest najwyżej ${st.available / LAMPORTS_PER_SOL} SOL (reszta należy do graczy)`);
+      if (lam > st.available) throw new E('amount', `Do wypłaty jest najwyżej ${(st.available / LAMPORTS_PER_SOL).toFixed(6)} SOL (reszta należy do graczy) – kod 2FA nie przepadł`);
+      // teraz dopiero zużywamy kod 2FA (atomowo – dwa kliknięcia naraz nie wypłacą dwa razy)
+      if (!q('UPDATE admins SET totp_step=? WHERE id=? AND COALESCE(totp_step,0) < ?').run(step, a.id, step).changes) throw new E('code', 'Ten kod 2FA został już użyty – poczekaj na następny (zmienia się co 30 s)', 400);
       const id = Number(q("INSERT INTO house_wd(t,admin,to_addr,lamports) VALUES(?,?,?,?)").run(Date.now(), adm.username, to.toBase58(), lam).lastInsertRowid);
       audit(adm.username, ip, 'house_wd', `#${id} ${lam / LAMPORTS_PER_SOL} SOL -> ${to.toBase58()}`);
       try {
