@@ -11,12 +11,17 @@ import { pathToFileURL } from 'node:url';
 
 // ---------------- stałe zgodne z grą (zrodla/index.html, weaponry.js) ----------------
 export const WEAPON_IDS = ['akm', 'm4a1', 'glock17', 'deagle'];          // 1v1: drużyna niebieska M4A1 + Desert Eagle, czerwona AKM + Glock-17
+// indeksy broni w paczkach ruchu = WEAPON_IDS gry (zrodla/weaponry.js); w 1v1 poza czterema podstawowymi tylko złoty AKM (indeks 6) u posiadacza
+const IDX = ['akm', 'm4a1', 'glock17', 'deagle', 'spas12', 'mp5k', 'akmgold'], GOLD_W = 6;
+const okW = (p, i) => (i >= 0 && i < WEAPON_IDS.length) || (i === GOLD_W && !!p.gold);
 export const WEAPONS = {
   akm: { rpm: 600, dmg: 25, head: 3, mag: 30, reserve: 90, reload: 2.45, spread: { hip: 0.0075, ads: 0.0016, move: 1.15, bloom: 0.14 } },
   m4a1: { rpm: 700, dmg: 25, head: 3, mag: 30, reserve: 90, reload: 2.3, spread: { hip: 0.0065, ads: 0.0011, move: 1.0, bloom: 0.11 } },
   glock17: { rpm: 400, dmg: 20, head: 3, mag: 17, reserve: 102, reload: 1.75, spread: { hip: 0.006, ads: 0.002, move: 0.7, bloom: 0.12 } },
   deagle: { rpm: 267, dmg: 33, head: 3, mag: 7, reserve: 35, reload: 2.2, spread: { hip: 0.009, ads: 0.0016, move: 1.0, bloom: 0.32 } },
 };
+// złoty AKM (limitowany, pierwsze 100 kont z meczem 1v1): jak AKM, ale 34 obrażeń i 90 w głowę – jak WEAPON_STATS.akmgold w grze
+WEAPONS.akmgold = { ...WEAPONS.akm, dmg: 34, head: 90 / 34 };
 const R = 0.3;                         // promień gracza w fizyce gry
 const CROUCH_DROP = 0.25;              // o tyle opada tułów w przysiadzie
 const EYE = (s) => s.y + 1.3 - s.cr * (CROUCH_DROP + 0.12) - 0.1 * (s.sl || 0);
@@ -148,7 +153,12 @@ function newPlayer() {
     an: { shots: 0, hits: 0, heads: 0, hitsOpen: 0, headsOpen: 0, reactions: [], flicks: 0, flickHeads: 0, snaps: 0, snapHeads: 0, trigger: [], sprays: [], mismatch: 0, noSamp: 0,
       samples: 0, noShotSamp: 0, spikes: 0, firstOn: 0, sweep: 0, shotsOn: 0, shotsSeen: 0, track: { n: 0, on: 0, on1: 0 }, gaps: 0, sevMoves: 0, rtts: [] } };
 }
-function refill(p) { p.ammo = {}; for (const id of WEAPON_IDS) p.ammo[id] = { mag: WEAPONS[id].mag, res: WEAPONS[id].reserve }; p.reloadW = -1; p.bloom = 0; }
+function refill(p) { p.ammo = {}; for (const id of [...WEAPON_IDS, ...(p.gold ? ['akmgold'] : [])]) p.ammo[id] = { mag: WEAPONS[id].mag, res: WEAPONS[id].reserve }; p.reloadW = -1; p.bloom = 0; }
+// złoty AKM dla gracza na tym miejscu (serwer.mjs woła przed startem meczu)
+export function setGold(room, seat, on) {
+  const p = room.p[seat]; p.gold = !!on; refill(p);
+  if (p.gold && p.allowW && !p.allowW.includes(GOLD_W)) p.allowW.push(GOLD_W);
+}
 
 export function createRoom(mapName, now) {
   const map = MAPS[mapName]; if (!map) throw new Error('Brak mapy ' + mapName);
@@ -159,7 +169,7 @@ export function createRoom(mapName, now) {
 }
 // Arsenał: bronie, które gracz może mieć w rękach (pierwsza = pistolet, na nią przechodzi każda inna); bez wywołania – wszystkie
 export function setGuns(room, seat, ids) {
-  const p = room.p[seat], allow = (ids || []).map((id) => WEAPON_IDS.indexOf(id)).filter((i) => i >= 0);
+  const p = room.p[seat], allow = (ids || []).map((id) => IDX.indexOf(id)).filter((i) => okW(p, i));
   p.allowW = allow.length ? allow : null; if (p.allowW && !p.allowW.includes(p.w)) p.w = p.allowW[0];
 }
 const spawnOf = (room, seat) => room.map.spawns[seat === 1 && room.map.spawns[1] ? 1 : 0];
@@ -276,7 +286,7 @@ function violation(p, why, now) {
 
 // ---------------- strzał ----------------
 function shoot(room, seat, m, now, out) {
-  const me = room.p[seat], op = room.p[1 - seat], wid = WEAPON_IDS[me.w] || 'akm', W = WEAPONS[wid];
+  const me = room.p[seat], op = room.p[1 - seat], wid = IDX[me.w] || 'akm', W = WEAPONS[wid];
   if (room.phase !== 'live' || !me.live || me.hp <= 0) return;
   const q = +m.q; if (!(q > me.lastQ)) return; me.lastQ = q;      // każdy strzał raz
   if (now - me.lastStT > LAG_SHOT) return;                         // lag switch: bez świeżych paczek ruchu nie ma strzałów
@@ -438,7 +448,7 @@ export function playerStats(room, seat) {
 }
 // bryły mapy (do rysowania powtórki w panelu admina)
 export const mapBoxes = (name) => (MAPS[name] ? MAPS[name].boxes.map((b) => [b.x0, b.y0, b.z0, b.x1, b.y1, b.z1].map((v) => +v.toFixed(2))) : null);
-function finishReload(p) { const id = WEAPON_IDS[p.reloadW], W = WEAPONS[id], a = p.ammo[id], n = Math.min(W.mag - a.mag, a.res); a.mag += n; a.res -= n; p.reloadW = -1; }
+function finishReload(p) { const id = IDX[p.reloadW], W = WEAPONS[id], a = p.ammo[id], n = Math.min(W.mag - a.mag, a.res); a.mag += n; a.res -= n; p.reloadW = -1; }
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const norm = (a) => { const l = Math.hypot(...a) || 1; return a.map((v) => v / l); };
 
@@ -489,7 +499,7 @@ export function handleMessage(room, seat, m, now, out) {
       processAim(room, seat, now, false);
       if (!me.inited) return;
       const [x, y, z, yaw, pitch, cr, run, air, sl, legYaw, w, ads] = m.s.map(Number);
-      const s = { x, y, z, yaw: yaw || 0, pitch: pitch || 0, cr: clamp01(cr), run: clamp01(run), air: clamp01(air), sl: clamp01(sl), legYaw: legYaw || 0, w: WEAPON_IDS[w | 0] ? w | 0 : 0, ads: ads > 0.5 ? 1 : 0 };
+      const s = { x, y, z, yaw: yaw || 0, pitch: pitch || 0, cr: clamp01(cr), run: clamp01(run), air: clamp01(air), sl: clamp01(sl), legYaw: legYaw || 0, w: okW(me, w | 0) ? w | 0 : 0, ads: ads > 0.5 ? 1 : 0 };
       if (me.allowW && !me.allowW.includes(s.w)) s.w = me.allowW[0];   // Arsenał: broń bez tokenu = pistolet
       if (s.w !== me.w && me.reloadW >= 0) me.reloadW = -1;          // zmiana broni przerywa przeładowanie
       const why = checkMove(room, me, s, now);
@@ -509,7 +519,7 @@ export function handleMessage(room, seat, m, now, out) {
     }
     case 'sh': shoot(room, seat, m, now, out); return;
     case 'rl': {
-      const id = WEAPON_IDS[me.w], a = me.ammo[id];
+      const id = IDX[me.w], a = me.ammo[id];
       if (me.reloadW < 0 && a.mag < WEAPONS[id].mag && a.res > 0) { me.reloadW = me.w; me.reloadAt = now + WEAPONS[id].reload * 0.9; }
       return;
     }

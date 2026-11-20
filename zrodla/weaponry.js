@@ -38,11 +38,12 @@ WEAPON_STATS.akmgold = { ...WEAPON_STATS.akm, name: 'AKM Gold', slot: 7, restric
 
 // ---------------- dostęp do broni z ograniczeniami ----------------
 // Broń z restricted: true widać (w slotach, później w sklepie) tylko u graczy, którym dano do niej dostęp.
-// Kryteria: do ustalenia – na razie dostęp ma tylko admin (podgląd). Lobby woła setWeaponAccess(weaponAccessFor(konto))
+// Dostęp daje serwer: konto.limited (np. ['akmgold'] – złoty AKM dla pierwszych 100 kont z meczem 1v1) albo admin. Lobby woła setWeaponAccess(weaponAccessFor(konto))
 // przy każdej zmianie konta, a gra dostaje zdarzenie 'fasolka:weapon-access'.
 const ACCESS = new Set();
 export function weaponAccessFor(acct) {
-  return Object.keys(WEAPON_STATS).filter((id) => WEAPON_STATS[id].restricted && acct && acct.admin);
+  const own = new Set((acct && acct.limited) || []);
+  return Object.keys(WEAPON_STATS).filter((id) => WEAPON_STATS[id].restricted && acct && (acct.admin || own.has(id)));
 }
 export function setWeaponAccess(ids) {
   const next = new Set(ids || []); if (next.size === ACCESS.size && [...next].every((id) => ACCESS.has(id))) return;

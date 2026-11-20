@@ -96,7 +96,7 @@ export function botStep(game, b, now, dt, send) {
   const p = game.p.get(b.pid); if (!p || p.left) return;
   if (!p.alive) { if (p.dead && b.deployAt && now >= b.deployAt) { b.deployAt = 0; send({ t: 'deploy' }); } return; }
   if (p.life !== b.lastLife) { b.lastLife = p.life; b.yaw = p.yaw; b.dir = p.yaw; b.goal = null; b.path = null; b.tgt = 0; b.hurtFrom = null; }
-  const cfg = game.cfg, gun = DM.DM_GUNS[p.level] || DM.PISTOL, W = cfg.weapons[gun];
+  const cfg = game.cfg, gun = [...p.owned].find((g) => g !== DM.PISTOL) || DM.PISTOL, W = cfg.weapons[gun];   // broń z drabinki, którą bot faktycznie ma
 
   // cel: najbliższy przeciwnik, którego serwer pokazuje temu botowi
   let tgt = null, best = 1e9;
