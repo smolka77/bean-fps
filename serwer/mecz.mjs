@@ -19,7 +19,7 @@ export const WEAPONS = {
   akm: { rpm: 600, dmg: 25, head: 3, mag: 30, reserve: 90, reload: 2.45, spread: { hip: 0.0075, ads: 0.0016, move: 1.15, bloom: 0.14 } },
   m4a1: { rpm: 700, dmg: 25, head: 3, mag: 30, reserve: 90, reload: 2.3, spread: { hip: 0.0065, ads: 0.0011, move: 1.0, bloom: 0.11 } },
   glock17: { rpm: 400, dmg: 20, head: 3, mag: 17, reserve: 102, reload: 1.75, spread: { hip: 0.006, ads: 0.002, move: 0.7, bloom: 0.12 } },
-  deagle: { rpm: 267, dmg: 33, head: 3, mag: 7, reserve: 35, reload: 2.2, spread: { hip: 0.009, ads: 0.0016, move: 1.0, bloom: 0.32 } },
+  deagle: { rpm: 60 / 1.1, dmg: 33, head: 3, mag: 7, reserve: 35, reload: 2.2, spread: { hip: 0.009, ads: 0.0016, move: 1.0, bloom: 0.32 } },
 };
 // złoty AKM (limitowany, pierwsze 100 kont z meczem 1v1): jak AKM, ale 34 obrażeń i 90 w głowę – jak WEAPON_STATS.akmgold w grze
 WEAPONS.akmgold = { ...WEAPONS.akm, dmg: 34, head: 90 / 34 };
@@ -303,8 +303,10 @@ function shoot(room, seat, m, now, out) {
   const q = +m.q; if (!(q > me.lastQ)) return; me.lastQ = q;      // każdy strzał raz
   if (now - me.lastStT > LAG_SHOT) return;                         // lag switch: bez świeżych paczek ruchu nie ma strzałów
   // szybkostrzelność: wiadro żetonów (rpm/60 na sekundę, zapas 2 na skoki sieci)
-  me.tokens = Math.min(2, me.tokens + (now - me.tokT) * (W.rpm / 60)); me.tokT = now;
-  if (me.tokens < 0.95) return; me.tokens -= 1;
+  // szybkostrzelność: wolne bronie (Deagle, strzelba) bez zapasu – po przerwie nie da się oddać dwóch strzałów naraz; margines ~10% na opóźnienia sieci
+  const slow = W.rpm < 120;
+  me.tokens = Math.min(slow ? 1 : 2, me.tokens + (now - me.tokT) * (W.rpm / 60)); me.tokT = now;
+  if (me.tokens < (slow ? 0.9 : 0.95)) return; me.tokens -= 1;
   // amunicja i przeładowanie
   if (me.reloadW >= 0 && now >= me.reloadAt) finishReload(me);
   if (me.reloadW >= 0) return;                                     // w trakcie przeładowania nie strzela

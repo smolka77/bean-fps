@@ -22,7 +22,8 @@ export const WEAPON_STATS = {
   glock17: { name: 'Glock-17',     slot: 3, auto: false, rpm: 400, dmg: 20, head: 3,   mag: 17, reserve: 102, reload: 1.75, draw: .4,
              recoil: { pitch: .0065, yaw: .0028, kick: .028, rot: .09 }, spread: { hip: .006, ads: .002, move: .7, bloom: .12 }, snd: 'glock17',
              fov: 62, relief: .3, recoilTravel: .022 },
-  deagle:  { name: 'Desert Eagle', slot: 4, auto: false, rpm: 267, dmg: 33, head: 3,   mag: 7, reserve: 35,  reload: 2.2,  draw: .5,
+  deagle:  { name: 'Desert Eagle', slot: 4, auto: false, rpm: 60 / 1.1,   // 1,1 s między strzałami (duże obrażenia)
+             dmg: 33, head: 3,   mag: 7, reserve: 35,  reload: 2.2,  draw: .5,
              recoil: { pitch: .021, yaw: .006, kick: .05, rot: .2 },  spread: { hip: .009, ads: .0016, move: 1.0, bloom: .32 }, snd: 'deagle',
              fov: 60, relief: .3, recoilTravel: .03 },
   // strzelba (śruciny, pompka) i pistolet maszynowy; w Deathmatch dokładne liczby podaje serwer

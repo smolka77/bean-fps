@@ -39,7 +39,7 @@ export const DEFAULTS = {
   weapons: {
     glock17: { name: 'Glock-17',     price: 0,    dmg: 20, head: 3,   rpm: 400, auto: false, mag: 17, reserve: 85,  reload: 1.75, pellets: 1, pelletSpread: 0,
                falloff: [22, 55, 0.6],  recoil: { pitch: 0.0065, yaw: 0.0028 }, spread: { hip: 0.006, ads: 0.002, move: 0.7, bloom: 0.12 } },
-    deagle:  { name: 'Desert Eagle', price: 500,  dmg: 33, head: 3,   rpm: 267, auto: false, mag: 7,  reserve: 35,  reload: 2.2,  pellets: 1, pelletSpread: 0,
+    deagle:  { name: 'Desert Eagle', price: 500,  dmg: 33, head: 3,   rpm: 60 / 1.1, auto: false, mag: 7,  reserve: 35,  reload: 2.2,  pellets: 1, pelletSpread: 0,
                falloff: [30, 70, 0.75], recoil: { pitch: 0.021, yaw: 0.006 },   spread: { hip: 0.009, ads: 0.0016, move: 1.0, bloom: 0.32 } },
     spas12:  { name: 'SPAS-12',      price: 900,  dmg: 10, head: 1.5, rpm: 72, auto: false, mag: 8,  reserve: 32,  reload: 2.6,  pellets: 9, pelletSpread: 0.052,
                falloff: [7, 26, 0.2],   recoil: { pitch: 0.045, yaw: 0.008 },   spread: { hip: 0.004, ads: 0.003, move: 0.4, bloom: 0.1 } },
@@ -358,8 +358,10 @@ function shoot(room, p, m, now, out) {
   if (room.phase !== 'live' || !p.alive || p.dead || !W || !p.owned.has(wid)) return;
   const q = +m.q; if (!(q > p.lastQ)) return; p.lastQ = q;
   if (now - p.lastStT > 0.4) return;                              // bez świeżych paczek ruchu (lag switch) strzały nie przechodzą
-  p.tokens = Math.min(2, p.tokens + (now - p.tokT) * (W.rpm / 60)); p.tokT = now;
-  if (p.tokens < 0.95) return; p.tokens -= 1;
+  // szybkostrzelność: wolne bronie (Deagle, strzelba) bez zapasu – po przerwie nie da się oddać dwóch strzałów naraz; margines ~10% na opóźnienia sieci
+  const slow = W.rpm < 120;
+  p.tokens = Math.min(slow ? 1 : 2, p.tokens + (now - p.tokT) * (W.rpm / 60)); p.tokT = now;
+  if (p.tokens < (slow ? 0.9 : 0.95)) return; p.tokens -= 1;
   if (p.reloadW >= 0 && now >= p.reloadAt) finishReload(p, cfg);
   if (p.reloadW >= 0) return;
   const a = p.ammo[wid]; if (!a || a.mag <= 0) return; a.mag--;
