@@ -4,19 +4,19 @@
 import { renderEarnings } from './earnings.js';
 
 const TXT = {
-  pl: { title: 'Profil', since: 'Gracz od {d}', tProf: 'Profil', tSec: 'Bezpieczeństwo', tStats: 'Statystyki', nick: 'Nick', nickD: '3–16 znaków: litery, cyfry, _', email: 'E-mail', emailD: 'Do kontaktu i odzyskania konta (opcjonalnie)',
+  pl: { close: 'Zamknij', title: 'Profil', since: 'Gracz od {d}', tProf: 'Profil', tSec: 'Bezpieczeństwo', tStats: 'Statystyki', nick: 'Nick', nickD: '3–16 znaków: litery, cyfry, _', email: 'E-mail', emailD: 'Do kontaktu i odzyskania konta (opcjonalnie)',
     avatar: 'Zdjęcie profilowe', avatarD: 'PNG, JPG lub WebP – przytniemy je do kwadratu', upload: 'Wgraj zdjęcie', change: 'Zmień zdjęcie', remove: 'Usuń', save: 'Zapisz zmiany', saving: 'Zapisywanie…', saved: 'Zapisano', pwOld: 'Obecne hasło', pwNew: 'Nowe hasło', pwNew2: 'Powtórz nowe hasło',
     pwBtn: 'Zmień hasło', pwOk: 'Hasło zmienione', pwShort: 'Nowe hasło: co najmniej 10 znaków', pwBad: 'Obecne hasło jest nieprawidłowe', pwMatch: 'Hasła nie są takie same', errNick: 'Nick: 3–16 znaków (litery, cyfry, _)', errMail: 'Nieprawidłowy adres e-mail',
     errImg: 'Nie udało się wczytać obrazka', matches: 'Mecze', wr: 'Skuteczność', kd: 'K/D', acc: 'Celność', hs: 'W głowę', earn: 'Zarobki', logout: 'Wyloguj', secD: 'Po zmianie hasła inne urządzenia zostaną wylogowane.', wl: '{w} W · {l} P' },
-  en: { title: 'Profile', since: 'Player since {d}', tProf: 'Profile', tSec: 'Security', tStats: 'Stats', nick: 'Nickname', nickD: '3–16 characters: letters, digits, _', email: 'E-mail', emailD: 'For contact and account recovery (optional)',
+  en: { close: 'Close', title: 'Profile', since: 'Player since {d}', tProf: 'Profile', tSec: 'Security', tStats: 'Stats', nick: 'Nickname', nickD: '3–16 characters: letters, digits, _', email: 'E-mail', emailD: 'For contact and account recovery (optional)',
     avatar: 'Profile picture', avatarD: 'PNG, JPG or WebP – we crop it to a square', upload: 'Upload photo', change: 'Change photo', remove: 'Remove', save: 'Save changes', saving: 'Saving…', saved: 'Saved', pwOld: 'Current password', pwNew: 'New password', pwNew2: 'Repeat new password',
     pwBtn: 'Change password', pwOk: 'Password changed', pwShort: 'New password: at least 10 characters', pwBad: 'Current password is incorrect', pwMatch: 'Passwords do not match', errNick: 'Nickname: 3–16 characters (letters, digits, _)', errMail: 'Invalid e-mail address',
     errImg: 'Could not load the image', matches: 'Matches', wr: 'Win rate', kd: 'K/D', acc: 'Accuracy', hs: 'Headshots', earn: 'Earnings', logout: 'Log out', secD: 'Changing your password signs out your other devices.', wl: '{w} W · {l} L' },
-  ru: { title: 'Профиль', since: 'Игрок с {d}', tProf: 'Профиль', tSec: 'Безопасность', tStats: 'Статистика', nick: 'Ник', nickD: '3–16 символов: буквы, цифры, _', email: 'E-mail', emailD: 'Для связи и восстановления (необязательно)',
+  ru: { close: 'Закрыть', title: 'Профиль', since: 'Игрок с {d}', tProf: 'Профиль', tSec: 'Безопасность', tStats: 'Статистика', nick: 'Ник', nickD: '3–16 символов: буквы, цифры, _', email: 'E-mail', emailD: 'Для связи и восстановления (необязательно)',
     avatar: 'Фото профиля', avatarD: 'PNG, JPG или WebP – обрежем до квадрата', upload: 'Загрузить фото', change: 'Сменить фото', remove: 'Удалить', save: 'Сохранить', saving: 'Сохранение…', saved: 'Сохранено', pwOld: 'Текущий пароль', pwNew: 'Новый пароль', pwNew2: 'Повтори новый пароль',
     pwBtn: 'Сменить пароль', pwOk: 'Пароль изменён', pwShort: 'Новый пароль: минимум 10 символов', pwBad: 'Текущий пароль неверный', pwMatch: 'Пароли не совпадают', errNick: 'Ник: 3–16 символов (буквы, цифры, _)', errMail: 'Неверный e-mail',
     errImg: 'Не удалось загрузить изображение', matches: 'Матчи', wr: 'Побед', kd: 'K/D', acc: 'Точность', hs: 'В голову', earn: 'Доход', logout: 'Выйти', secD: 'После смены пароля другие устройства выйдут из аккаунта.', wl: '{w} П · {l} Пор' },
-  es: { title: 'Perfil', since: 'Jugador desde {d}', tProf: 'Perfil', tSec: 'Seguridad', tStats: 'Estadísticas', nick: 'Apodo', nickD: '3–16 caracteres: letras, números, _', email: 'E-mail', emailD: 'Para contacto y recuperar la cuenta (opcional)',
+  es: { close: 'Cerrar', title: 'Perfil', since: 'Jugador desde {d}', tProf: 'Perfil', tSec: 'Seguridad', tStats: 'Estadísticas', nick: 'Apodo', nickD: '3–16 caracteres: letras, números, _', email: 'E-mail', emailD: 'Para contacto y recuperar la cuenta (opcional)',
     avatar: 'Foto de perfil', avatarD: 'PNG, JPG o WebP – la recortamos en cuadrado', upload: 'Subir foto', change: 'Cambiar foto', remove: 'Quitar', save: 'Guardar cambios', saving: 'Guardando…', saved: 'Guardado', pwOld: 'Contraseña actual', pwNew: 'Nueva contraseña', pwNew2: 'Repite la nueva contraseña',
     pwBtn: 'Cambiar contraseña', pwOk: 'Contraseña cambiada', pwShort: 'Nueva contraseña: al menos 10 caracteres', pwBad: 'La contraseña actual no es correcta', pwMatch: 'Las contraseñas no coinciden', errNick: 'Apodo: 3–16 caracteres (letras, números, _)', errMail: 'E-mail no válido',
     errImg: 'No se pudo cargar la imagen', matches: 'Partidas', wr: 'Victorias', kd: 'K/D', acc: 'Precisión', hs: 'A la cabeza', earn: 'Ganancias', logout: 'Cerrar sesión', secD: 'Al cambiar la contraseña se cerrará la sesión en otros dispositivos.', wl: '{w} V · {l} D' },
@@ -103,7 +103,7 @@ export function createProfile({ root, getLang, toast, adapter }) {
   if (!document.getElementById('bl-p-css')) { const st = document.createElement('style'); st.id = 'bl-p-css'; st.textContent = CSS; document.head.appendChild(st); }
   const wrap = document.createElement('div'); wrap.id = 'bl-p'; wrap.hidden = true; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true');
   const camI = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
-  wrap.innerHTML = `<div class="bp"><button class="bp-x" type="button" data-x aria-label="Zamknij"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  wrap.innerHTML = `<div class="bp"><button class="bp-x" type="button" data-x aria-label="Close"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     <div class="bp-hero"><div class="bp-av" id="bp-av"><button class="bp-cam" type="button" id="bp-cam">${camI}</button></div>
       <div class="bp-who"><h2 id="bp-name"></h2><small id="bp-since"></small></div></div>
     <div class="bp-tabs"><button type="button" data-tab="prof" data-t="tProf"></button><button type="button" data-tab="sec" data-t="tSec"></button><button type="button" data-tab="stats" data-t="tStats"></button></div>
@@ -173,6 +173,7 @@ export function createProfile({ root, getLang, toast, adapter }) {
 
   function render() {
     wrap.querySelectorAll('[data-t]').forEach(el => { el.textContent = T(el.dataset.t); });
+    wrap.querySelectorAll('[data-x]').forEach(el => el.setAttribute('aria-label', T('close')));   // przycisk ✕ w języku gry
     const a = adapter.acct; if (!a || wrap.hidden) return;
     const shown = { ...a, avatar: draftAv !== null ? draftAv : a.avatar };
     paintAvatar($('bp-av'), shown); $('bp-av').appendChild(camBtn);

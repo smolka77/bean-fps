@@ -1874,7 +1874,8 @@ const lobby=createLobby({renderer,bean:lobbyBean,animate:lobbyAnimate,weaponArt:
     setMode(m,null);lobby.hide();document.body.classList.remove('in-lobby');startPlay()},
   onSkin:s=>{mySkin=s.id||'';applySkin(me.userData.mats.skin,s);applySkin(me.userData.mats.body,s);applySkin(fpsSkin,s);me.userData.eyes.visible=lobbyBean.userData.eyes.visible=s.eyes!==false}});   // skin z lobby także na postaci w grze
 $('overlay').addEventListener('click',()=>setTimeout(()=>{setPauseText();if(duel.mapBanner&&oaza.active){duel.mapBanner=false;banner(i18n('mt.map')+': '+mapName(oaza.map.name).toUpperCase(),'#ff4fa8')}},0));
-const stakeTxt=v=>'$'+(Math.round(v*100)/100).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2});   // kwota w USD (płatna w SOL)
+const numLoc=()=>({pl:'pl-PL',en:'en-US',ru:'ru-RU',es:'es-ES'})[getLang()]||'en-US';   // format kwot w języku gry
+const stakeTxt=v=>'$'+(Math.round(v*100)/100).toLocaleString(numLoc(),{minimumFractionDigits:2,maximumFractionDigits:2});   // kwota w USD (płatna w SOL)
 const midMatch=()=>(match.on&&match.phase!=='final')||!!(DMX&&DMX.inMatch&&DMX.phase!=='end');     // trwa mecz (po zakończeniu wyjście nic nie kosztuje)
 $('toLobby').addEventListener('click',e=>{
   e.stopPropagation();
@@ -1913,7 +1914,7 @@ const match=createMatch({
   cancelQueue:()=>{NET.cancel();setTimeout(()=>NET.close(),400);ON.active=false;dispatchEvent(new CustomEvent('fasolka:cancelled'))},
   localReady:()=>{if(!BOT.on)NET.send({t:'ready'})},
   introDone:()=>{if(!BOT.on)NET.send({t:'in'})},     // koniec intro: serwer rusza z odliczaniem, gdy obaj gracze są na mapie
-  money:v=>'$'+(Math.round(v*100)/100).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2}),
+  money:v=>'$'+(Math.round(v*100)/100).toLocaleString(numLoc(),{minimumFractionDigits:2,maximumFractionDigits:2}),
   prize:s=>payout(s),                                   // wypłata za wygraną (pula 2 × stawka minus prowizja lobby)
   matchEnd:won=>dispatchEvent(new CustomEvent('fasolka:match',{detail:{won:!!won}})),   // lobby rozlicza stawkę w portfelu
   again:()=>{toLobbyBg();lobby.show();const b=lobby.ui.querySelector('#lb-play');if(b)b.click()},   // nowa stawka i losowanie mapy w lobby

@@ -15,6 +15,18 @@ const originOf = (u) => { try { const x = new URL(u); return /^https?:$/.test(x.
 const isLocal = (o) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(o);
 const trusted = (o) => !!o && (isLocal(o) || [WALLET_API, ...TRUSTED_APIS].some((t) => t && originOf(t) === o));
 let cached = null;
+// ostrzeżenie przed obcym serwerem w języku gry (ustawienia lobby w localStorage; lobby-ui.js nie jest jeszcze wczytane)
+const API_WARN = {
+  pl: ['Gra połączy się z serwerem portfela:', 'Logowanie, hasło i wpłaty pójdą na ten adres. Kontynuuj tylko, jeśli to oficjalny serwer gry.'],
+  en: ['The game will connect to this wallet server:', 'Your login, password and deposits will go to this address. Continue only if it is the official game server.'],
+  ru: ['Игра подключится к серверу кошелька:', 'Вход, пароль и пополнения пойдут на этот адрес. Продолжай, только если это официальный сервер игры.'],
+  es: ['El juego se conectará a este servidor de cartera:', 'Tu inicio de sesión, contraseña y depósitos irán a esta dirección. Continúa solo si es el servidor oficial del juego.'],
+};
+const apiWarn = (o) => {
+  let l = 'en';
+  try { const s = JSON.parse(localStorage.getItem('fasolka-settings') || 'null'); if (s && s.langPicked && API_WARN[s.lang]) l = s.lang; } catch {}
+  return `${API_WARN[l][0]}\n\n${o}\n\n${API_WARN[l][1]}`;
+};
 
 export function walletApi() {
   if (cached !== null) return cached;
@@ -27,7 +39,7 @@ export function walletApi() {
       if (p === 'off') localStorage.removeItem('bl-api');
       else if (p && originOf(p)) localStorage.setItem('bl-api', p.trim());
       const s = (localStorage.getItem('bl-api') || '').trim(), o = originOf(s);
-      if (o && (trusted(o) || confirm(`Gra połączy się z serwerem portfela:\n\n${o}\n\nLogowanie, hasło i wpłaty pójdą na ten adres. Kontynuuj tylko, jeśli to oficjalny serwer gry.`))) v = s;
+      if (o && (trusted(o) || confirm(apiWarn(o)))) v = s;
       else if (s) localStorage.removeItem('bl-api');
     }
   } catch {}

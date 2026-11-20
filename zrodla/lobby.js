@@ -687,7 +687,7 @@ const IC = {
 const VROW = (k, c, icon, l, d) => `<div class="lb-vrow ${c}" data-k="${k}"><button type="button" class="lb-vic">${IC[icon]}${IC.mute}</button>
   <div class="lb-vtt"><b data-i18n="${l}"></b><small data-i18n="${d}"></small></div><b class="lb-vval"></b>
   <div class="lb-vsl"><input type="range" min="0" max="100" step="1" data-i18n-title="${l}"><button type="button" class="lb-vplay" data-i18n-title="set.preview">${IC.play}</button></div></div>`;
-const X_BTN = `<button class="lb-x" type="button" aria-label="Zamknij">${IC.x}</button>`;
+const X_BTN = `<button class="lb-x" type="button" aria-label="Close" data-i18n-aria="close">${IC.x}</button>`;
 const HTML = `
 <div class="lb-shade"></div>
 <header class="lb-top">
@@ -729,7 +729,7 @@ const HTML = `
   </div>
   <div class="lb-playwrap"><button class="lb-play" id="lb-play" type="button"><span class="lb-pl" data-i18n="play"></span><small id="lb-play-sub"></small></button></div>
 </div>
-<div class="lb-skins" id="lb-skins" role="dialog" aria-label="Skiny" hidden>
+<div class="lb-skins" id="lb-skins" role="dialog" aria-label="Skins" data-i18n-aria="skins.title" hidden>
   <h2 data-i18n="skins.title"></h2>
   <div class="grid" id="lb-skin-grid"></div>
   <button class="lb-btn pri" id="lb-skin-close" type="button" data-i18n="done"></button>

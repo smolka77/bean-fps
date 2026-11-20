@@ -57,6 +57,48 @@ const T = {
     coinTokT: '{sym} coin – guns for holding', coinTokL: 'You start with a pistol. Hold {sym} on your in-game address to unlock the other guns (1v1 and Deathmatch).',
     coinNone: 'Nothing is charged – only the balance counts', coinDrop: 'If your balance drops below a threshold, that gun locks again', coinCa: 'CA: <code>{ca}</code>', coinNeed: '{gun}: from {n} {u}',
     coinOffT: 'Inventory', coinOffL: 'Right now every gun is available to everyone. When Inventory is on, some guns unlock for holding SOL or the coin – nothing is ever charged.' },
+  ru: { skip: 'Пропустить', back: 'Назад', next: 'Далее', go: 'Играем!', menu: 'Как играть', step: '{i} / {n}',
+    s: [
+      ['hello', 'Добро пожаловать в GTASSAULT', 'Быстрый FPS-шутер в браузере. Играй бесплатно или на реальные SOL. Без скачивания и установки.',
+        ['<b>1v1</b> – матч на ставку против живого игрока', '<b>Deathmatch</b> – бесплатное лобби, заходи когда хочешь', '<b>Стрельбище</b> – тренировка прицеливания']],
+      ['duel', '1v1 на ставку', 'Выбираешь ставку, сервер подбирает соперника с такой же ставкой. Играете до 3 выигранных раундов.',
+        ['Ставки <b>$1 · $5 · $10</b> или своя (оплата в SOL по текущему курсу)', 'Победитель забирает обе ставки минус <b>10% комиссии</b>', 'Новый аккаунт: сначала до $5, ставки выше – после следующих матчей', 'Выход из матча = техническое поражение']],
+      ['dm', 'Deathmatch – бесплатно', 'Постоянное лобби до 20 человек (игроки и боты). Заходишь и выходишь в любой момент.',
+        ['Старт с <b>Glock</b>', 'Оружие лучше за 1 убийство, потом за следующие 2, 3, 4…', 'Смерть возвращает к Glock', '<b>Пробел</b> – возрождение, <b>Tab</b> – рейтинг, <b>Esc</b> – выход']],
+      ['dep', 'Пополнение', 'У каждого аккаунта свой адрес SOL в кошельке игры (сеть Solana).',
+        ['Отправь SOL на свой адрес с любого кошелька или биржи', 'Сервер сам увидит пополнение, можно также нажать «Проверить»', 'Баланс показан в USD, расчёты идут в SOL']],
+      ['wd', 'Вывод', 'Выводи на любой адрес Solana во вкладке «Вывод» в кошельке.',
+        ['Выводы больше <b>$100</b> админ проверяет вручную', 'Лимит <b>$500</b> в сутки на аккаунт', 'После смены пароля или e-mail вывод приостановлен на 24 ч – это защита аккаунта']],
+      ['coin', '{coinTitle}', '{coinLead}', '{coinList}'],
+      ['fair', 'Честная игра', 'Попадания, урон и движение считает сервер, а не браузер – читы не помогут.',
+        ['Подозрительные выигрыши ждут проверки (у нас есть повторы матчей)', 'За обман: запрет игры на ставки и вывода', 'Играй ответственно – ставь только то, что готов потерять']],
+    ],
+    dmX: '<b>Вход после публикации об игре в X</b>: получаешь свой код, публикуешь пост с этим кодом (текст подставится сам) и вставляешь ссылку на пост – один раз на аккаунт',
+    coinSolT: 'Инвентарь – оружие за баланс', coinSolL: 'На старте у тебя пистолет. Держи SOL на игровом балансе – и откроешь остальное оружие (1v1 и Deathmatch).',
+    coinTokT: 'Монета {sym} – оружие за удержание', coinTokL: 'На старте у тебя пистолет. Держи {sym} на своём игровом адресе – и откроешь остальное оружие (1v1 и Deathmatch).',
+    coinNone: 'Ничего не списывается – важен только баланс', coinDrop: 'Если баланс упадёт ниже порога, оружие снова заблокируется', coinCa: 'CA: <code>{ca}</code>', coinNeed: '{gun}: от {n} {u}',
+    coinOffT: 'Инвентарь', coinOffL: 'Сейчас всё оружие доступно всем. Когда включим Инвентарь, часть оружия откроется за удержание SOL или монеты – ничего не будет списываться.' },
+  es: { skip: 'Saltar', back: 'Atrás', next: 'Siguiente', go: '¡A jugar!', menu: 'Cómo jugar', step: '{i} / {n}',
+    s: [
+      ['hello', 'Bienvenido a GTASSAULT', 'Un shooter FPS rápido en el navegador. Juega gratis o por SOL de verdad. Sin descargas ni instalación.',
+        ['<b>1v1</b> – partida con apuesta contra un jugador real', '<b>Deathmatch</b> – lobby gratis, entras cuando quieras', '<b>Campo de tiro</b> – entrenamiento de puntería']],
+      ['duel', '1v1 con apuesta', 'Eliges la apuesta y el servidor busca un rival con la misma apuesta. Gana quien llegue a 3 rondas.',
+        ['Apuestas de <b>$1 · $5 · $10</b> o personalizada (pagas en SOL al cambio actual)', 'El ganador se lleva ambas apuestas menos una <b>comisión del 10%</b>', 'Cuenta nueva: primero hasta $5, apuestas mayores tras más partidas', 'Salir de la partida = derrota por abandono']],
+      ['dm', 'Deathmatch – gratis', 'Lobby permanente de hasta 20 personas (jugadores y bots). Entras y sales cuando quieras.',
+        ['Empiezas con una <b>Glock</b>', 'Mejor arma tras 1 baja, luego tras otras 2, 3, 4…', 'Morir te devuelve a la Glock', '<b>Espacio</b> – reaparecer, <b>Tab</b> – clasificación, <b>Esc</b> – salir']],
+      ['dep', 'Depósitos', 'Cada cuenta tiene su propia dirección SOL en la cartera del juego (red Solana).',
+        ['Envía SOL a tu dirección desde cualquier cartera o exchange', 'El servidor detecta el depósito solo, o pulsa «Comprobar»', 'Ves el saldo en USD y se liquida en SOL']],
+      ['wd', 'Retiros', 'Retira a cualquier dirección de Solana en la pestaña Retirar de la cartera.',
+        ['Los retiros de más de <b>$100</b> los revisa un admin', 'Límite de <b>$500</b> al día por cuenta', 'Tras cambiar la contraseña o el e-mail, los retiros se pausan 24 h – protección de la cuenta']],
+      ['coin', '{coinTitle}', '{coinLead}', '{coinList}'],
+      ['fair', 'Juego limpio', 'Los impactos, el daño y el movimiento los calcula el servidor, no tu navegador: las trampas no sirven.',
+        ['Las victorias sospechosas quedan en revisión (guardamos repeticiones)', 'Por hacer trampas: sin apuestas ni retiros', 'Juega con responsabilidad: apuesta solo lo que puedas perder']],
+    ],
+    dmX: '<b>Acceso tras compartir el juego en X</b>: recibes tu código, publicas un post con él (el texto se rellena solo) y pegas el enlace del post – una vez por cuenta',
+    coinSolT: 'Inventario – armas por tu saldo', coinSolL: 'Empiezas con una pistola. Mantén SOL en tu saldo del juego y desbloquea el resto de armas (1v1 y Deathmatch).',
+    coinTokT: 'Moneda {sym} – armas por mantenerla', coinTokL: 'Empiezas con una pistola. Guarda {sym} en tu dirección del juego y desbloquea el resto de armas (1v1 y Deathmatch).',
+    coinNone: 'No se cobra nada: solo cuenta el saldo', coinDrop: 'Si el saldo baja del umbral, el arma se vuelve a bloquear', coinCa: 'CA: <code>{ca}</code>', coinNeed: '{gun}: desde {n} {u}',
+    coinOffT: 'Inventario', coinOffL: 'Ahora todas las armas están disponibles para todos. Cuando activemos el Inventario, algunas armas se desbloquearán por mantener SOL o la moneda: nunca se cobrará nada.' },
 };
 
 const CSS = `#gta-tut{position:fixed;inset:0;z-index:99985;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(6,2,12,.66);backdrop-filter:blur(8px);animation:gt-in .25s ease}
@@ -88,7 +130,7 @@ const ls = { get(k) { try { return localStorage.getItem(k); } catch { return nul
 export function createTutorial({ getLang, api }) {
   const base = String(api || location.origin).replace(/\/+$/, '');
   let open = false, info = null;
-  const L = () => T[getLang && getLang() === 'pl' ? 'pl' : 'en'];
+  const L = () => T[getLang && getLang()] || T.en;   // pl / en / ru / es
   async function loadInfo() {
     if (info) return info;
     const get = async (p) => { try { const r = await fetch(base + p, { cache: 'no-store' }); return r.ok ? await r.json() : null; } catch { return null; } };
