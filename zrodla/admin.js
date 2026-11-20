@@ -325,6 +325,9 @@ function mountArsenal($) {
       </div>
       <h4>Progi broni – ${tok ? 'ile tokenów' : 'ile SOL'} gracz musi mieć (nic się nie pobiera; Glock-17 zawsze za darmo, 0 = broń dla każdego)</h4>
       <div class="fa-dmg">${info.guns.map((g) => `<label class="fa-dmf"><span>${esc(ARS_NAMES[g] || g)}</span><input class="fa-q" type="number" min="0" step="any" data-need="${g}" value="${cfg.need[g]}"></label>`).join('')}</div>
+      <h4>Skiny broni – ${tok ? 'ile tokenów' : 'ile SOL'} gracz musi mieć (zwykłe zawsze za darmo; serwer sprawdza próg przy wejściu do meczu)</h4>
+      <div class="fa-dmg"><label class="fa-dmf"><span>Średnie (tygrys, karbon, neon, chrom…) od</span><input class="fa-q" type="number" min="0" step="any" id="fa-ars-wsm" value="${(cfg.wskin || {}).mid ?? 5000000}"></label>
+        <label class="fa-dmf"><span>Legendarne (złoto, damast, lawa, galaktyka, hologram) od</span><input class="fa-q" type="number" min="0" step="any" id="fa-ars-wsl" value="${(cfg.wskin || {}).legend ?? 10000000}"></label></div>
       <h4>Progi skinów z kreatora – ${tok ? 'ile tokenów' : 'ile SOL'} gracz musi mieć (podstawowe kolorowe fasolki zawsze za darmo; puste pole = próg domyślny, 0 = skin dla każdego)</h4>
       <div class="fa-dmg"><label class="fa-dmf"><span><b>Próg domyślny</b></span><input class="fa-q" type="number" min="0" step="any" id="fa-ars-skdef" value="${cfg.skinDefault ?? 0}"></label>
         ${skinList.map((k) => `<label class="fa-dmf"><span>${esc(k.name || k.id)}</span><input class="fa-q" type="number" min="0" step="any" data-skin="${esc(k.id)}" value="${cfg.skinNeed && cfg.skinNeed[k.id] !== undefined ? cfg.skinNeed[k.id] : ''}" placeholder="${cfg.skinDefault ?? 0} (domyślny)"></label>`).join('') || '<p class="fa-empty">Brak skinów z kreatora (skins.json).</p>'}</div>`;
@@ -338,6 +341,7 @@ function mountArsenal($) {
     cfg.enabled = $('fa-ars-on').checked; cfg.unit = $('fa-ars-unit').value; cfg.mint = $('fa-ars-mint').value.trim(); cfg.symbol = $('fa-ars-sym').value.trim(); cfg.network = $('fa-ars-net').value; cfg.refresh = +$('fa-ars-ref').value;
     box.querySelectorAll('[data-need]').forEach((i) => { cfg.need[i.dataset.need] = +i.value; });
     cfg.skinDefault = +$('fa-ars-skdef').value || 0; cfg.skinNeed = {};
+    cfg.wskin = { mid: +$('fa-ars-wsm').value || 0, legend: +$('fa-ars-wsl').value || 0 };
     box.querySelectorAll('[data-skin]').forEach((i) => { if (i.value.trim() !== '') cfg.skinNeed[i.dataset.skin] = +i.value; });   // puste = próg domyślny
   }
   (async () => { try { info = await srvGet('/api/admin/arsenal'); cfg = JSON.parse(JSON.stringify(info.config));

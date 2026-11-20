@@ -21,7 +21,8 @@ import * as MECZ from './mecz.mjs';
 import * as DM from './dm.mjs';
 import * as BOTY from './dm-boty.mjs';                            // boty zapełniające lobby Deathmatch (ustawienie „bots” w panelu admina)                                   // tryb Deathmatch: stałe darmowe lobby do 20 graczy, broń za zabójstwa, WANTED
 import * as XS from './xshare.mjs';                              // udostępnienie gry na X = wejście do Deathmatch
-import * as ARS from './arsenal.mjs';                             // Arsenał: bronie za trzymanie tokenu na adresie depozytu (1v1 i Deathmatch)
+import * as ARS from './arsenal.mjs';
+import * as WSK from './wskins.mjs';                              // skiny broni (progi: zwykłe / średnie od 5 mln / legendarne od 10 mln tokenów)                             // Arsenał: bronie za trzymanie tokenu na adresie depozytu (1v1 i Deathmatch)
 import * as OCH from './ochrona.mjs';
 import * as ANTY from './antycheat.mjs';                          // ocena ryzyka cheatów po meczu (aimbot, triggerbot, silent aim)
 
@@ -1087,7 +1088,7 @@ function startRoom(a, b) {
   // P90 (za grę w Deathmatch): dodatkowa broń w 1v1
   [a, b].forEach((pl, seat) => { if (hasItem(pl.user.id, 'p90')) { MECZ.setP90(room.game, seat, true); if (pl.guns && !pl.guns.includes('p90')) pl.guns.push('p90'); } });
   for (const pl of [a, b]) try { q('UPDATE matches SET map=? WHERE id=?').run(room.map, pl.matchId); } catch {}
-  [a, b].forEach((pl, seat) => { const op = room.p[1 - seat]; wsSend(pl.ws, { t: 'matched', seat, map: room.map, opp: { nick: op.nick, skin: op.skin }, ...(pl.guns ? { guns: pl.guns } : {}) }); });
+  [a, b].forEach((pl, seat) => { const op = room.p[1 - seat]; wsSend(pl.ws, { t: 'matched', seat, map: room.map, opp: { nick: op.nick, skin: op.skin, wsk: op.wsk || {} }, ...(pl.guns ? { guns: pl.guns } : {}) }); });
   console.log(`[1v1] pokój ${room.id}: ${a.nick} vs ${b.nick}, stawka $${a.stake}, mapa ${room.map}`);
 }
 function endRoom(room, winner, reason) {
@@ -1121,7 +1122,7 @@ function onDuelMessage(ws, user, raw, arsChecked = false) {
     if ([...rooms].some(r => !r.over && r.p.some(p => p.matchId === match.id))) return wsSend(ws, { t: 'error', code: 'dup', message: 'Ten mecz już trwa w innej karcie.' });
     for (const x of mmQueue.filter(x => x.user.id === user.id)) { leaveQueue(x.ws, x.matchId !== match.id); wsSend(x.ws, { t: 'error', code: 'dup', message: 'Szukasz meczu w innej karcie.' }); }
     if (!q("SELECT 1 FROM matches WHERE id=? AND state='open'").get(match.id)) return noMatch();   // stawka mogła właśnie wrócić
-    const entry ={ ws, user, matchId: match.id, stake: match.stake_usd, lam: match.stake_lamports || 0, nick: user.username, skin: arsenalSkin(user.id, String(m.skin || '').slice(0, 64), match.stake_lamports || 0) };   // skin z kreatora tylko powyżej progu Arsenału
+    const entry ={ ws, user, matchId: match.id, stake: match.stake_usd, lam: match.stake_lamports || 0, nick: user.username, skin: arsenalSkin(user.id, String(m.skin || '').slice(0, 64), match.stake_lamports || 0), wsk: arsenalWsk(user.id, m.wsk, match.stake_lamports || 0) };   // skin z kreatora tylko powyżej progu Arsenału
     const i = mmQueue.findIndex(x => x.stake === entry.stake && x.user.id !== user.id && x.ws.readyState === 1 && !(MM_BLOCK_LINKED && linkOf(x.user.id, user.id)));
     if (i < 0) { mmQueue.push(entry); ws.mm = entry; wsSend(ws, { t: 'queued', waiting: mmQueue.filter(x => x.stake === entry.stake).length }); return; }
     startRoom(mmQueue.splice(i, 1)[0], entry); return;
@@ -1177,6 +1178,8 @@ function creatorSkinIds() {
   return skinIdsCache.ids;
 }
 // skin, z którym gracz wchodzi do meczu: skin z kreatora poniżej progu → '' (podstawowa fasolka)
+// skiny broni od gracza: tylko z progu, na który pozwala jego saldo (lam = stawka zamrożona na mecz też się liczy)
+const arsenalWsk = (uid, src, lam = 0) => WSK.clean(src, arsenal.wskinRank(uid, (lam || 0) / LAMPORTS_PER_SOL));
 const arsenalSkin = (uid, skin, lam = 0) => (!skin || !creatorSkinIds().has(skin) || arsenal.skinOk(uid, skin, (lam || 0) / LAMPORTS_PER_SOL) ? skin : '');
 const arsenalGuns = (uid, ids, lam = 0) => { const g = arsenal.gunsFor(uid, (lam || 0) / LAMPORTS_PER_SOL); return g ? g.filter((id) => ids.includes(id)) : null; };
 
@@ -1255,7 +1258,7 @@ function dmJoin(ws, user, m, arsChecked = false, xsChecked = false) {
   try { e.entryId = Number(q("INSERT INTO dm_entries(user_id,t,tier,entry_usd,lamports,price,state,room,map) VALUES(?,?,?,?,?,?,'playing',?,?)")
     .run(user.id, Date.now(), room.tier.id, 0, 0, 0, room.key, room.game.mapName).lastInsertRowid); } catch (er) { console.error('[dm] zapis wejścia', er); }
   const t = nowS();
-  e.pid = DM.addPlayer(room.game, { uid: user.id, nick: e.nick, skin: e.skin, gold: hasGold(user.id), p90: hasItem(user.id, 'p90'), guns: arsenalGuns(user.id, DM.DM_GUNS) }, t, room.out);   // pozostali dostają {t:'joined'} (nowy gracz jeszcze nie jest na liście)
+  e.pid = DM.addPlayer(room.game, { uid: user.id, nick: e.nick, skin: e.skin, gold: hasGold(user.id), p90: hasItem(user.id, 'p90'), wsk: arsenalWsk(user.id, m.wsk), guns: arsenalGuns(user.id, DM.DM_GUNS) }, t, room.out);   // pozostali dostają {t:'joined'} (nowy gracz jeszcze nie jest na liście)
   room.entries.set(e.pid, e); dmUsers.set(user.id, e); ws.dm = e;
   wsSend(ws, DM.startMessage(room.game, e.pid, t));
   console.log(`[dm] lobby ${room.key}: ${e.nick} wszedł (${dmCount()}/${dmCfg.maxPlayers})`);
@@ -1285,7 +1288,7 @@ function dmPlayerGone(e, why, stats) {
 // boty: dodanie jednego do lobby / usunięcie (domyślnie martwego albo ostatnio dodanego)
 function dmBotAdd(room, t) {
   const taken = new Set([...room.game.p.values()].map((p) => String(p.nick).toLowerCase()));
-  const pid = DM.addPlayer(room.game, { uid: 0, nick: BOTY.botNick(taken), skin: BOTY.botSkin([...room.game.p.values()].map((p) => p.skin)), bot: true }, t, room.out);
+  const pid = DM.addPlayer(room.game, { uid: 0, nick: BOTY.botNick(taken), skin: BOTY.botSkin([...room.game.p.values()].map((p) => p.skin)), wsk: WSK.botSkins(), bot: true }, t, room.out);
   room.bots.set(pid, BOTY.createBot(pid, dmCfg.botSkill));
 }
 function dmBotRemove(room, pid) {

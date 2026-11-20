@@ -208,7 +208,7 @@ export function navPath(map, fx, fz, tx, tz) {
 // ---------------- pokój ----------------
 const RW = 0.12;                                            // ile s po śmierci przeciwnik jeszcze jest w historii (żeby strzał oddany chwilę przed śmiercią się liczył)
 function newPlayer(pid, info, cfg) {
-  return { pid, uid: info.uid, nick: info.nick, skin: info.skin || '', bot: !!info.bot, gold: !!info.gold, p90: !!info.p90,
+  return { pid, uid: info.uid, nick: info.nick, skin: info.skin || '', bot: !!info.bot, gold: !!info.gold, p90: !!info.p90, wsk: info.wsk && Object.keys(info.wsk).length ? info.wsk : null,   // skiny broni (sprawdzone przez serwer)
     guns: Array.isArray(info.guns) ? new Set(info.guns) : null,     // Arsenał: bronie, które gracz może kupić (null = wszystkie)
     x: 0, y: 0, z: 0, yaw: 0, pitch: 0, cr: 0, sl: 0, ads: 0, w: WIDS.indexOf(PISTOL), run: 0, air: 0, legYaw: 0,
     hp: 100, armor: 0, helmet: false, alive: false, dead: true, deadAt: -99, life: 0, protUntil: 0, level: 0, lk: 0,
@@ -239,7 +239,7 @@ export const playerCount = (room) => room.p.size;
 export function addPlayer(room, info, now, out) {
   const p = newPlayer(++room.nextPid, info, room.cfg); room.p.set(p.pid, p);
   spawnPlayer(room, p, now, null);
-  out(-1, { t: 'joined', id: p.pid, nick: p.nick, skin: p.skin });
+  out(-1, { t: 'joined', id: p.pid, nick: p.nick, skin: p.skin, ...(p.wsk ? { wsk: p.wsk } : {}) });
   room.boardDirty = true;
   return p.pid;
 }
@@ -536,5 +536,5 @@ export function tick(room, now, out) {
 export function startMessage(room, pid, now) {
   const p = room.p.get(pid);
   return { t: 'dm', you: pid, map: room.mapName, liveIn: 0, duration: 0, persistent: 1, cfg: publicConfig(room.cfg),
-    players: [...room.p.values()].map((q) => ({ id: q.pid, nick: q.nick, skin: q.skin })), ...invOf(p), ...(p.guns ? { guns: [...p.guns] } : {}) };
+    players: [...room.p.values()].map((q) => ({ id: q.pid, nick: q.nick, skin: q.skin, ...(q.wsk ? { wsk: q.wsk } : {}) })), ...invOf(p), ...(p.guns ? { guns: [...p.guns] } : {}) };
 }

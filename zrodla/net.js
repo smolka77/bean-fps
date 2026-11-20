@@ -43,7 +43,7 @@ export function createNet() {
   return {
     on: (t, f) => { on[t] = f; },
     connect,
-    async queue(o) { await connect(); send({ t: 'queue', matchId: o.matchId, skin: o.skin || '' }); },
+    async queue(o) { await connect(); send({ t: 'queue', matchId: o.matchId, skin: o.skin || '', wsk: o.wsk || {} }); },
     cancel() { send({ t: 'cancel' }); },
     send,
     close() { closing = true; if (ws) try { ws.close(); } catch {} ws = null; },
