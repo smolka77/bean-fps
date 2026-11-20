@@ -1,6 +1,7 @@
 // Autorytatywny serwer trybu DEATHMATCH: stałe, zawsze otwarte lobby do 20 graczy, za darmo, bez końca meczu
 // (wchodzisz i wychodzisz kiedy chcesz; ranking: zabójstwa, potem zadane obrażenia).
-// Broń: każde zabójstwo daje kolejną broń z drabinki DM_GUNS (Glock → Deagle → SPAS → MP5K → AKM → M4A1), śmierć cofa na Glocka.
+// Broń: zabójstwa dają kolejne bronie z drabinki DM_GUNS (Glock → Deagle → SPAS → MP5K → AKM → M4A1); śmierć cofa o jedną broń,
+// a odzyskanie straconej kosztuje zawsze RECOVER_KILLS zabójstw (np. SPAS → śmierć → Deagle → 3 zabójstwa → SPAS).
 // Jak w 1v1 (mecz.mjs) to SERWER decyduje o wszystkim, co ważne:
 //  - ruch: prędkość, skok, ściany, wyjście poza mapę (zły ruch = korekta „fix”),
 //  - strzały: szybkostrzelność, amunicja, przeładowanie, rozrzut, śruciny strzelby, spadek obrażeń z odległością,
@@ -220,8 +221,12 @@ function newPlayer(pid, info, cfg) {
 // drabinka: kolejna broń za coraz więcej zabójstw – 1. awans za 1 zabójstwo, 2. za kolejne 2, 3. za kolejne 3 itd. (lk = zabójstwa od ostatniego awansu)
 // Ekwipunek: drabinka pomija bronie, których gracz nie ma odblokowanych (p.guns; null = wszystkie)
 // Ekwipunek: drabinka pomija bronie bez progu; złoty AKM (zamiast AKM) posiadacz ma zawsze, bez względu na saldo
-const nextLevel = (p) => { let nl = p.level + 1; while (nl < DM_GUNS.length && p.guns && !p.guns.has(DM_GUNS[nl]) && !(DM_GUNS[nl] === 'akm' && p.gold) && !(DM_GUNS[nl] === 'mp5k' && p.p90)) nl++; return nl; };
-const killsNeed = (p) => p.level + 1;
+const hasLevel = (p, l) => l <= 0 || !p.guns || p.guns.has(DM_GUNS[l]) || (DM_GUNS[l] === 'akm' && p.gold) || (DM_GUNS[l] === 'mp5k' && p.p90);
+const nextLevel = (p) => { let nl = p.level + 1; while (nl < DM_GUNS.length && !hasLevel(p, nl)) nl++; return nl; };
+const prevLevel = (p) => { let l = p.level - 1; while (l > 0 && !hasLevel(p, l)) l--; return Math.max(0, l); };
+// śmierć cofa o jedną broń (p.back = gracz odzyskuje broń straconą przy śmierci); odzyskanie kosztuje zawsze tyle zabójstw
+export const RECOVER_KILLS = 3;
+const killsNeed = (p) => (p.back ? RECOVER_KILLS : p.level + 1);
 // broń gracza na danym poziomie drabinki: posiadacz złotego AKM dostaje go zamiast zwykłego AKM
 const gunOf = (p, level = p.level) => { const g = DM_GUNS[Math.min(DM_GUNS.length - 1, Math.max(0, level))] || PISTOL; return g === 'akm' && p.gold ? GOLD : g === 'mp5k' && p.p90 ? P90 : g; };
 const ownedFor = (level, p) => new Set([PISTOL, gunOf(p, level)]);
@@ -429,8 +434,9 @@ function applyDamage(room, t, raw, head) {
 function onKill(room, k, v, wid, head, dist, now, out) {
   const cfg = room.cfg, wasWanted = room.wanted === v.pid;
   v.alive = false; v.dead = true; v.deadAt = now; v.deaths++; v.streak = 0; v.killer = k ? k.pid : null;
-  // śmierć: drabinka broni od początku (Glock)
-  v.level = 0; v.lk = 0; v.owned = ownedFor(0, v); v.armor = 0; v.helmet = false; v.reloadW = -1;
+  // śmierć: broń o jeden szczebel niżej (Glock zostaje Glockiem), postęp do następnej od zera; kamizelka i hełm przepadają
+  if (v.level > 0) { v.level = prevLevel(v); v.back = true; }
+  v.lk = 0; v.owned = ownedFor(v.level, v); v.armor = 0; v.helmet = false; v.reloadW = -1;
   let up = null;
   if (k && k !== v) {
     k.kills++; k.streak++; k.best = Math.max(k.best, k.streak);
@@ -438,7 +444,7 @@ function onKill(room, k, v, wid, head, dist, now, out) {
     const nl = nextLevel(k);
     if (nl < DM_GUNS.length) k.lk = (k.lk || 0) + 1;
     if (nl < DM_GUNS.length && k.lk >= killsNeed(k)) {
-      k.level = nl; k.lk = 0; const gun = gunOf(k), W = cfg.weapons[gun];
+      k.level = nl; k.lk = 0; k.back = false; const gun = gunOf(k), W = cfg.weapons[gun];
       k.owned = ownedFor(k.level, k); k.ammo[gun] = { mag: W.mag, res: W.reserve }; k.w = WIDS.indexOf(gun); k.reloadW = -1; k.bloom = 0;
       up = gun;
     }
