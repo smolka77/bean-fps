@@ -430,6 +430,7 @@ function mountHouse($) {
   const msg = $('fa-house-msg'), go = $('fa-house-go'); let st = null, all = false;
   const sol = (l) => (l / 1e9).toLocaleString('pl-PL', { maximumFractionDigits: 6 }) + ' SOL';
   const inUsd = (l) => st && st.price ? ' · ' + usd(l / 1e9 * st.price) : '';
+  const paren = (l) => st && st.price ? ` (${usd(l / 1e9 * st.price)})` : '';
   const kv = (k, v, sub) => `<div class="fa-dmf"><span>${esc(k)}</span><b style="font-size:15px;color:var(--fg,#fff)">${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
   async function pull() {
     try {
@@ -438,8 +439,10 @@ function mountHouse($) {
       $('fa-house-sum').textContent = `skarbiec ${st.address.slice(0, 4)}…${st.address.slice(-4)} · ${st.cluster}`;
       $('fa-house-kv').innerHTML = kv('Saldo skarbca', sol(st.treasury) + inUsd(st.treasury))
         + kv('Należy się graczom', sol(o.total), `salda ${sol(o.balances)} · stawki ${sol(o.stakes)} · wypłaty ${sol(o.withdrawals)}`)
-        + kv('Do wypłaty (nadwyżka)', `<span style="color:#3ce38a">${sol(st.available)}</span>` + inUsd(st.available))
-        + kv('Prowizja z meczów / wypłacone', `${sol(st.fees)} / ${sol(st.sent)}`);
+        + kv('Do wypłaty (nadwyżka)', `<span style="color:#3ce38a">${sol(st.available)}</span>` + inUsd(st.available),
+          st.feePart != null ? `prowizja ${sol(st.feePart)}${paren(st.feePart)} · inne środki ${sol(st.other)}${paren(st.other)}` : '')
+        + kv('Prowizja z meczów / wypłacone', `${sol(st.fees)} / ${sol(st.sent)}`,
+          st.feesDuel != null ? [`1v1 ${sol(st.feesDuel)}`, st.feesDm ? `Deathmatch ${sol(st.feesDm)}` : '', st.prior ? `sprzed resetu historii ${sol(st.prior)}` : ''].filter(Boolean).join(' · ') : '');
       $('fa-house-hist').innerHTML = st.history.length ? st.history.map((w) => `<li><div><b>${sol(w.lamports)} → <code>${esc(w.to_addr.slice(0, 6) + '…' + w.to_addr.slice(-6))}</code></b>
           <small>${new Date(w.t).toLocaleString('pl-PL')} · ${esc(w.admin)}${w.note ? ' · ' + esc(w.note) : ''}</small></div>
           <span class="mut">${w.state === 'sent' ? `<a href="${esc(w.url)}" target="_blank" rel="noopener">wysłane ↗</a>` : w.state === 'failed' ? 'nieudane' : 'w toku'}</span></li>`).join('')
@@ -654,7 +657,8 @@ function buildDashboard(db, close) {
     <section class="fa-kpis" id="fa-kpis" aria-label="Liczby ogólne"></section>
     ${SRV ? `<section class="fa-card" id="fa-house-card"><div class="fa-ch"><h3>Prowizja domu – wypłata ze skarbca</h3><small id="fa-house-sum">Ładowanie…</small></div>
       <p class="fa-msg" style="margin:0 0 12px">Prowizja z meczów zostaje w skarbcu razem z pieniędzmi graczy. Wypłacić można tylko <b>nadwyżkę</b>: saldo skarbca minus to, co należy się graczom
-        (salda w grze, stawki w trwających meczach, wypłaty w toku) i 0,001 SOL rezerwy. Każda wypłata wymaga aktualnego kodu 2FA.</p>
+        (salda w grze, stawki w trwających meczach, wypłaty w toku) i 0,001 SOL rezerwy. Nadwyżka to niewypłacona prowizja plus <b>inne środki</b> –
+        SOL wysłany prosto na adres skarbca (np. na opłaty sieci), pomniejszony o opłaty zapłacone od tamtej pory. Każda wypłata wymaga aktualnego kodu 2FA.</p>
       <div class="fa-dmg" id="fa-house-kv"></div>
       <div class="fa-dmg" style="margin-top:12px">
         <label class="fa-dmf" style="grid-column:span 2"><span>Adres portfela Solana (dokąd)</span><input class="fa-q" id="fa-house-to" placeholder="np. 7xKX…" spellcheck="false" autocomplete="off"></label>

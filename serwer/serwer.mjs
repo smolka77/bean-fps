@@ -597,9 +597,14 @@ const routes = {
   'GET /api/admin/house': async ({ req }) => {
     adminGate(req);
     let st; try { st = await houseState(); } catch (e) { throw new E('rpc', 'Nie udało się odczytać salda skarbca – spróbuj za chwilę', 503); }
-    const fees = q("SELECT COALESCE(SUM(fee_lamports),0) s FROM matches WHERE state IN ('won','held')").get().s || 0;
+    const feesDuel = q("SELECT COALESCE(SUM(fee_lamports),0) s FROM matches WHERE state IN ('won','held')").get().s || 0;
+    let feesDm = 0; try { feesDm = q("SELECT COALESCE(SUM(fee_lamports),0) s FROM dm_entries WHERE state='played'").get().s || 0; } catch {}
+    // prowizja z meczów, których nie ma już w bazie (reset historii meczów) – klucz 'house_fees_prior' w config, w lamportach
+    let prior = 0; try { prior = Math.max(0, Math.floor(+(q("SELECT value FROM config WHERE key='house_fees_prior'").get() || {}).value || 0)); } catch {}
     const sent = q("SELECT COALESCE(SUM(lamports),0) s FROM house_wd WHERE state='sent'").get().s || 0;
-    return { ...st, address: TREASURY.publicKey.toBase58(), cluster: CLUSTER, price: PRICE, fees, sent,
+    // rozbicie nadwyżki: najpierw niewypłacona prowizja, reszta to inne środki (SOL wysłany prosto na skarbiec, minus opłaty sieci)
+    const fees = feesDuel + feesDm + prior, feePart = Math.min(st.available, Math.max(0, fees - sent)), other = st.available - feePart;
+    return { ...st, address: TREASURY.publicKey.toBase58(), cluster: CLUSTER, price: PRICE, fees, feesDuel, feesDm, prior, sent, feePart, other,
       history: q('SELECT * FROM house_wd ORDER BY id DESC LIMIT 30').all().map((w) => ({ ...w, url: w.sig ? explorer(w.sig) : '' })) };
   },
   // wypłata prowizji domu na podany adres: kwota w SOL albo all=true (cała dostępna nadwyżka); wymaga aktualnego kodu 2FA
