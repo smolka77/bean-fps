@@ -1,6 +1,8 @@
-# Bean FPS
+# Bean FPS – BEANLADEN
 
-Strzelanka FPS z fasolką (three.js). **Zagraj w przeglądarce: https://smolka77.github.io/bean-fps/**
+Strzelanka FPS z fasolką (three.js). Gałąź `beanladen`: wygląd oryginalnego **BEANLADEN** (lobby z wioską i czołgami o zachodzie słońca,
+granatowo-złoty interfejs, logo BEANLADEN, skiny BEANLADEN, oryginalna Strzelnica i mapy Oaza / Magazyn / Baza) z całą techniką z GTASSAULT
+(płynność, bronie GLB z dźwiękami, obrażenia i mechanika broni, Deathmatch, Ekwipunek, serwer). Bez muzyki w lobby. **Zagraj w przeglądarce: https://smolka77.github.io/bean-fps/**
 
 Gra to mała strona [`index.html`](index.html) (ok. 60 KB) i folder `gra/` z kodem, modelami i zdjęciami.
 Przy wejściu przez sieć idzie ok. 0,45 MB kodu (skompresowane), bronie ok. 1,4 MB, a mapy, dźwięki i tryby doczytują się w tle.
@@ -9,13 +11,15 @@ Wersja w jednym pliku do otwarcia dwuklikiem (bez serwera): `npm run build:offli
 
 ## Co jest w środku
 
-- **Lobby:** konto i testowy portfel USDT (zapisywane w przeglądarce), stawki, losowanie mapy, skiny, ustawienia (dźwięk, FOV, język).
+- **Lobby:** pole bitwy BEANLADEN (wioska, okopy, czołgi; w panelu admina do wyboru też las i hangar), konto i portfel, stawki, losowanie mapy, skiny, ustawienia (dźwięk, FOV, język).
 - **Tryby:**
-  - **Strzelnica:** trening solo w podziemnym bunkrze (tunel w skale, tory, świetlówki), tarcze-fasolki na stojakach i tablica ustawień.
+  - **Strzelnica:** trening solo na placu o zachodzie słońca (oryginalna mapa BEANLADEN, `zrodla/strzelnica-data.js`), czerwone fasolki-cele i tablica ustawień.
   - **Z botem:** mecz 1v1 z botem do 3 wygranych rund, bez serwera i stawki.
-  - **1v1:** mecz z prawdziwym graczem o stawkę do 3 wygranych rund (serwer meczów), na jednej z trzech map.
+  - **1v1:** mecz z prawdziwym graczem o stawkę do 3 wygranych rund (serwer meczów), na jednej z siedmiu map.
   - **Deathmatch:** za darmo, stałe lobby do 20 graczy (wchodzisz i wychodzisz kiedy chcesz), widok z 3. osoby (wymaga serwera gry – szczegóły niżej).
-- **Mapy:** Bagno (dawna Oaza), Magazyn, Salon (dawna Baza), Strzelnica.
+- **Mapy:** w rotacji 1v1 i Deathmatch jest siedem map: trzy oryginalne mapy BEANLADEN – Oaza, Magazyn, Baza (modele GLB, id `OazaBL`, `MagazynBL`, `BazaBL`,
+  pliki `zrodla/oazabl-data.js`, `magazynbl-data.js`, `bazabl-data.js`; zwykły build zapisuje ich modele jako `gra/*.glb`) oraz mapy z GTASSAULT:
+  Bagno (id `Oaza`), Jachty (id `Magazyn`), Salon (id `Baza`) i Igloo (id `Iglo`). Do tego Strzelnica.
   Bagno to przystań na bagnie budowana w kodzie (`zrodla/oaza-data.js` – kolizje i spawny, `zrodla/bagno-scena.js` – wygląd): sklepik z przynętą na palach,
   pomosty, dwa hydroplany, przyczepy kempingowe, dęby z korzeniami, beczki i rozlewisko, którym się brodzi; niebo i światło ustawia `zrodla/klimaty.js`.
   Po zmianie kolizji mapy serwer meczów trzeba zrestartować (czyta `zrodla/*-data.js` przy starcie).

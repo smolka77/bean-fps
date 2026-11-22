@@ -8,21 +8,22 @@
 // Ustawienia w panelu admina (klucz 'xshare' w config). Domyślnie wyłączone.
 
 // domyślny post po angielsku z linkiem do gry i CA; razem z linkiem (X liczy go jako 23 znaki), CA i kodem ok. 270 z 280 znaków X
-const DEFAULT_TEXT = 'Just dropped into GRAND THEFT ASSAULT 🔫 – a fast browser FPS with real money stakes.\n\nNo download. Deathmatch, unlock guns or go 1v1 for real money. Can you beat me? 👇\n{url}\n\nCA: {ca}\n\n#GTASSAULT #FPS {code}';
+const DEFAULT_TEXT = 'Just dropped into BEANLADEN 🔫 – a fast browser bean FPS with real money stakes.\n\nNo download. Deathmatch, unlock guns or go 1v1 for real money. Can you beat me? 👇\n{url}\n\nCA: {ca}\n\n#BEANLADEN #FPS {code}';
+const GTA_DEFAULT = 'Just dropped into GRAND THEFT ASSAULT 🔫 – a fast browser FPS with real money stakes.\n\nNo download. Deathmatch, unlock guns or go 1v1 for real money. Can you beat me? 👇\n{url}\n\nCA: {ca}\n\n#GTASSAULT #FPS {code}';
 // poprzedni domyślny tekst (bez linku): zapisany w ustawieniach zamienia się na nowy, żeby post dostał link bez ręcznej zmiany w panelu
 const OLD_DEFAULT = 'Just dropped into GRAND THEFT ASSAULT 🔫 – a fast browser FPS with real money stakes.\n\nNo download. Jump into Deathmatch, unlock guns, top the kill feed or go 1v1 for real money. Can you beat me? 👇\n\nCA: {ca}\n\n#GTASSAULT #FPS {code}';
-const GAME_CA = '6MLXACPntZ74yoYErw5dBLeqPZu9X3dtEP5EPNQbpump', GAME_URL = 'https://gtassault.com';
+const GAME_CA = '6MLXACPntZ74yoYErw5dBLeqPZu9X3dtEP5EPNQbpump', GAME_URL = 'https://beanladen.pl';
 // długość posta tak, jak liczy X: link = 23 znaki, emoji i znaki spoza alfabetów łacińskich = 2
 export function xLength(t) {
   let n = 0;
   for (const ch of String(t).replace(/https?:\/\/\S+/g, 'x'.repeat(23))) { const c = ch.codePointAt(0); n += c <= 0x10ff || (c >= 0x2000 && c <= 0x200d) || (c >= 0x2010 && c <= 0x201f) || (c >= 0x2032 && c <= 0x2037) ? 1 : 2; }
   return n;
 }
-const D = { enabled: false, text: DEFAULT_TEXT, ca: GAME_CA, url: GAME_URL, requireCa: true, recheckHours: 24, profile: 'https://x.com/playGTAssault' };   // profile: strona gry na X (kafelek X w lobby)
+const D = { enabled: false, text: DEFAULT_TEXT, ca: GAME_CA, url: GAME_URL, requireCa: true, recheckHours: 24, profile: '' };   // profile: strona gry na X (kafelek X w lobby)
 const isB58 = (s) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
 
 export function sanitize(s = {}) {
-  const text = (s.text == null || s.text === OLD_DEFAULT ? D.text : String(s.text)).slice(0, 600);
+  const text = (s.text == null || s.text === OLD_DEFAULT || s.text === GTA_DEFAULT ? D.text : String(s.text)).slice(0, 600);
   const ca = String(s.ca || D.ca).trim();                               // puste pole w panelu = CA gry
   const url = String(s.url || D.url).trim();                            // puste pole w panelu = adres gry (https)
   return {
@@ -48,7 +49,7 @@ export const hasCode = (text, code) => !!code && norm(text).includes(norm(code))
 export const hasCa = (text, ca) => !!ca && String(text || '').replace(/\s+/g, '').includes(ca);
 // token, którego wymaga cdn.syndication.twimg.com (ten sam wzór co w osadzonych postach X i react-tweet)
 const synToken = (id) => ((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, '');
-const UA = 'Mozilla/5.0 (compatible; GTASSAULT-xshare/1.0)';
+const UA = 'Mozilla/5.0 (compatible; BEANLADEN-xshare/1.0)';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', mdash: '—', ndash: '–', hellip: '…' };

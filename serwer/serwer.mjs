@@ -969,7 +969,7 @@ function serveCover(res) {
 // graczy z tą samą stawką, losuje mapę, a potem przekazuje między nimi stan (ruch, strzały, trafienia). Rundy liczy serwer
 // (z meldunków 'dead' gracza, który zginął) i to on rozlicza stawki obu graczy po meczu. Wyjście z kolejki = zwrot stawki,
 // zerwanie połączenia w trakcie meczu = wygrana przeciwnika.
-const DUEL_MAPS = ['Oaza', 'Magazyn', 'Baza', 'Iglo'];
+const DUEL_MAPS = ['OazaBL', 'MagazynBL', 'BazaBL', 'Oaza', 'Magazyn', 'Baza', 'Iglo'];
 await MECZ.loadMaps(GAME_DIR, DUEL_MAPS);                       // kolizje map z plików gry (zrodla/*-data.js): serwer sam liczy ruch i strzały
 for (const n of DM.DEFAULTS.maps) if (!DUEL_MAPS.includes(n)) { try { await MECZ.loadMaps(GAME_DIR, [n]); } catch (e) { console.warn(`[dm] mapa ${n} niedostępna:`, e.message); } }   // mapy tylko do Deathmatch
 const dmMapsReady = (list) => { const ok = list.filter((n) => MECZ.mapByName(n)); return ok.length ? ok : DUEL_MAPS; };
@@ -1210,7 +1210,7 @@ const arsenalGuns = (uid, ids, lam = 0) => { const g = arsenal.gunsFor(uid, (lam
 // własny portfel (tryb 'hold'): jednorazowe kody do podpisu (id gracza -> { message, exp }) i weryfikacja podpisu
 const holdNonces = new Map();
 setInterval(() => { const t = Date.now(); for (const [k, v] of holdNonces) if (v.exp < t) holdNonces.delete(k); }, 300e3).unref();
-const holdMessage = (name, code) => `GTASSAULT: link this wallet to account ${name}.\nSigning is free and sends no transaction.\nCode: ${code}`;
+const holdMessage = (name, code) => `BEANLADEN: link this wallet to account ${name}.\nSigning is free and sends no transaction.\nCode: ${code}`;
 const ED25519_SPKI = Buffer.from('302a300506032b6570032100', 'hex');
 function verifyEd25519(pub, msg, sig) {
   try { return crypto.verify(null, msg, crypto.createPublicKey({ key: Buffer.concat([ED25519_SPKI, Buffer.from(pub)]), format: 'der', type: 'spki' }), sig); } catch { return false; }

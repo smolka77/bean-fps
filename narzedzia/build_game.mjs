@@ -41,7 +41,7 @@ html = html.slice(0, a) + '@@BUNDLE@@' + html.slice(b + '</script>'.length);
 html = html.replace(/<script type="importmap">[\s\S]*?<\/script>\s*/, '');
 
 // 2) mapy: dynamiczny import(M.src) -> mapa importów (w zwykłym buildzie każda mapa to osobny plik, pobierany w tle)
-const maps = ['oaza', 'magazyn', 'baza', 'iglo', 'bunkier'];
+const maps = ['oazabl', 'magazynbl', 'bazabl', 'oaza', 'magazyn', 'baza', 'iglo', 'strzelnica'];
 patch('main.js', 'const MAPS=[', 'const MAP_MODS={' + maps.map((m) => `'./${m}-data.js':()=>import('./${m}-data.js')`).join(',') + '};\nconst MAPS=[');
 patch('main.js', 'await import(M.src)', 'await MAP_MODS[M.src]()');
 
@@ -60,6 +60,13 @@ if (!OFFLINE) {
   };
   for (const f of fs.readdirSync(path.join(work, 'weapons')).filter((f) => f.endsWith('-glb.js'))) toFile(`weapons/${f}`, f.replace('-glb.js', '.glb'));
   toFile('bean-data.js', 'fasolka.glb');
+  for (const m of maps) {                     // mapy z modelem GLB w base64 (BEANLADEN): plik binarny, gra pobiera go przez fetch
+    const f = m + '-data.js'; if (!fs.existsSync(path.join(work, f))) continue;
+    const s = rd(f), g = s.match(/export const GLB\s*=\s*['"]([A-Za-z0-9+/=]+)['"];?/);
+    if (!g) continue;
+    fs.writeFileSync(path.join(work, m + '.glb'), Buffer.from(g[1], 'base64'));
+    wr(f, `import __GLB from './${m}.glb';\n` + s.replace(g[0], 'export const GLB = new URL(__GLB, import.meta.url).href;'));
+  }
   patch('main.js', 'const bytes=Uint8Array.from(atob(glbB64),c=>c.charCodeAt(0));', 'const bytes=new Uint8Array(await(await fetch(glbB64)).arrayBuffer());');
 }
 
@@ -69,11 +76,7 @@ let ui = rd('lobby-ui.js');
 const imports = imgs.map((f, i) => `import __IMG${i} from './maps/${f}';`).join('\n');
 imgs.forEach((f, i) => { ui = ui.split(`new URL('./maps/${f}', import.meta.url)`).join(OFFLINE ? `new URL(__IMG${i})` : `new URL(__IMG${i}, import.meta.url)`); });
 if (ui.includes("new URL('./maps/")) throw new Error('lobby-ui.js nadal używa import.meta.url');
-// 4b) muzyka w lobby: new URL('./muzyka/x.mp3', import.meta.url) -> plik w gra/ (zwykły build); offline – bez muzyki (6 MB w jednym pliku to za dużo)
-const MUS = "new URL('./muzyka/gtassault-anthem.mp3', import.meta.url).href";
-if (!ui.includes(MUS)) throw new Error('lobby-ui.js: nie ma adresu muzyki');
-ui = OFFLINE ? ui.replace(MUS, "''") : ui.replace(MUS, 'new URL(__MUSIC, import.meta.url).href');
-wr('lobby-ui.js', imports + (OFFLINE ? '' : "\nimport __MUSIC from './muzyka/gtassault-anthem.mp3';") + '\n' + ui);
+wr('lobby-ui.js', imports + '\n' + ui);
 
 // 5) bundel
 const common = {

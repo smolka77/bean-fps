@@ -34,7 +34,7 @@ const CSS = `
 #fa-admin .fa-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px}
 #fa-admin .fa-brand{display:flex;align-items:baseline;gap:12px}
 #fa-admin .fa-brand b{font:400 30px/1 Anton,Oswald,Impact,sans-serif;letter-spacing:.04em;transform:skewX(-6deg)}
-#fa-admin .fa-brand b{font-family:Anton,Impact,'Arial Narrow Bold',sans-serif;background:linear-gradient(100deg,#ff2e93 0%,#ff5470 48%,#ff9a3c 100%);-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.05em}
+#fa-admin .fa-brand b i{color:var(--acc);font-style:normal}
 #fa-admin .fa-brand span{font:700 20px/1 Rajdhani,Oswald,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
 #fa-admin .fa-live{display:inline-flex;align-items:center;gap:7px;font:600 12px/1 Inter,sans-serif;color:var(--mut);padding:6px 10px;border:1px solid var(--line2);border-radius:999px}
 #fa-admin .fa-live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--mut)}
@@ -227,7 +227,7 @@ export async function openAdmin({ onClose } = {}) {
   const onKey = e => { if (e.key !== 'Escape' || !root) return; const rp = root.querySelector('.fa-rp'), d = root.querySelector('.fa-drw');
     if (rp && !rp.hidden) rp.querySelector('[data-rpx]').click(); else if (d && !d.hidden) d.hidden = true; else close(); };
   addEventListener('keydown', onKey); cleanup.push(() => removeEventListener('keydown', onKey));
-  root.innerHTML = `<div class="fa-wrap"><div class="fa-head"><div class="fa-brand"><b>GTASSAULT</b><span>Panel admina</span></div><div class="fa-sp"></div>
+  root.innerHTML = `<div class="fa-wrap"><div class="fa-head"><div class="fa-brand"><b>BEAN<i>LADEN</i></b><span>Panel admina</span></div><div class="fa-sp"></div>
     <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div><p class="fa-empty">Ładowanie danych…</p></div>`;
   root.querySelector('[data-close]').addEventListener('click', close);
 
@@ -654,7 +654,7 @@ function relockAdmin() { admTok.set(''); cleanup.forEach(f => { try { f(); } cat
 
 function buildDashboard(db, close) {
   root.innerHTML = `<div class="fa-wrap">
-    <div class="fa-head"><div class="fa-brand"><b>GTASSAULT</b><span>Panel admina</span></div><span class="fa-live" id="fa-live">Łączenie…</span><div class="fa-sp"></div>
+    <div class="fa-head"><div class="fa-brand"><b>BEAN<i>LADEN</i></b><span>Panel admina</span></div><span class="fa-live" id="fa-live">Łączenie…</span><div class="fa-sp"></div>
       ${SRV ? '<button class="fa-btn" type="button" id="fa-lock" title="Kończy sesję panelu – następne wejście wymaga loginu, hasła i kodu 2FA">Wyloguj z panelu</button>' : ''}
       <button class="fa-btn" type="button" data-close>← Wróć do gry</button></div>
     <p class="fa-note" id="fa-note" hidden></p>

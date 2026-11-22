@@ -12,7 +12,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(path.join(here, '../serwer/package.json'));
 const WebSocket = require('ws');
 const MECZ = await import(pathToFileURL(path.join(here, '../serwer/mecz.mjs')).href);
-const MAPS = ['Oaza', 'Magazyn', 'Baza', 'Iglo'];
+const MAPS = ['OazaBL', 'MagazynBL', 'BazaBL', 'Oaza', 'Magazyn', 'Baza', 'Iglo'];
 await MECZ.loadMaps(path.join(here, '..'), MAPS);
 
 const N = +(process.argv[2] || 8), BASE = (process.argv[3] || 'http://127.0.0.1:8787').replace(/\/+$/, ''), SECS = +(process.argv[4] || 60);

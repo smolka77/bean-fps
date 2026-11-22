@@ -1,4 +1,4 @@
-// Deathmatch – interfejs (HUD w meczu, ekran WASTED, sklep po śmierci, kolejka, podium, tabela wyników).
+// Deathmatch – interfejs (HUD w meczu, ekran śmierci, sklep po śmierci, kolejka, podium, tabela wyników).
 // Wygląd według wzorów: amunicja i broń w prawym górnym rogu (duże liczby z obrysem i ikona broni), kasa pod spodem,
 // paski zdrowia / energii / pancerza z okrągłymi ikonami, czerwony napis „wasted”, sklep na ciemnym tle z kartami broni,
 // panelem statystyk, zakładkami i listą kategorii (biały pasek wybranego wiersza), różowy akcent, zielona ikona kasy.
@@ -7,10 +7,10 @@ import { getLang } from './lobby-ui.js';
 
 // ---------------- teksty (PL / EN / RU / ES) ----------------
 const TX = {
-  pl: { nextGun: 'NASTĘPNA BROŃ: {n}/{m} KILL', topGun: 'NAJLEPSZA BROŃ', lockedGuns: 'ODBLOKUJ BRONIE W EKWIPUNKU', kills: 'ZABÓJSTWA', rank: 'MIEJSCE', wanted: 'POSZUKIWANY', youWanted: 'JESTEŚ POSZUKIWANY', youWantedSub: 'Za twoją głowę płacą ×{m}', wantedNow: '{n} jest POSZUKIWANY',
+  pl: { died: 'ZGINĄŁEŚ', nextGun: 'NASTĘPNA BROŃ: {n}/{m} KILL', topGun: 'NAJLEPSZA BROŃ', lockedGuns: 'ODBLOKUJ BRONIE W EKWIPUNKU', kills: 'ZABÓJSTWA', rank: 'MIEJSCE', wanted: 'POSZUKIWANY', youWanted: 'JESTEŚ POSZUKIWANY', youWantedSub: 'Za twoją głowę płacą ×{m}', wantedNow: '{n} jest POSZUKIWANY',
     wantedKill: 'ZABÓJSTWO POSZUKIWANEGO ×{m}', head: 'STRZAŁ W GŁOWĘ', kill: 'ZABÓJSTWO', protect: 'OCHRONA', killedBy: 'Zabity przez', weapon: 'Broń', dist: 'Odległość',
     headshot: 'w głowę', killerLeft: 'Zabójcy zostało', yourStats: 'Twój mecz', deaths: 'ŚMIERCI', damage: 'OBRAŻENIA', cash: 'KASA', toShop: 'Sklep za chwilę…',
-    shopName: 'VICE BEACH ARMORY', sidearms: 'PISTOLETY', longarms: 'BROŃ DŁUGA', equipment: 'PANCERZ', pistols: 'Pistolety', shotguns: 'Strzelby', assault: 'Karabiny szturmowe',
+    shopName: 'BEANLADEN ARMORY', sidearms: 'PISTOLETY', longarms: 'BROŃ DŁUGA', equipment: 'PANCERZ', pistols: 'Pistolety', shotguns: 'Strzelby', assault: 'Karabiny szturmowe',
     tactical: 'Karabiny taktyczne', smg: 'Pistolety maszynowe', sniper: 'Karabiny snajperskie', armorCat: 'Kamizelki', buyEquip: 'KUP I WYPOSAŻ', equipped: 'WYPOSAŻONE', owned: 'Masz', back: 'WRÓĆ DO WALKI',
     purchase: 'Kup {what} i wróć do walki', what_long: 'broń długą', what_side: 'pistolet', what_eq: 'pancerz', free: 'W ZESTAWIE', noFunds: 'Za mało kasy', locked: 'Odblokuj w Ekwipunku w lobby', lockedNeed: 'Odblokuj w Ekwipunku: miej {n} na saldzie (nic się nie pobiera)', lockedTag: 'EKWIPUNEK',
     loadout: 'Wyposażenie', st_dmg: 'OBRAŻENIA', st_acc: 'CELNOŚĆ', st_hand: 'PRĘDKOŚĆ', st_range: 'ZASIĘG', st_prot: 'OCHRONA', st_head: 'GŁOWA', st_mag: 'MAGAZYNEK',
@@ -20,10 +20,10 @@ const TX = {
     entry: 'Wpisowe', prize: 'Pula dla top 3', countdown: 'MECZ ZA', fight: 'WALCZ!', timeUp: 'KONIEC CZASU', results: 'WYNIKI MECZU', you: 'Ty', toLobby: 'Wróć do lobby', backIn: 'Lobby za {s} s',
     place1: '1. MIEJSCE', place2: '2. MIEJSCE', place3: '3. MIEJSCE', reward: 'Nagroda', player: 'GRACZ', board: 'TABELA', left: 'wyszedł', joined: 'w meczu', unlockP90: 'ODBLOKOWANO P90', unlockP90s: 'Darmowa broń za grę w Deathmatch – Twoja na zawsze', tabHint: 'TAB – tabela',
     spawnProt: 'Ochrona po odrodzeniu', armorUp: 'PANCERZ', mapLbl: 'Mapa', bought: 'Kupiono: {n}', yourPlace: 'Twoje miejsce: {p}', leaveTitle: 'Wyjść z meczu?', deadHint: 'SPACJA – odrodzenie · ESC – wyjście do lobby', deadWait: 'Odrodzenie za chwilę…', upgrade: 'NOWA BROŃ', maxGun: 'NAJLEPSZA BROŃ', online: 'W LOBBY', lost: 'Utracono połączenie z serwerem meczu.' },
-  en: { nextGun: 'NEXT GUN: {n}/{m} KILLS', topGun: 'TOP GUN', lockedGuns: 'UNLOCK GUNS IN INVENTORY', kills: 'KILLS', rank: 'RANK', wanted: 'WANTED', youWanted: 'YOU ARE WANTED', youWantedSub: 'Your head is worth ×{m}', wantedNow: '{n} is WANTED',
+  en: { died: 'YOU DIED', nextGun: 'NEXT GUN: {n}/{m} KILLS', topGun: 'TOP GUN', lockedGuns: 'UNLOCK GUNS IN INVENTORY', kills: 'KILLS', rank: 'RANK', wanted: 'WANTED', youWanted: 'YOU ARE WANTED', youWantedSub: 'Your head is worth ×{m}', wantedNow: '{n} is WANTED',
     wantedKill: 'WANTED KILL ×{m}', head: 'HEADSHOT', kill: 'KILL', protect: 'PROTECTED', killedBy: 'Killed by', weapon: 'Weapon', dist: 'Distance',
     headshot: 'headshot', killerLeft: 'Killer left with', yourStats: 'Your match', deaths: 'DEATHS', damage: 'DAMAGE', cash: 'CASH', toShop: 'Opening the shop…',
-    shopName: 'VICE BEACH ARMORY', sidearms: 'SIDEARMS', longarms: 'LONGARMS', equipment: 'AMMO & EQUIPMENT', pistols: 'Pistols', shotguns: 'Shotguns', assault: 'Assault Rifles',
+    shopName: 'BEANLADEN ARMORY', sidearms: 'SIDEARMS', longarms: 'LONGARMS', equipment: 'AMMO & EQUIPMENT', pistols: 'Pistols', shotguns: 'Shotguns', assault: 'Assault Rifles',
     tactical: 'Tactical Rifles', smg: 'Submachine Guns', sniper: 'Sniper Rifles', armorCat: 'Body Armor', buyEquip: 'BUY & EQUIP', equipped: 'EQUIPPED', owned: 'Owned', back: 'BACK TO FIGHT',
     purchase: 'Purchase a {what} and get back in', what_long: 'longarm', what_side: 'sidearm', what_eq: 'vest', free: 'INCLUDED', noFunds: 'Not enough cash', locked: 'Unlock it in the Inventory in the lobby', lockedNeed: 'Unlock it in the Inventory: keep {n} in your balance (nothing is charged)', lockedTag: 'INVENTORY',
     loadout: 'Loadout', st_dmg: 'DAMAGE', st_acc: 'ACCURACY', st_hand: 'HANDLING', st_range: 'RANGE', st_prot: 'PROTECTION', st_head: 'HEAD', st_mag: 'MAGAZINE',
@@ -33,10 +33,10 @@ const TX = {
     entry: 'Entry', prize: 'Top 3 prize pool', countdown: 'MATCH IN', fight: 'FIGHT!', timeUp: 'TIME UP', results: 'MATCH RESULTS', you: 'You', toLobby: 'Back to lobby', backIn: 'Lobby in {s}s',
     place1: '1ST PLACE', place2: '2ND PLACE', place3: '3RD PLACE', reward: 'Reward', player: 'PLAYER', board: 'SCOREBOARD', left: 'left', joined: 'in match', unlockP90: 'P90 UNLOCKED', unlockP90s: 'Free gun for playing Deathmatch – yours forever', tabHint: 'TAB – scoreboard',
     spawnProt: 'Spawn protection', armorUp: 'ARMOR', mapLbl: 'Map', bought: 'Bought: {n}', yourPlace: 'Your place: {p}', leaveTitle: 'Leave the match?', deadHint: 'SPACE – respawn · ESC – back to lobby', deadWait: 'Respawn in a moment…', upgrade: 'NEW WEAPON', maxGun: 'TOP WEAPON', online: 'IN LOBBY', lost: 'Lost connection to the match server.' },
-  ru: { nextGun: 'СЛЕД. ОРУЖИЕ: {n}/{m}', topGun: 'ЛУЧШЕЕ ОРУЖИЕ', lockedGuns: 'ОТКРОЙ ОРУЖИЕ В ИНВЕНТАРЕ', kills: 'УБИЙСТВА', rank: 'МЕСТО', wanted: 'В РОЗЫСКЕ', youWanted: 'ТЫ В РОЗЫСКЕ', youWantedSub: 'За твою голову платят ×{m}', wantedNow: '{n} В РОЗЫСКЕ',
+  ru: { died: 'ТЫ ПОГИБ', nextGun: 'СЛЕД. ОРУЖИЕ: {n}/{m}', topGun: 'ЛУЧШЕЕ ОРУЖИЕ', lockedGuns: 'ОТКРОЙ ОРУЖИЕ В ИНВЕНТАРЕ', kills: 'УБИЙСТВА', rank: 'МЕСТО', wanted: 'В РОЗЫСКЕ', youWanted: 'ТЫ В РОЗЫСКЕ', youWantedSub: 'За твою голову платят ×{m}', wantedNow: '{n} В РОЗЫСКЕ',
     wantedKill: 'УБИЙСТВО РАЗЫСКИВАЕМОГО ×{m}', head: 'В ГОЛОВУ', kill: 'УБИЙСТВО', protect: 'ЗАЩИТА', killedBy: 'Убит игроком', weapon: 'Оружие', dist: 'Дистанция',
     headshot: 'в голову', killerLeft: 'У убийцы осталось', yourStats: 'Твой матч', deaths: 'СМЕРТИ', damage: 'УРОН', cash: 'ДЕНЬГИ', toShop: 'Открываем магазин…',
-    shopName: 'VICE BEACH ARMORY', sidearms: 'ПИСТОЛЕТЫ', longarms: 'ДЛИННОСТВОЛЬНОЕ', equipment: 'СНАРЯЖЕНИЕ', pistols: 'Пистолеты', shotguns: 'Дробовики', assault: 'Штурмовые винтовки',
+    shopName: 'BEANLADEN ARMORY', sidearms: 'ПИСТОЛЕТЫ', longarms: 'ДЛИННОСТВОЛЬНОЕ', equipment: 'СНАРЯЖЕНИЕ', pistols: 'Пистолеты', shotguns: 'Дробовики', assault: 'Штурмовые винтовки',
     tactical: 'Тактические винтовки', smg: 'Пистолеты-пулемёты', sniper: 'Снайперские винтовки', armorCat: 'Бронежилеты', buyEquip: 'КУПИТЬ', equipped: 'ЭКИПИРОВАНО', owned: 'Есть', back: 'В БОЙ',
     purchase: 'Купи {what} и возвращайся', what_long: 'винтовку', what_side: 'пистолет', what_eq: 'броню', free: 'В КОМПЛЕКТЕ', noFunds: 'Мало денег', locked: 'Открой в инвентаре в лобби', lockedNeed: 'Открой в инвентаре: держи {n} на балансе (ничего не списывается)', lockedTag: 'ИНВЕНТАРЬ',
     loadout: 'Снаряжение', st_dmg: 'УРОН', st_acc: 'ТОЧНОСТЬ', st_hand: 'СКОРОСТЬ', st_range: 'ДАЛЬНОСТЬ', st_prot: 'ЗАЩИТА', st_head: 'ГОЛОВА', st_mag: 'МАГАЗИН',
@@ -46,10 +46,10 @@ const TX = {
     entry: 'Взнос', prize: 'Призовой фонд топ-3', countdown: 'МАТЧ ЧЕРЕЗ', fight: 'В БОЙ!', timeUp: 'ВРЕМЯ ВЫШЛО', results: 'ИТОГИ МАТЧА', you: 'Ты', toLobby: 'В лобби', backIn: 'Лобби через {s} с',
     place1: '1 МЕСТО', place2: '2 МЕСТО', place3: '3 МЕСТО', reward: 'Награда', player: 'ИГРОК', board: 'ТАБЛИЦА', left: 'вышел', joined: 'в матче', unlockP90: 'P90 ОТКРЫТ', unlockP90s: 'Бесплатное оружие за игру в Deathmatch – твоё навсегда', tabHint: 'TAB – таблица',
     spawnProt: 'Защита после возрождения', armorUp: 'БРОНЯ', mapLbl: 'Карта', bought: 'Куплено: {n}', yourPlace: 'Твоё место: {p}', leaveTitle: 'Выйти из матча?', deadHint: 'ПРОБЕЛ – возрождение · ESC – в лобби', deadWait: 'Возрождение через мгновение…', upgrade: 'НОВОЕ ОРУЖИЕ', maxGun: 'ЛУЧШЕЕ ОРУЖИЕ', online: 'В ЛОББИ', lost: 'Соединение с сервером матча потеряно.' },
-  es: { nextGun: 'SIGUIENTE ARMA: {n}/{m} BAJAS', topGun: 'MEJOR ARMA', lockedGuns: 'DESBLOQUEA ARMAS EN EL INVENTARIO', kills: 'BAJAS', rank: 'PUESTO', wanted: 'BUSCADO', youWanted: 'ESTÁS BUSCADO', youWantedSub: 'Tu cabeza vale ×{m}', wantedNow: '{n} está BUSCADO',
+  es: { died: 'HAS MUERTO', nextGun: 'SIGUIENTE ARMA: {n}/{m} BAJAS', topGun: 'MEJOR ARMA', lockedGuns: 'DESBLOQUEA ARMAS EN EL INVENTARIO', kills: 'BAJAS', rank: 'PUESTO', wanted: 'BUSCADO', youWanted: 'ESTÁS BUSCADO', youWantedSub: 'Tu cabeza vale ×{m}', wantedNow: '{n} está BUSCADO',
     wantedKill: 'BAJA DEL BUSCADO ×{m}', head: 'TIRO A LA CABEZA', kill: 'BAJA', protect: 'PROTEGIDO', killedBy: 'Te mató', weapon: 'Arma', dist: 'Distancia',
     headshot: 'a la cabeza', killerLeft: 'Al asesino le quedó', yourStats: 'Tu partida', deaths: 'MUERTES', damage: 'DAÑO', cash: 'DINERO', toShop: 'Abriendo la tienda…',
-    shopName: 'VICE BEACH ARMORY', sidearms: 'PISTOLAS', longarms: 'ARMAS LARGAS', equipment: 'EQUIPO', pistols: 'Pistolas', shotguns: 'Escopetas', assault: 'Rifles de asalto',
+    shopName: 'BEANLADEN ARMORY', sidearms: 'PISTOLAS', longarms: 'ARMAS LARGAS', equipment: 'EQUIPO', pistols: 'Pistolas', shotguns: 'Escopetas', assault: 'Rifles de asalto',
     tactical: 'Rifles tácticos', smg: 'Subfusiles', sniper: 'Rifles de francotirador', armorCat: 'Chalecos', buyEquip: 'COMPRAR Y EQUIPAR', equipped: 'EQUIPADO', owned: 'Tienes', back: 'VOLVER A LUCHAR',
     purchase: 'Compra {what} y vuelve', what_long: 'un arma larga', what_side: 'una pistola', what_eq: 'un chaleco', free: 'INCLUIDO', noFunds: 'Dinero insuficiente', locked: 'Desbloquéala en el Inventario del lobby', lockedNeed: 'Desbloquéala en el Inventario: mantén {n} en tu saldo (no se cobra nada)', lockedTag: 'INVENTARIO',
     loadout: 'Equipo', st_dmg: 'DAÑO', st_acc: 'PRECISIÓN', st_hand: 'MANEJO', st_range: 'ALCANCE', st_prot: 'PROTECCIÓN', st_head: 'CABEZA', st_mag: 'CARGADOR',
@@ -85,9 +85,9 @@ const IC = {
 // ---------------- style ----------------
 const CSS = `
 #dmh,#dm-wasted,#dm-podium,#dm-board,#dm-scope,#dm-count{
-  --ink:#fff;--dim:#a9a9b3;--mut:#6f6f7a;--pink:#ff5fa2;--pink2:#ff8cc0;--green:#2fc46f;--red:#ef5952;--panel:rgba(14,14,18,.82);--line:rgba(255,255,255,.14);
-  --hp:#f2a7c9;--hpTrack:#7d5d6c;--en:#5fe3c8;--enTrack:#2e6e63;--ar:#9b8cf4;--arTrack:#4b437a;
-  --head:"Barlow Condensed","Oswald","Arial Narrow",sans-serif;--body:Inter,"Segoe UI",system-ui,sans-serif;--num:"Barlow Condensed","Oswald",Impact,sans-serif;
+  --ink:#f4f7ff;--dim:rgba(207,224,255,.62);--mut:#6f7a90;--pink:#ffd400;--pink2:#ffe14a;--green:#2fc46f;--red:#ef5952;--panel:rgba(10,22,48,.82);--line:rgba(207,224,255,.2);
+  --hp:#ffd400;--hpTrack:#5e4c12;--en:#5fe3c8;--enTrack:#2e6e63;--ar:#7fb2ff;--arTrack:#2f4a78;
+  --head:Rajdhani,"Oswald","Arial Narrow",sans-serif;--body:Inter,"Segoe UI",system-ui,sans-serif;--num:Anton,"Oswald",Impact,sans-serif;
   --stroke:0 0 1px #000,0 0 2px #000,1px 1px 0 #000,-1px 1px 0 #000,1px -1px 0 #000,-1px -1px 0 #000,0 2px 3px rgba(0,0,0,.55);
   font-family:var(--body);color:var(--ink);-webkit-user-select:none;user-select:none}
 #dmh{position:fixed;inset:0;z-index:4;pointer-events:none}
@@ -107,18 +107,18 @@ body.dm-shop #dmh,body.dm-shop .hud,body.dm-shop #dm-scope,body.dm-dead #dmh,bod
 #dmh .gun{height:46px;display:flex;align-items:center;justify-content:flex-end;margin-top:2px}
 #dmh .gun img{height:38px;max-width:150px;object-fit:contain;filter:brightness(.78) drop-shadow(0 0 1px #000) drop-shadow(0 1px 0 #000) drop-shadow(0 2px 4px rgba(0,0,0,.6));opacity:.95}
 #dmh .gun span{font:700 20px var(--head);letter-spacing:.08em;text-transform:uppercase;text-shadow:var(--stroke)}
-#dmh .nx{margin-top:4px;font:700 12px/14px var(--head);letter-spacing:.16em;text-transform:uppercase;color:#5ff0e2;text-shadow:var(--stroke)}
+#dmh .nx{margin-top:4px;font:700 12px/14px var(--head);letter-spacing:.16em;text-transform:uppercase;color:#9fc2ff;text-shadow:var(--stroke)}
 #dmh .nx i{display:inline-block;width:7px;height:7px;margin:0 2px;background:rgba(255,255,255,.25);vertical-align:1px}
-#dmh .nx i.on{background:#5ff0e2;box-shadow:0 0 6px #5ff0e2}
+#dmh .nx i.on{background:#9fc2ff;box-shadow:0 0 6px #9fc2ff}
 #dmh .st{min-height:14px;font:700 13px/14px var(--head);letter-spacing:.18em;text-transform:uppercase;color:#ffe08a;text-shadow:var(--stroke)}
 #dmh .cash{margin-top:6px;font:700 30px/1 var(--num);letter-spacing:.02em;text-shadow:var(--stroke);font-variant-numeric:tabular-nums;position:relative}
 #dmh .cash .plus{position:absolute;right:0;top:100%;margin-top:3px;font-size:24px;color:#7dffb0;opacity:0;white-space:nowrap}
 #dmh .cash .plus.go{animation:dm-plus 1.6s ease-out forwards}
 @keyframes dm-plus{0%{opacity:0;transform:translateY(-6px)}12%{opacity:1;transform:none}75%{opacity:1}100%{opacity:0;transform:translateY(8px)}}
 #dmh .feed{margin-top:8px;display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:260px}
-#dmh .kf{display:flex;align-items:center;gap:8px;padding:5px 10px;background:rgba(10,10,14,.62);border-right:3px solid transparent;font:700 15px/1 var(--head);letter-spacing:.04em;
+#dmh .kf{display:flex;align-items:center;gap:8px;padding:5px 10px;background:rgba(10,22,48,.62);border-right:3px solid transparent;font:700 15px/1 var(--head);letter-spacing:.04em;
   text-transform:uppercase;white-space:nowrap;animation:dm-kf .25s ease-out}
-#dmh .kf.me{border-right-color:var(--pink);background:rgba(40,10,26,.72)}
+#dmh .kf.me{border-right-color:var(--pink);background:rgba(48,38,6,.72)}
 #dmh .kf .k{color:#fff}#dmh .kf .v{color:#d6d6dd}#dmh .kf b.k.self,#dmh .kf b.v.self{color:var(--pink2)}
 #dmh .kf img{height:16px;max-width:64px;object-fit:contain;filter:brightness(.9)}
 #dmh .kf svg{width:15px;height:15px;fill:currentColor}
@@ -126,7 +126,7 @@ body.dm-shop #dmh,body.dm-shop .hud,body.dm-shop #dm-scope,body.dm-dead #dmh,bod
 @keyframes dm-kf{from{opacity:0;transform:translateX(12px)}}
 /* --- środek góry: czas, zabójstwa, miejsce, POSZUKIWANY --- */
 #dmh .tc{position:absolute;left:50%;top:14px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
-#dmh .timer{display:flex;align-items:stretch;background:rgba(10,10,14,.7);clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 100%,0 100%)}
+#dmh .timer{display:flex;align-items:stretch;background:rgba(10,22,48,.7);clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 100%,0 100%)}
 #dmh .timer > div{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 18px 7px;min-width:74px}
 #dmh .timer small{font:600 10px/1 var(--head);letter-spacing:.24em;color:var(--dim)}
 #dmh .timer b{font:700 27px/1.05 var(--num);letter-spacing:.03em;font-variant-numeric:tabular-nums}
@@ -140,22 +140,22 @@ body.dm-shop #dmh,body.dm-shop .hud,body.dm-shop #dm-scope,body.dm-dead #dmh,bod
 #dmh .wantedme[hidden]{display:none}
 /* --- lewa góra: ranking na żywo --- */
 #dmh .lb{position:absolute;left:max(18px,env(safe-area-inset-left,0px));top:62px;display:flex;flex-direction:column;gap:2px;min-width:232px}
-#dmh .lb .row{display:grid;grid-template-columns:22px 1fr 34px 46px;align-items:center;gap:6px;padding:4px 10px 4px 8px;background:rgba(10,10,14,.58);font:700 14px/1 var(--head);letter-spacing:.04em}
+#dmh .lb .row{display:grid;grid-template-columns:22px 1fr 34px 46px;align-items:center;gap:6px;padding:4px 10px 4px 8px;background:rgba(10,22,48,.58);font:700 14px/1 var(--head);letter-spacing:.04em}
 #dmh .lb .row i{font-style:normal;color:var(--dim);text-align:center}
 #dmh .lb .row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase;display:flex;align-items:center;gap:5px}
 #dmh .lb .row span svg{flex:none;width:14px;height:14px;fill:var(--red)}
 #dmh .lb .row b{text-align:right;font-variant-numeric:tabular-nums}
 #dmh .lb .row em{font-style:normal;text-align:right;color:var(--dim);font-size:12px;font-variant-numeric:tabular-nums}
-#dmh .lb .row.me{background:linear-gradient(90deg,rgba(150,18,84,.88),rgba(110,14,62,.7));box-shadow:inset 3px 0 0 var(--pink)}
+#dmh .lb .row.me{background:linear-gradient(90deg,rgba(120,92,8,.88),rgba(70,54,6,.7));box-shadow:inset 3px 0 0 var(--pink)}
 #dmh .lb .row.gap{background:none;padding:0;height:6px}
 #dmh .lb .head{display:flex;justify-content:space-between;font:600 10px/1 var(--head);letter-spacing:.24em;color:var(--dim);padding:0 10px 3px 8px;text-shadow:0 1px 2px #000}
 /* --- lewy dół: minimapa i paski --- */
 #dmh .bl{position:absolute;left:max(18px,env(safe-area-inset-left,0px));bottom:max(18px,env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px}
-#dmh .mm{position:relative;width:236px;height:150px;border-radius:10px;overflow:hidden;background:#15151b;box-shadow:0 0 0 2px rgba(0,0,0,.55),0 6px 16px rgba(0,0,0,.4)}
+#dmh .mm{position:relative;width:236px;height:150px;border-radius:10px;overflow:hidden;background:#0a1630;box-shadow:0 0 0 2px rgba(0,0,0,.55),0 6px 16px rgba(0,0,0,.4)}
 #dmh .mm canvas{display:block;width:100%;height:100%}
 #dmh .vit{display:flex;flex-direction:column;gap:5px}
 #dmh .vrow{display:flex;align-items:center;gap:8px}
-#dmh .vrow .ic{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:rgba(20,18,24,.85);box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+#dmh .vrow .ic{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:rgba(6,14,32,.86);box-shadow:0 0 0 1px rgba(0,0,0,.5)}
 #dmh .vrow .ic svg{width:14px;height:14px}
 #dmh .vrow .bar{position:relative;width:200px;height:10px;box-shadow:0 0 0 1px rgba(0,0,0,.55)}
 #dmh .vrow .bar b{position:absolute;left:0;top:0;bottom:0;transition:width .12s}
@@ -196,17 +196,17 @@ body.dm-shop #dmh,body.dm-shop .hud,body.dm-shop #dm-scope,body.dm-dead #dmh,bod
 /* --- odliczanie przed startem --- */
 #dm-count{position:fixed;inset:0;z-index:6;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:radial-gradient(ellipse at center,rgba(0,0,0,.15),rgba(0,0,0,.55))}
 #dm-count small{font:700 16px/1 var(--head);letter-spacing:.4em;color:#fff;text-shadow:var(--stroke)}
-#dm-count b{font:700 130px/1 var(--num);color:#fff;text-shadow:var(--stroke),0 0 40px rgba(255,95,162,.6)}
+#dm-count b{font:700 130px/1 var(--num);color:#fff;text-shadow:var(--stroke),0 0 40px rgba(255,212,0,.5)}
 #dm-count b.pop{animation:dm-pop .9s ease-out}
 #dm-count b.go{color:var(--pink2);animation:dm-pop .9s ease-out}
-#dm-count .map{margin-bottom:10px;padding:6px 14px;background:rgba(10,10,14,.6);font:700 14px/1 var(--head);letter-spacing:.24em;color:#fff}
+#dm-count .map{margin-bottom:10px;padding:6px 14px;background:rgba(10,22,48,.6);font:700 14px/1 var(--head);letter-spacing:.24em;color:#fff}
 @keyframes dm-pop{0%{transform:scale(1.6);opacity:0}25%{transform:scale(1);opacity:1}}
 /* --- WASTED --- */
 #dm-wasted{position:fixed;inset:0;z-index:7;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;background:rgba(0,0,0,0);transition:background .9s ease}
 #dm-wasted.on{background:rgba(0,0,0,.62)}
-#dm-wasted .w{font:900 clamp(90px,15vw,210px)/.9 "Passion One","Pricedown","Anton",Impact,sans-serif;color:var(--red);letter-spacing:.01em;text-shadow:0 4px 0 rgba(0,0,0,.35);opacity:0;transform:scale(1.25)}
+#dm-wasted .w{font:400 clamp(64px,10vw,150px)/.95 Anton,Oswald,Impact,sans-serif;color:var(--red);letter-spacing:.04em;text-transform:uppercase;transform:skewX(-6deg) scale(1.25);text-shadow:0 4px 0 rgba(60,0,0,.45),0 10px 30px rgba(0,0,0,.5);opacity:0}
 #dm-wasted.on .w{animation:dm-wasted 1s cubic-bezier(.2,.8,.2,1) .25s forwards}
-@keyframes dm-wasted{0%{opacity:0;transform:scale(1.25)}100%{opacity:1;transform:scale(1)}}
+@keyframes dm-wasted{0%{opacity:0;transform:skewX(-6deg) scale(1.25)}100%{opacity:1;transform:skewX(-6deg) scale(1)}}
 #dm-wasted .info{margin-top:26px;display:flex;flex-direction:column;align-items:center;gap:14px;opacity:0}
 #dm-wasted.on .info{animation:dm-fade .6s ease 1s forwards}
 @keyframes dm-fade{to{opacity:1}}
@@ -215,7 +215,7 @@ body.dm-shop #dmh,body.dm-shop .hud,body.dm-shop #dm-scope,body.dm-dead #dmh,bod
 #dm-wasted .by img{height:24px;max-width:90px;object-fit:contain;filter:brightness(.9)}
 #dm-wasted .by .hs{color:#ffcf5a;font:700 14px/1 var(--head);letter-spacing:.2em;text-transform:uppercase}
 #dm-wasted .facts{display:flex;gap:2px}
-#dm-wasted .facts div{min-width:104px;padding:10px 16px;background:rgba(14,14,18,.75);display:flex;flex-direction:column;align-items:center;gap:6px}
+#dm-wasted .facts div{min-width:104px;padding:10px 16px;background:rgba(10,22,48,.75);display:flex;flex-direction:column;align-items:center;gap:6px}
 #dm-wasted .facts small{font:600 10px/1 var(--head);letter-spacing:.24em;color:var(--dim)}
 #dm-wasted .facts b{font:700 24px/1 var(--num);font-variant-numeric:tabular-nums}
 #dm-wasted .facts b.g{color:#7dffb0}
@@ -233,32 +233,32 @@ body.dm-shop #dmh,body.dm-shop .hud,body.dm-shop #dm-scope,body.dm-dead #dmh,bod
 #dm-podium .ttl{position:absolute;left:28px;top:22px;text-align:left}
 #dm-podium .ttl small{display:block;font:700 13px/1 var(--head);letter-spacing:.4em;color:var(--pink2);text-shadow:0 1px 3px #000}
 #dm-podium .ttl b{display:block;margin-top:6px;font:700 46px/1 var(--head);letter-spacing:.08em;text-shadow:0 3px 10px rgba(0,0,0,.6)}
-#dm-podium .plate{position:absolute;transform:translate(-50%,-100%);min-width:170px;text-align:center;padding:8px 12px 9px;background:rgba(10,10,14,.8);border-top:3px solid #fff;opacity:0;animation:dm-fade .5s ease forwards}
+#dm-podium .plate{position:absolute;transform:translate(-50%,-100%);min-width:170px;text-align:center;padding:8px 12px 9px;background:rgba(10,22,48,.8);border-top:3px solid #fff;opacity:0;animation:dm-fade .5s ease forwards}
 #dm-podium .plate.p1{border-top-color:#ffd55a}#dm-podium .plate.p2{border-top-color:#dfe3ea}#dm-podium .plate.p3{border-top-color:#e39a62}
 #dm-podium .plate small{display:block;font:700 11px/1 var(--head);letter-spacing:.24em;color:var(--dim)}
 #dm-podium .plate b{display:block;margin:4px 0 5px;font:700 24px/1 var(--head);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
 #dm-podium .plate.me b{color:var(--pink2)}
 #dm-podium .plate span{display:block;font:600 13px/1.3 var(--body);color:#d2d2da;font-variant-numeric:tabular-nums}
 #dm-podium .plate em{display:block;margin-top:4px;font:700 20px/1 var(--num);font-style:normal;color:#7dffb0}
-#dm-podium .table{position:absolute;right:24px;top:22px;width:min(380px,34vw);max-height:calc(100% - 190px);overflow:auto;background:rgba(10,10,14,.72)}
+#dm-podium .table{position:absolute;right:24px;top:22px;width:min(380px,34vw);max-height:calc(100% - 190px);overflow:auto;background:rgba(10,22,48,.72)}
 #dm-podium .table .r{display:grid;grid-template-columns:30px 1fr 40px 40px 56px 64px;gap:4px;align-items:center;padding:7px 12px;font:600 14px/1 var(--head);letter-spacing:.03em;border-bottom:1px solid rgba(255,255,255,.06)}
 #dm-podium .table .r.h{font-size:10px;letter-spacing:.2em;color:var(--dim)}
-#dm-podium .table .r.me{background:rgba(255,95,162,.2)}
+#dm-podium .table .r.me{background:rgba(255,212,0,.18)}
 #dm-podium .table .r.lf{opacity:.45}
 #dm-podium .table .r span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase}
 #dm-podium .table .r b,#dm-podium .table .r em{text-align:right;font-style:normal;font-variant-numeric:tabular-nums}
 #dm-podium .table .r em{color:#7dffb0}
 #dm-podium .foot{position:absolute;left:0;right:0;bottom:24px;display:flex;flex-direction:column;align-items:center;gap:10px}
 #dm-podium .foot .mine{font:700 18px/1 var(--head);letter-spacing:.12em;text-shadow:0 1px 3px #000}
-#dm-podium .foot button{height:48px;padding:0 34px;border:0;cursor:pointer;font:700 18px/1 var(--head);letter-spacing:.18em;text-transform:uppercase;color:#fff;background:linear-gradient(90deg,#ff2d95,#ff8a3d)}
+#dm-podium .foot button{height:48px;padding:0 34px;border:0;cursor:pointer;font:700 18px/1 var(--head);letter-spacing:.18em;text-transform:uppercase;color:#2a1c00;background:linear-gradient(180deg,#fff7a8,#ffd400 60%,#f5ad00)}
 #dm-podium .foot small{font:600 12px/1 var(--head);letter-spacing:.2em;color:rgba(255,255,255,.6)}
 /* --- tabela (Tab) --- */
-#dm-board{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;width:min(640px,94vw);max-height:80vh;overflow:auto;background:rgba(10,10,14,.88);border-top:3px solid var(--pink);pointer-events:none}
+#dm-board{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;width:min(640px,94vw);max-height:80vh;overflow:auto;background:rgba(10,22,48,.88);border-top:3px solid var(--pink);pointer-events:none}
 #dm-board h3{margin:0;padding:14px 18px 10px;display:flex;justify-content:space-between;font:700 22px/1 var(--head);letter-spacing:.14em}
 #dm-board h3 small{font:600 12px/1.8 var(--head);letter-spacing:.2em;color:var(--dim)}
 #dm-board .r{display:grid;grid-template-columns:34px 1fr 60px 60px 80px;gap:6px;align-items:center;padding:7px 18px;font:600 15px/1 var(--head);letter-spacing:.03em;border-bottom:1px solid rgba(255,255,255,.06)}
 #dm-board .r.h{font-size:11px;letter-spacing:.22em;color:var(--dim)}
-#dm-board .r.me{background:rgba(255,95,162,.2)}#dm-board .r.lf{opacity:.4}
+#dm-board .r.me{background:rgba(255,212,0,.18)}#dm-board .r.lf{opacity:.4}
 #dm-board .r span{display:flex;align-items:center;gap:6px;text-transform:uppercase;overflow:hidden;white-space:nowrap}
 #dm-board .r span svg{width:15px;height:15px;fill:var(--red);flex:none}
 #dm-board .r b{text-align:right;font-variant-numeric:tabular-nums}
@@ -270,7 +270,7 @@ body.dm-shop #dmh,body.dm-shop .hud,body.dm-shop #dm-scope,body.dm-dead #dmh,bod
 export function createDmUi(opts = {}) {
   if (!document.getElementById('dm-font')) {
     const l = document.createElement('link'); l.id = 'dm-font'; l.rel = 'stylesheet';
-    l.href = 'https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Passion+One:wght@700;900&display=swap';
+    l.href = 'https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap';
     document.head.appendChild(l);
   }
   const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
@@ -422,9 +422,10 @@ export function createDmUi(opts = {}) {
     </g><g fill="#050505">${dots}</g><circle r="1.05" fill="#e0291c"/></svg></div>`); document.body.appendChild(scope);
 
   // ===== WASTED =====
-  const wasted = el(`<div id="dm-wasted" hidden><div class="w">wasted</div><div class="info"><div class="by"></div><div class="kleft"></div><div class="facts"></div><div class="hint"></div></div></div>`);
+  const wasted = el(`<div id="dm-wasted" hidden><div class="w"></div><div class="info"><div class="by"></div><div class="kleft"></div><div class="facts"></div><div class="hint"></div></div></div>`);
   document.body.appendChild(wasted);
   function showWasted(o) {
+    wasted.querySelector('.w').textContent = tx('died');
     wasted.querySelector('.by').innerHTML = o.killer ? `<span>${esc(tx('killedBy'))}</span><b>${esc(o.killer)}</b>${gunImg(o.weapon)}${o.head ? `<span class="hs">${esc(tx('headshot'))}</span>` : ''}<span>${o.dist} m</span>` : '';
     wasted.querySelector('.kleft').innerHTML = o.killer ? `${esc(tx('killerLeft'))}: <b>${o.killerHp} HP</b>${o.killerAr > 0 ? ` · <em>${o.killerAr} ${esc(tx('armorUp'))}</em>` : ''}` : '';
     wasted.querySelector('.facts').innerHTML = `<div><small>${esc(tx('kills'))}</small><b>${o.kills}</b></div><div><small>${esc(tx('deaths'))}</small><b>${o.deaths}</b></div>`

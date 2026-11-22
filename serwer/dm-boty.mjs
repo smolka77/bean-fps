@@ -9,13 +9,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const NICKS = ['Rico', 'Vercetti', 'Sonny', 'Lance', 'Kenji', 'Cortez', 'Diaz', 'Mercedes', 'Phil', 'Umberto', 'Candy', 'Avery', 'Hilary', 'Kent', 'Maude',
+const NICKS = ['Fasol', 'Bobik', 'Groszek', 'Bean', 'Kidney', 'Pinto', 'Edamame', 'Soja', 'Ciecierka', 'Jasiek', 'Bobo', 'Strączek', 'Fasolka', 'Mung', 'Lima',
   'Tito', 'Marco', 'Benny', 'Zero', 'Kowal', 'Szczur', 'Bandzior', 'Mrozik', 'Kaktus', 'Rambo', 'Szeryf', 'Lis', 'Wilk', 'Grizzly', 'Joker', 'Cobra', 'Viper',
   'Ghost', 'Bullet', 'Razor', 'Tank', 'Sniper', 'Hitman', 'Bandit', 'Outlaw', 'Maverick', 'Ace', 'Dex', 'Nitro', 'Turbo', 'Blaze', 'Rocky', 'Shadow'];
-// skiny botów: tylko postacie GTA z kreatora skinów (skins.json obok gry, ten sam plik, który czyta lobby) – w pliku są też memy (Pepe, Trump…),
-// których boty nie biorą. Nową postać GTA dla botów dopisuje się do GTA_SKINS (id z kreatora). Plik czytany najwyżej raz na minutę.
+// skiny botów: wybrane skiny BEANLADEN z kreatora skinów (skins.json obok gry, ten sam plik, który czyta lobby),
+// Nowy skin dla botów (BEANLADEN) dopisuje się do GTA_SKINS (id z kreatora). Plik czytany najwyżej raz na minutę.
 const SKINS_FILE = path.join(process.env.GAME_DIR || path.join(path.dirname(fileURLToPath(import.meta.url)), '..'), 'skins.json');
-const GTA_SKINS = ['nowy-skin-8', 'jason-duval', 'lucia', 'michael-de-santa', 'tommy', 'niko-bellic', 'b-i-g-s-m-o-k-e', 'trevor'];   // CJ, Jason, Lucia, Michael, Tommy, Niko, Big Smoke, Trevor
+const GTA_SKINS = ['moj-skin', 'nowy-skin', 'nowy-skin-2', 'nowy-skin-3', 'nowy-skin-4', 'nowy-skin-5', 'nowy-skin-6', 'nowy-skin-7', 'nowy-skin-8', 'ghost', 'trollface', 'chad', 'gigachad', 'wojak'];   // BEANLADEN: Pepe, Bean Jong Un, Putin, BeanLaden, Trump, Xi, SIUUUU, Spiderman, CJ, Ghost, trollface, chad, gigachad, wojak
 const GTA = new Set(GTA_SKINS), FALLBACK = GTA_SKINS;
 let gta = null, gtaT = 0;
 function gtaSkins() {

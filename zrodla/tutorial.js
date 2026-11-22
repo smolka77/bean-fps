@@ -17,7 +17,7 @@ const GUN = { deagle: 'Desert Eagle', mp5k: 'MP5K', spas12: 'SPAS-12', akm: 'AKM
 const T = {
   pl: { skip: 'Pomiń', back: 'Wstecz', next: 'Dalej', go: 'Gramy!', menu: 'Jak grać', step: '{i} / {n}',
     s: [
-      ['hello', 'Witaj w GTASSAULT', 'Szybka strzelanka FPS w przeglądarce. Grasz za darmo albo o prawdziwe SOL. Bez pobierania, bez instalacji.',
+      ['hello', 'Witaj w BEANLADEN', 'Szybka strzelanka FPS w przeglądarce. Grasz za darmo albo o prawdziwe SOL. Bez pobierania, bez instalacji.',
         ['<b>1v1</b> – mecz o stawkę z prawdziwym graczem', '<b>Deathmatch</b> – darmowe lobby, wchodzisz kiedy chcesz', '<b>Strzelnica</b> – trening celowania']],
       ['duel', '1v1 o stawkę', 'Wybierasz stawkę, serwer dobiera rywala z tą samą stawką. Gracie do 3 wygranych rund.',
         ['Stawki <b>$1 · $5 · $10</b> albo własna (płacisz w SOL po bieżącym kursie)', 'Zwycięzca bierze pulę obu stawek minus <b>10% prowizji</b>', 'Nowe konto: najpierw do $5, wyższe stawki po kolejnych meczach', 'Wyjście z meczu = przegrana walkowerem']],
@@ -40,7 +40,7 @@ coinHoldT: 'Coin {sym} – bronie za trzymanie', coinHoldL: 'Na start masz pisto
     coinOffT: 'Ekwipunek', coinOffL: 'Teraz wszystkie bronie są dostępne dla każdego. Gdy włączymy Ekwipunek, część broni odblokujesz za trzymanie SOL lub coina – nic nie będzie pobierane.' },
   en: { skip: 'Skip', back: 'Back', next: 'Next', go: 'Let’s play!', menu: 'How to play', step: '{i} / {n}',
     s: [
-      ['hello', 'Welcome to GTASSAULT', 'A fast browser FPS. Play for free or for real SOL. No download, no install.',
+      ['hello', 'Welcome to BEANLADEN', 'A fast browser FPS. Play for free or for real SOL. No download, no install.',
         ['<b>1v1</b> – a match for a stake against a real player', '<b>Deathmatch</b> – a free lobby, drop in any time', '<b>Shooting range</b> – aim training']],
       ['duel', '1v1 for a stake', 'Pick a stake and the server finds an opponent with the same stake. First to 3 rounds wins.',
         ['Stakes <b>$1 · $5 · $10</b> or custom (paid in SOL at the current rate)', 'The winner takes both stakes minus a <b>10% fee</b>', 'New accounts: up to $5 first, higher stakes after more matches', 'Leaving a match = loss by forfeit']],
@@ -63,7 +63,7 @@ coinHoldT: '{sym} coin – guns for holding', coinHoldL: 'You start with a pisto
     coinOffT: 'Inventory', coinOffL: 'Right now every gun is available to everyone. When Inventory is on, some guns unlock for holding SOL or the coin – nothing is ever charged.' },
   ru: { skip: 'Пропустить', back: 'Назад', next: 'Далее', go: 'Играем!', menu: 'Как играть', step: '{i} / {n}',
     s: [
-      ['hello', 'Добро пожаловать в GTASSAULT', 'Быстрый FPS-шутер в браузере. Играй бесплатно или на реальные SOL. Без скачивания и установки.',
+      ['hello', 'Добро пожаловать в BEANLADEN', 'Быстрый FPS-шутер в браузере. Играй бесплатно или на реальные SOL. Без скачивания и установки.',
         ['<b>1v1</b> – матч на ставку против живого игрока', '<b>Deathmatch</b> – бесплатное лобби, заходи когда хочешь', '<b>Стрельбище</b> – тренировка прицеливания']],
       ['duel', '1v1 на ставку', 'Выбираешь ставку, сервер подбирает соперника с такой же ставкой. Играете до 3 выигранных раундов.',
         ['Ставки <b>$1 · $5 · $10</b> или своя (оплата в SOL по текущему курсу)', 'Победитель забирает обе ставки минус <b>10% комиссии</b>', 'Новый аккаунт: сначала до $5, ставки выше – после следующих матчей', 'Выход из матча = техническое поражение']],
@@ -86,7 +86,7 @@ coinHoldT: 'Монета {sym} – оружие за удержание', coinHo
     coinOffT: 'Инвентарь', coinOffL: 'Сейчас всё оружие доступно всем. Когда включим Инвентарь, часть оружия откроется за удержание SOL или монеты – ничего не будет списываться.' },
   es: { skip: 'Saltar', back: 'Atrás', next: 'Siguiente', go: '¡A jugar!', menu: 'Cómo jugar', step: '{i} / {n}',
     s: [
-      ['hello', 'Bienvenido a GTASSAULT', 'Un shooter FPS rápido en el navegador. Juega gratis o por SOL de verdad. Sin descargas ni instalación.',
+      ['hello', 'Bienvenido a BEANLADEN', 'Un shooter FPS rápido en el navegador. Juega gratis o por SOL de verdad. Sin descargas ni instalación.',
         ['<b>1v1</b> – partida con apuesta contra un jugador real', '<b>Deathmatch</b> – lobby gratis, entras cuando quieras', '<b>Campo de tiro</b> – entrenamiento de puntería']],
       ['duel', '1v1 con apuesta', 'Eliges la apuesta y el servidor busca un rival con la misma apuesta. Gana quien llegue a 3 rondas.',
         ['Apuestas de <b>$1 · $5 · $10</b> o personalizada (pagas en SOL al cambio actual)', 'El ganador se lleva ambas apuestas menos una <b>comisión del 10%</b>', 'Cuenta nueva: primero hasta $5, apuestas mayores tras más partidas', 'Salir de la partida = derrota por abandono']],
@@ -109,27 +109,27 @@ coinHoldT: 'Moneda {sym} – armas por mantenerla', coinHoldL: 'Empiezas con una
     coinOffT: 'Inventario', coinOffL: 'Ahora todas las armas están disponibles para todos. Cuando activemos el Inventario, algunas armas se desbloquearán por mantener SOL o la moneda: nunca se cobrará nada.' },
 };
 
-const CSS = `#gta-tut{position:fixed;inset:0;z-index:99985;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(6,2,12,.66);backdrop-filter:blur(8px);animation:gt-in .25s ease}
+const CSS = `#gta-tut{position:fixed;inset:0;z-index:99985;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(4,8,18,.66);backdrop-filter:blur(8px);animation:gt-in .25s ease}
 @keyframes gt-in{from{opacity:0}to{opacity:1}}
-#gta-tut .gt{position:relative;width:min(760px,100%);display:grid;grid-template-columns:220px 1fr;min-height:380px;background:linear-gradient(160deg,#1c0b2c 0%,#110619 100%);
-  border:1px solid rgba(255,79,168,.38);box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 50px rgba(255,46,147,.18);color:#fff;font:500 15px/1.5 Barlow,system-ui,sans-serif;overflow:hidden}
-#gta-tut .art{position:relative;display:flex;align-items:center;justify-content:center;background:radial-gradient(120% 90% at 30% 20%,rgba(255,79,168,.45),transparent 60%),radial-gradient(110% 90% at 80% 90%,rgba(95,240,226,.35),transparent 60%),#160828}
-#gta-tut .art svg{width:96px;height:96px;color:#fff;filter:drop-shadow(0 0 18px rgba(255,79,168,.8));animation:gt-pop .35s ease}
+#gta-tut .gt{position:relative;width:min(760px,100%);display:grid;grid-template-columns:220px 1fr;min-height:380px;background:linear-gradient(160deg,#121a30 0%,#0a1020 100%);
+  border:1px solid rgba(255,225,74,.38);box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 50px rgba(255,198,41,.18);color:#fff;font:500 15px/1.5 Inter,system-ui,sans-serif;overflow:hidden}
+#gta-tut .art{position:relative;display:flex;align-items:center;justify-content:center;background:radial-gradient(120% 90% at 30% 20%,rgba(255,225,74,.45),transparent 60%),radial-gradient(110% 90% at 80% 90%,rgba(159,194,255,.35),transparent 60%),#0e1628}
+#gta-tut .art svg{width:96px;height:96px;color:#fff;filter:drop-shadow(0 0 18px rgba(255,225,74,.8));animation:gt-pop .35s ease}
 @keyframes gt-pop{from{transform:scale(.7);opacity:0}to{transform:none;opacity:1}}
-#gta-tut .num{position:absolute;left:16px;top:14px;font:800 12px/1 Barlow,sans-serif;letter-spacing:.2em;color:rgba(255,255,255,.65)}
+#gta-tut .num{position:absolute;left:16px;top:14px;font:800 12px/1 Inter,sans-serif;letter-spacing:.2em;color:rgba(255,255,255,.65)}
 #gta-tut .body{display:flex;flex-direction:column;padding:28px 28px 22px}
-#gta-tut h2{margin:0 0 8px;font:800 26px/1.1 Barlow,sans-serif;letter-spacing:.03em;text-transform:uppercase;background:linear-gradient(90deg,#ff4fa8,#ffb84f);-webkit-background-clip:text;background-clip:text;color:transparent}
-#gta-tut p{margin:0 0 14px;color:#d9cfee}
+#gta-tut h2{margin:0 0 8px;font:800 26px/1.1 Inter,sans-serif;letter-spacing:.03em;text-transform:uppercase;background:linear-gradient(90deg,#ffe14a,#ffb84f);-webkit-background-clip:text;background-clip:text;color:transparent}
+#gta-tut p{margin:0 0 14px;color:#cfd8ea}
 #gta-tut ul{margin:0;padding:0;list-style:none;display:grid;gap:8px}
-#gta-tut li{position:relative;padding-left:20px;color:#efe9fb}#gta-tut li::before{content:"";position:absolute;left:2px;top:.55em;width:8px;height:8px;background:#5ff0e2;box-shadow:0 0 8px #5ff0e2;transform:rotate(45deg)}
+#gta-tut li{position:relative;padding-left:20px;color:#eef1f7}#gta-tut li::before{content:"";position:absolute;left:2px;top:.55em;width:8px;height:8px;background:#9fc2ff;box-shadow:0 0 8px #9fc2ff;transform:rotate(45deg)}
 #gta-tut li b{color:#fff}#gta-tut code{font:600 12px/1.3 ui-monospace,Consolas,monospace;background:rgba(255,255,255,.08);padding:2px 5px;word-break:break-all}
 #gta-tut .foot{margin-top:auto;padding-top:20px;display:flex;align-items:center;gap:10px}
-#gta-tut .dots{display:flex;gap:6px;margin-right:auto}#gta-tut .dots i{width:8px;height:8px;background:rgba(255,255,255,.22);transition:all .2s}#gta-tut .dots i.on{width:22px;background:linear-gradient(90deg,#ff4fa8,#ff7a4f)}
-#gta-tut button{border:0;cursor:pointer;font:800 13px/1 Barlow,sans-serif;letter-spacing:.12em;text-transform:uppercase;padding:12px 18px}
+#gta-tut .dots{display:flex;gap:6px;margin-right:auto}#gta-tut .dots i{width:8px;height:8px;background:rgba(255,255,255,.22);transition:all .2s}#gta-tut .dots i.on{width:22px;background:linear-gradient(90deg,#ffe14a,#ff9f0a)}
+#gta-tut button{border:0;cursor:pointer;font:800 13px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;padding:12px 18px}
 #gta-tut .skip{position:absolute;right:12px;top:10px;background:transparent;color:rgba(255,255,255,.55);padding:6px 8px;letter-spacing:.14em;font-size:11px}#gta-tut .skip:hover{color:#fff}
-#gta-tut .bk{background:transparent;color:#d9cfee;border:1px solid rgba(255,255,255,.2)}#gta-tut .bk[hidden]{display:none}
-#gta-tut .nx{background:linear-gradient(90deg,#ff4fa8,#ff7a4f);color:#fff;min-width:120px}#gta-tut .nx:hover,#gta-tut .bk:hover{filter:brightness(1.12)}
-#gta-tut button:focus-visible{outline:2px solid #5ff0e2;outline-offset:2px}
+#gta-tut .bk{background:transparent;color:#cfd8ea;border:1px solid rgba(255,255,255,.2)}#gta-tut .bk[hidden]{display:none}
+#gta-tut .nx{background:linear-gradient(180deg,#fff7a8,#ffd400 60%,#f5ad00);color:#2a1c00;min-width:120px}#gta-tut .nx:hover,#gta-tut .bk:hover{filter:brightness(1.12)}
+#gta-tut button:focus-visible{outline:2px solid #9fc2ff;outline-offset:2px}
 @media (max-width:640px){#gta-tut .gt{grid-template-columns:1fr}#gta-tut .art{min-height:120px}#gta-tut .art svg{width:64px;height:64px}#gta-tut h2{font-size:22px}}`;
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));

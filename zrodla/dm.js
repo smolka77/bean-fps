@@ -290,7 +290,7 @@ export function createDM(ctx) {
     ctx.setDead(true); ctx.setHp(0); document.body.classList.add('dm-dead'); ctx.me.userData.gear.set(false, false);
     ui.scope(false); S.boardOpen = false; ui.showBoard(false);
     ctx.unlock();                                              // kursor wolny: Esc trafia do gry (wyjście do lobby), a nie tylko zwalnia mysz
-    ctx.filter('grayscale(1) contrast(1.08) brightness(.82)');
+    ctx.filter('saturate(.35) brightness(.78)');
     const k = m.by ? nameOf(m.by) : '';
     ui.showWasted({ killer: k, weapon: ctx.WEAPON_IDS[m.w] || ctx.PISTOL_ID, head: !!m.h, dist: m.d, killerHp: m.killerHp, killerAr: m.killerAr,
       kills: m.stats.kills, deaths: m.stats.deaths, damage: m.stats.damage });
