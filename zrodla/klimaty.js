@@ -4,6 +4,8 @@
 //    sama mapa (sklepik na palach, pomosty, hydroplany, drzewa) jest budowana w kodzie: zrodla/bagno-scena.js + dane w zrodla/oaza-data.js
 //  • Iglo → „Igloo”: mroźne, słoneczne popołudnie nad zamarzniętym jeziorem (góry, padający śnieg, kruki);
 //    mapa (iglo, chaty, łódź w lodzie, grań) jest budowana w kodzie: zrodla/iglo-scena.js + dane w zrodla/iglo-data.js
+//  • Kaskady → „Kaskady”: jesienna wyspa-diorama nad morzem chmur w złotym popołudniu (latające wysepki, spadające liście, ptaki);
+//    mapa (tarasy z rudej ziemi, wodospad, staw, warownia, krąg kamieni) jest budowana w kodzie: zrodla/kaskady-scena.js + dane w zrodla/kaskady-data.js
 // Styl fasolki: low poly, płaskie kolory, cieniowanie płaskie. Dekoracje leżą poza polem gry (albo płasko na ziemi), kule ich nie widzą.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -673,7 +675,117 @@ function themeSnow(M, root) {
   return T;
 }
 
-const THEMES = { Baza: themeDealer, Oaza: themeBayou, Magazyn: themeYachts, Iglo: themeSnow };
+// ======================================================================================================
+//            KASKADY → jesienna wyspa-diorama nad morzem chmur (złote popołudnie)
+// ======================================================================================================
+// Mapa i kolizje: kaskady-data.js, grafika: kaskady-scena.js (woda i wodospady animuje root.userData.tick – wołane stąd co klatkę).
+// Tu otoczenie: ciepłe niebo z niskim słońcem z zachodu (z boku dla obu stron), morze chmur pod wyspą, latające wysepki
+// z drzewami i wodospadami, spadające jesienne liście i ptaki.
+function themeCascades(M, root) {
+  const rand = rng(1122);
+  const sunOff = V3(-24, 19, -7);
+  const FOG = '#f1dcc3';
+  const sky = skyTexture({
+    stops: [[90, '#3a74c8'], [60, '#4f8bd6'], [35, '#86b4e6'], [18, '#bcd3ea'], [8, '#f2d9b8'], [3, '#ffd6a0'], [0, FOG], [-8, '#f4e4d2'], [-90, '#e8d6c4']],
+    sun: { dir: sunOff.clone().normalize(), r: 26, disc: '#fff4dc', glow: [[620, 'rgba(255,196,130,.30)'], [240, 'rgba(255,214,160,.45)'], [95, 'rgba(255,244,220,.95)']] },
+    paint: (x, W, H, px, wrap) => {
+      const r = rng(31);
+      for (let i = 0; i < 44; i++) {                          // pierzaste chmury w złotym świetle
+        const el = 6 + r() * 34, cy = elevY(H, el), cx = r() * W, len = (70 + r() * 200) * (1 - el / 70), th = 4 + r() * 9;
+        wrap((o) => {
+          for (let k = 0; k < 5; k++) {
+            x.fillStyle = `rgba(255,${236 + Math.floor(r() * 19)},${214 + Math.floor(r() * 30)},${0.18 + r() * 0.22})`;
+            x.beginPath(); x.ellipse(cx + o + (k - 2) * len * 0.3, cy + (r() - 0.5) * th, len * (0.3 + r() * 0.25), th * (0.6 + r() * 0.5), 0, 0, Math.PI * 2); x.fill();
+          }
+        });
+      }
+    },
+  });
+  // ---- morze chmur pod wyspą: płaszczyzna z miękkimi kłębami + bryły chmur przy brzegach ----
+  const cv = document.createElement('canvas'); cv.width = cv.height = 512; const cx = cv.getContext('2d');
+  cx.fillStyle = '#f3e3d0'; cx.fillRect(0, 0, 512, 512);
+  const cr = rng(5);
+  for (let i = 0; i < 160; i++) {
+    const x = cr() * 512, y = cr() * 512, rr = 20 + cr() * 70, g = cx.createRadialGradient(x, y, 0, x, y, rr);
+    g.addColorStop(0, `rgba(255,255,255,${0.35 + cr() * 0.4})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+    for (const ox of [-512, 0, 512]) for (const oy of [-512, 0, 512]) { cx.save(); cx.translate(ox, oy); cx.fillStyle = g; cx.fillRect(x - rr, y - rr, rr * 2, rr * 2); cx.restore(); }
+  }
+  const ctex = new THREE.CanvasTexture(cv); ctex.wrapS = ctex.wrapT = THREE.RepeatWrapping; ctex.repeat.set(14, 14); ctex.colorSpace = THREE.SRGBColorSpace;
+  const sea = new THREE.Mesh(new THREE.PlaneGeometry(1800, 1800), new THREE.MeshBasicMaterial({ map: ctex, color: '#fff1e2' }));
+  sea.rotation.x = -Math.PI / 2; sea.position.y = -12; sea.userData.deco = true; root.add(sea);
+  const puffs = new Kit(), PUFF = ['#fffaf2', '#fbeee0', '#ffffff', '#f6e3cf'];
+  for (let i = 0; i < 70; i++) {
+    const a = rand() * Math.PI * 2, d = 36 + rand() * 170, x = Math.cos(a) * d * 0.9, z = Math.sin(a) * d * 1.15, s = 4 + rand() * 9;
+    for (let k = 0; k < 4; k++) puffs.add(jitter(new THREE.IcosahedronGeometry(s * (0.6 + rand() * 0.5), 1), s * 0.15, rand), PUFF[(i + k) % 4], M4(x + (rand() - 0.5) * s * 2, -11 + rand() * 4, z + (rand() - 0.5) * s * 2, 0, 0, 0, 1, 0.55, 1));
+  }
+  const pm = new THREE.Mesh(puffs.geometry('solid'), new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, emissive: '#f0d6bc', emissiveIntensity: 0.35 }));
+  pm.userData.deco = true; root.add(pm);
+  // ---- latające wysepki: blok rudej ziemi z trawą, drzewa, skalny stożek pod spodem; niektóre z wodospadem ----
+  const isles = [];
+  const LV = ['#f0862e', '#d9472b', '#f2b632', '#5f9e35', '#e8742a'], ER = ['#c8693c', '#bd5f36', '#d17545'], PN = ['#2f6b4a', '#357452'];
+  const ISL = [[-62, 6, -40, 9], [70, 12, 30, 11], [-48, 18, 72, 7], [55, 2, -78, 8], [-95, 10, 15, 13], [100, 20, -20, 9], [10, 26, 115, 10], [-20, 14, -120, 12]];
+  for (const [x, y, z, s] of ISL) {
+    const k = new Kit(), h = s * 0.55;
+    k.box(s, h, s * 0.8, ER[Math.floor(rand() * 3)], M4(0, -h / 2, 0));
+    k.box(s + 0.3, 0.35, s * 0.8 + 0.3, '#86b83f', M4(0, 0.1, 0));
+    k.add(jitter(new THREE.ConeGeometry(s * 0.55, s * 1.2, 6, 2), s * 0.08, rand), '#a9522f', M4(0, -h - s * 0.6, 0, Math.PI));
+    const n = 1 + Math.floor(rand() * 3);
+    for (let i = 0; i < n; i++) {
+      const tx = (rand() - 0.5) * s * 0.6, tz = (rand() - 0.5) * s * 0.5, ts = s * (0.12 + rand() * 0.08);
+      k.add(new THREE.CylinderGeometry(ts * 0.15, ts * 0.22, ts * 2.2, 5), '#6b4a32', M4(tx, ts * 1.1 + 0.2, tz));
+      if (rand() < 0.4) k.add(new THREE.ConeGeometry(ts * 0.9, ts * 3.2, 7), PN[i % 2], M4(tx, ts * 3.2, tz));
+      else for (let j = 0; j < 3; j++) k.add(jitter(new THREE.IcosahedronGeometry(ts * (0.8 + rand() * 0.4), 0), ts * 0.15, rand), LV[Math.floor(rand() * LV.length)], M4(tx + (rand() - 0.5) * ts, ts * 2.6 + rand() * ts * 0.6, tz + (rand() - 0.5) * ts));
+    }
+    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rand() * Math.PI * 2;
+    for (const m of k.meshes(false)) { m.userData.deco = true; g.add(m); }
+    if (rand() < 0.6) {                                                                              // wodospad z krawędzi wysepki
+      const fall = new THREE.Mesh(new THREE.PlaneGeometry(s * 0.18, s * 3.2), new THREE.MeshBasicMaterial({ color: '#c9f3f7', transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false }));
+      fall.position.set(s * 0.2, -s * 1.5, s * 0.41); fall.userData.deco = true; g.add(fall);
+    }
+    g.userData = { y, ph: rand() * 6.28, sp: 0.25 + rand() * 0.2 };
+    root.add(g); isles.push(g);
+  }
+  // ---- spadające liście (ruch w shaderze, kolory w wierzchołkach) ----
+  const N = 1400, pos = new Float32Array(N * 3), seed = new Float32Array(N), col = new Float32Array(N * 3), C = new THREE.Color();
+  const LC = ['#f0862e', '#e8742a', '#d9472b', '#f2b632', '#c93a26'];
+  for (let i = 0; i < N; i++) {
+    pos[i * 3] = (rand() * 2 - 1) * 30; pos[i * 3 + 1] = rand() * 16; pos[i * 3 + 2] = (rand() * 2 - 1) * 38; seed[i] = rand() * 6.283;
+    C.set(LC[i % LC.length]); col[i * 3] = C.r; col[i * 3 + 1] = C.g; col[i * 3 + 2] = C.b;
+  }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.boundingSphere = new THREE.Sphere(V3(0, 8, 0), 60);
+  const lc = document.createElement('canvas'); lc.width = lc.height = 32; const lx = lc.getContext('2d');
+  lx.fillStyle = '#fff'; lx.beginPath(); lx.ellipse(16, 16, 13, 7, 0.6, 0, Math.PI * 2); lx.fill();
+  const leafTex = new THREE.CanvasTexture(lc);
+  const uT = { value: 0 };
+  const lmat = new THREE.PointsMaterial({ size: 0.16, map: leafTex, vertexColors: true, transparent: true, alphaTest: 0.4, depthWrite: true, sizeAttenuation: true });
+  lmat.onBeforeCompile = (sh) => {
+    sh.uniforms.uT = uT;
+    sh.vertexShader = 'uniform float uT;\nattribute float aSeed;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      transformed.y = mod(position.y - uT * (0.45 + 0.35 * fract(aSeed * 3.7)), 16.0) + 0.3;
+      transformed.x = mod(position.x + 30.0 + uT * 0.6 + sin(uT * 1.3 + aSeed) * 1.1, 60.0) - 30.0;
+      transformed.z += cos(uT * 0.9 + aSeed * 1.7) * 0.9;`);
+  };
+  lmat.customProgramCacheKey = () => 'kaskady-leaves';
+  const leaves = new THREE.Points(geo, lmat); leaves.frustumCulled = false; leaves.renderOrder = 3; root.add(leaves);
+  // ---- ptaki nad wyspą ----
+  const flock = birds(9, rand, '#3a2a2a');
+  flock.forEach((b) => { b.scale.setScalar(1.2); root.add(b); });
+  const T = {
+    sky, fog: FOG, near: 60, far: 360,
+    hemi: ['#d6e6ff', '#b08a6a', 1.05], sun: ['#ffd9aa', 2.6], sunOff, env: sky, envI: 0.45,
+    update(t) {
+      uT.value = t; if (root.userData.tick) root.userData.tick(t);
+      ctex.offset.set(t * 0.004, t * 0.002);
+      for (const g of isles) { const u = g.userData; g.position.y = u.y + Math.sin(t * u.sp + u.ph) * 0.8; g.rotation.y += 0.0004; }
+      flock.forEach((b, i) => { const u = b.userData, a = u.a + t * 0.12 * u.s; b.position.set(34 * Math.cos(a) * u.r + (i % 2 ? 18 : -18), 17 + u.h, 44 * Math.sin(a) * u.r); b.rotation.y = -a; b.scale.set(1.2, 1.2 * Math.sin(t * 7 + u.ph), 1.2); });
+    },
+  };
+  T.update(0);
+  return T;
+}
+
+const THEMES = { Baza: themeDealer, Oaza: themeBayou, Magazyn: themeYachts, Iglo: themeSnow, Kaskady: themeCascades };
 
 // klocki low poly wspólne z mapami budowanymi w kodzie (zrodla/bagno-scena.js)
 export { Kit, M4, V3, between, jitter, rng, mats, addPalm, addRushes, addLily, neonSign };
