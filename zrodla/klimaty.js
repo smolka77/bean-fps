@@ -311,6 +311,7 @@ function themeDealer(M, root) {
   K.box(3, 0.15, 800, '#bdb6c9', M4(37.5, 0.075, 0));      // chodnik po stronie salonu poza parkingiem (pod parkingiem schowany)
 
   // ---- kamienice art déco po drugiej stronie ulicy: pastele, białe gzymsy, okna (część zapalona), neony ----
+  const rd = rng(4242);                                     // osobny los dla detali fasad (układ kamienic i szyldów bez zmian)
   const signs = [], SIGNS = [['MOTEL', '#ff4fd8'], ['DINER', '#3ff0e0'], ['ARCADE', '#b06bff'], ['TACOS', '#ffd23f'], ['HOTEL', '#ff4fd8'], ['DISCO', '#3ff0e0'], ['SURF SHOP', '#ff7a5a'], ['BEAN CLUB', '#b06bff'], ['PAWN', '#ffd23f'], ['GYM', '#3ff0e0'], ['TATTOO', '#ff4fd8'], ['PIZZA', '#ff7a5a']];
   const facade = (x0, z0, z1, h, d, col, face, si) => {      // face = -1: front w stronę -X (do ulicy), +1: w stronę +X
     const fx = face < 0 ? x0 : x0 + d;
@@ -319,10 +320,26 @@ function themeDealer(M, root) {
     for (let y = 3.6; y < h - 1; y += 3.2) K.box(0.12, 0.22, z1 - z0 + 0.2, '#fbf7f2', M4(fxo, y, (z0 + z1) / 2));
     K.box(0.4, 0.5, z1 - z0 + 0.4, '#fbf7f2', M4(fx, h + 0.25, (z0 + z1) / 2));
     K.box(0.14, 3.0, z1 - z0 - 1, '#1b1636', M4(fxo, 1.6, (z0 + z1) / 2));                       // witryna parteru
-    K.box(0.16, 0.5, z1 - z0 - 0.6, PAST[(si + 3) % PAST.length], M4(fxo + face * 0.05, 3.3, (z0 + z1) / 2));   // markiza
+    const zc = (z0 + z1) / 2, L = z1 - z0, aw = PAST[(si + 3 + PAST.length) % PAST.length];
+    for (let i = 0, n = Math.max(2, Math.round((L - 0.6) / 0.9)); i < n; i++) {                 // markiza w pasy, skośna
+      const a = z0 + 0.3 + (i * (L - 0.6)) / n, b = z0 + 0.3 + ((i + 1) * (L - 0.6)) / n;
+      K.box(1.25, 0.06, b - a, i % 2 ? '#fbf7f2' : aw, M4(fxo + face * 0.6, 3.25, (a + b) / 2, 0, 0, -face * 0.38));
+    }
+    for (let z = z0 + 1.1; z < z1 - 0.9; z += 1.7) K.box(0.2, 3.0, 0.1, '#fbf7f2', M4(fxo + face * 0.03, 1.6, z));   // szprosy witryn
+    K.box(0.3, 0.12, L - 0.8, '#fbf7f2', M4(fxo + face * 0.08, 0.06, zc));                                         // cokół witryn
+    if (h > 10) for (let y = 3.6 + 3.2; y < h - 2.5; y += 6.4) {                                                    // balkony co drugie piętro
+      K.box(0.95, 0.14, L - 2.4, '#fbf7f2', M4(fx + face * 0.48, y, zc));
+      K.box(0.05, 0.85, L - 2.4, '#2e2a40', M4(fx + face * 0.93, y + 0.5, zc));
+      K.box(0.06, 0.06, L - 2.4, '#fbf7f2', M4(fx + face * 0.93, y + 0.95, zc));
+    }
+    for (let i = 0, n = 1 + Math.floor(rd() * 3); i < n; i++) K.box(1.3, 0.9, 1.1, '#c9c6d4', M4(x0 + d * (0.25 + rd() * 0.5), h + 0.95, z0 + 1.5 + rd() * (L - 3)));   // klimatyzatory na dachu
+    if (rd() < 0.45) { const tx = x0 + d * 0.6, tz = z0 + 1.5 + rd() * (L - 3);                                // drewniany zbiornik na wodę
+      K.add(new THREE.CylinderGeometry(1.0, 1.0, 1.8, 10), '#8a6a4c', M4(tx, h + 2.4, tz)); K.add(new THREE.ConeGeometry(1.1, 0.6, 10), '#5a4a5e', M4(tx, h + 3.6, tz));
+      for (const [ox, oz] of [[0.6, 0.6], [-0.6, 0.6], [0.6, -0.6], [-0.6, -0.6]]) K.box(0.12, 1.0, 0.12, '#3a3448', M4(tx + ox, h + 1.0, tz + oz)); }
     for (let y = 4.4; y < h - 1.6; y += 3.2) for (let z = z0 + 1.4; z < z1 - 1; z += 2.2) {
       const lit = rand() < 0.45;
       K.box(0.1, 1.3, 1.0, lit ? (rand() < 0.75 ? '#ffd48a' : '#7fffe0') : '#2a2340', M4(fxo, y + 0.7, z), lit ? 'glow' : 'solid');
+      K.box(0.22, 0.08, 1.2, '#fbf7f2', M4(fxo + face * 0.06, y + 0.02, z)); K.box(0.12, 0.08, 1.15, '#fbf7f2', M4(fxo, y + 1.4, z));   // parapet i nadproże
     }
     if (h > 12 && rand() < 0.7) K.box(0.5, h * 0.35, 1.2, '#fbf7f2', M4(fxo + face * 0.1, h - h * 0.175 + 1.2, (z0 + z1) / 2));   // pionowa „płetwa” art déco
     if (si >= 0) {
@@ -377,8 +394,11 @@ function themeDealer(M, root) {
     }
     if (rand() < 0.35) { K.box(0.5, 8 + rand() * 8, 0.5, '#3a2f4a', M4(x, top + 5, z)); K.box(0.8, 0.8, 0.8, '#ff3a3a', M4(x, top + 10, z), 'glow'); }
   }
-  root.add(new THREE.Mesh(mergeGeometries(city, false), new THREE.MeshStandardMaterial({ color: '#3a2c56', roughness: 0.75, metalness: 0.1, emissive: '#ffffff', emissiveMap: wt, emissiveIntensity: 1 })));
-  K.meshes(true).forEach((m) => root.add(m));
+  // ulica, ziemia, kamienice i miasto rysują się po hali (renderOrder 1): to, co zasłania posadzka i ściany salonu, odrzuca test głębi
+  // zamiast liczyć pełne oświetlenie (ziemia 900 × 900 m leży pod całą halą)
+  const cityMesh = new THREE.Mesh(mergeGeometries(city, false), new THREE.MeshStandardMaterial({ color: '#3a2c56', roughness: 0.75, metalness: 0.1, emissive: '#ffffff', emissiveMap: wt, emissiveIntensity: 1 }));
+  cityMesh.renderOrder = 1; root.add(cityMesh);
+  K.meshes(true).forEach((m) => { m.renderOrder = 1; root.add(m); });
 
   // ---- reflektory na parkingu: snopy światła omiatają niebo ----
   const fade = (() => {                                    // snop jasny przy lampie i zanikający ku górze
@@ -536,8 +556,9 @@ function themeYachts(M, root) {
   });
 
   // ---- morze ----
-  const water = makeWater({ y: WL, color: '#1d5a9a', rough: 0.22, metal: 0.35, env: sky, envI: 0.95, amp: 0.13, freq: 0.16, speed: 0.9 });
+  const water = makeWater({ y: WL, seg: 110, color: '#1d5a9a', rough: 0.22, metal: 0.35, env: sky, envI: 0.95, amp: 0.13, freq: 0.16, speed: 0.9 });   // 110 segmentów: fale długie, fasetki prawie te same, ~20 tys. trójkątów mniej
   root.add(water.mesh);
+  water.mesh.renderOrder = 1;                             // morze po jachtach: piksele zasłonięte pokładem i salonem odrzuca test głębi (było rysowane pierwsze)
   const K = new Kit();
   // piana wzdłuż kadłubów (biały postrzępiony pas przy linii wody) i przy motorówce
   const foam = (pts, w) => {
