@@ -2138,7 +2138,68 @@ function inspectProbe(){
   return out;
 }
 window.__game={setBot:v=>{BOT.on=!!v},THREE,renderer,climates,TEAM,slotList,match,MAPS,snapMap,playerHit,armJoints,bodyHit,inv,selectWeapon,get curW(){return curW},get rifle(){return rifle},solveArm,armR,armL,TP_HOLD,VM,me,poseArmsTo,makeBean,scene,keepRifleOut,placeTP,createWeapon,lobby,duel,setMode,player,gun,enemies,camera,setView:attachRifle,startPlay,start:()=>{playing=true;$('overlay').style.display='none'},fire:()=>{if(gun.mag>0&&gun.cd<=0&&gun.reloading<=0)fireShot()},reload:startReload,inspect:startInspect,inspectProbe,INSP,fpsArms:[fpsArmR,fpsArmL],viewModel,vmCam,WRIST,setAds:v=>adsHeld=v,keys};
-// ================= rozgrzewka: ekran wczytywania znika dopiero, gdy gra jest gotowa i nie przytnie ==========loader.hide();window.__ready=true;if(!window.__mobileGate)frame();   // na telefonie gra nie rusza (ekran „coming soon”)
+// ================= rozgrzewka: ekran wczytywania znika dopiero, gdy gra jest gotowa i nie przytnie =================
+// Pierwsze narysowanie materiału kompiluje jego shader na karcie graficznej – na słabszym komputerze setki ms na raz. Dawniej działo się to
+// już po zniknięciu ekranu wczytywania: w lobby (miniatury map, 10 map wczytywanych w tle), na wejściu do meczu (fasolka, broń z 1. osoby)
+// i przy pierwszych strzałach (smugi, iskry). Teraz: czekamy na mapy, a shadery kompilujemy równolegle w tle (KHR_parallel_shader_compile,
+// renderer.compileAsync) dokładnie w tych ustawieniach, w jakich gra je narysuje (klimat i światła każdej mapy, „studio” broni z 1. osoby),
+// potem jedna klatka każdej mapy (miniatura do losowania) i jedna klatka gry wysyłają tekstury i siatki na kartę.
+// Shadery zależą od liczby świateł w scenie: płomień broni z 1. osoby (PointLight) liczy się do świateł świata – podczas kompilacji
+// świata broń jest odpięta od kamery, a jej światło zastępuje identyczne światło w zestawie rozgrzewkowym.
+const WARM={};window.__warm=WARM;
+async function warmUp(){
+  const T=performance.now(),lap=k=>WARM[k]=Math.round(performance.now()-T);
+  // pule efektów strzału gotowe od razu (bez tworzenia obiektów przy pierwszych strzałach)
+  for(let i=0;i<24;i++)tracerPool.push(new THREE.Mesh(tracerGeo,tracerMat.clone()));
+  for(let i=0;i<56;i++)sparkPool.push({m:new THREE.Mesh(sparkGeo,sparkMat),v:V3(),life:0});
+  // zestaw rzeczy, których jeszcze nie ma w scenie: bronie w 3. osobie (bot, gracze Deathmatch), fasolka ze skinem, efekty strzału
+  const kit=new THREE.Group(),flash=new THREE.PointLight(0xffb45a,0,5,2);flash.layers.enable(1);kit.add(flash);
+  for(const id of WEAPON_IDS){const w=createWeapon(id,{fx:false});placeTP(w);kit.add(w.group)}
+  {const b=makeBean(HUES[0]);const k={id:'bot',c:HUES[0]};applySkin(b.userData.mats.skin,k);applySkin(b.userData.mats.body,k);kit.add(b)}
+  kit.add(new THREE.Mesh(tracerGeo,tracerMat),new THREE.Mesh(holeGeo,holeMat));for(const c of[0,0xff8a7a])kit.add(new THREE.Mesh(sparkGeo,sparkMatFor(c)));
+  const compile=(root,cam,target)=>{try{return renderer.compileAsync(root,cam,target).catch(e=>console.warn('Shadery:',e))}catch(e){console.warn('Shadery:',e);return Promise.resolve()}};
+  const isMap=o=>ALLMAPS.some(X=>X.group===o);
+  // Każde zlecenie podmienia na chwilę (synchronicznie) zawartość sceny i kamery, wysyła shadery do kompilacji i od razu wszystko przywraca;
+  // kompilacja trwa dalej w tle na wątkach sterownika, a w tym czasie wczytują się kolejne mapy.
+  function submitWorld(M){                                      // świat z jedną mapą (albo bez mapy: arena / Strzelnica) w jej klimacie
+    const kids=scene.children,ck=camera.children,saved=climates.save();
+    scene.children=kids.filter(o=>!isMap(o)||(M&&o===M.group)).concat(kit);camera.children=ck.filter(o=>o!==viewModel);climates.use(M?M.name:null);
+    try{return compile(scene,camera)}finally{scene.children=kids;camera.children=ck;climates.restore(saved)}
+  }
+  function submitGun(){                                         // broń i ręce z 1. osoby: drugi przebieg (vmCam, warstwa 1) z „studiem” odbić; po jednej broni (jedno światło płomienia)
+    const env=scene.environment,ck=camera.children,vk=viewModel.children,base=vk.filter(o=>!inv.some(w=>w.inst.group===o)),ps=[];
+    scene.environment=GUN_ENV;camera.children=ck.filter(o=>o!==viewModel);
+    try{for(const w of inv){const g=w.inst.group,vis=g.visible;setLayer(g,1);g.visible=true;viewModel.children=base.concat(g);ps.push(compile(viewModel,vmCam,scene));g.visible=vis}}
+    finally{viewModel.children=vk;camera.children=ck;scene.environment=env;setLayer(rifle.group,1)}
+    return Promise.all(ps);
+  }
+  // pasek: etapy map (moduł, model, nakładki – po 3 na mapę) i zadania kompilacji (arena, broń z 1. osoby, lobby, każda mapa)
+  const jobs=[],seen=new Set(),all=ALLMAPS.length*4+3;let done=0;
+  const prog=()=>loader.set(.45+.53*Math.min(1,(done+mapSteps)/all)),progT=setInterval(prog,120);
+  const job=p=>jobs.push(p.then(()=>{done++;prog()}));
+  job(submitWorld(null));job(submitGun());job(compile(lobby.scene,lobby.camera));
+  // mapy: kompilacja w klimacie mapy zaraz po wczytaniu, potem jej miniatura do losowania (klatka mapy = tekstury i siatki na kartę)
+  const onMap=M=>{if(seen.has(M)||!M.group)return;seen.add(M);
+    job(submitWorld(M).then(()=>{const i=thumbQ.indexOf(M);if(i>=0){thumbQ.splice(i,1);try{snapMap(M)}catch(e){console.warn('Miniatura:',e)}}}))};
+  for(const M of ALLMAPS)if(M.ready)onMap(M);onMapReady=onMap;
+  await Promise.race([loadMaps,new Promise(r=>setTimeout(r,60000))]);onMapReady=null;lap('maps');   // gdyby coś wisiało, reszta doczyta się w tle jak dawniej
+  await Promise.race([Promise.all(jobs),new Promise(r=>setTimeout(r,30000))]);clearInterval(progT);lap('shaders');
+  // tekstury wszystkich broni (nie tylko tej w rękach), fasolek i efektów od razu na kartę – nie przy pierwszym wyjęciu broni
+  {const texs=new Set(),add=o=>o.traverse(x=>{if(!x.material)return;for(const m of[].concat(x.material))for(const k in m){const v=m[k];if(v&&v.isTexture)texs.add(v)}});
+   for(const w of inv)add(w.inst.group);add(kit);for(const e of enemies)add(e.root);
+   for(const t of texs)try{renderer.initTexture(t)}catch(e){}WARM.textures=texs.size}
+  // jedna klatka gry z fasolką, bronią i efektami przed kamerą: shadery cieni (głębia) i wysłanie siatek na kartę
+  try{
+    kit.remove(flash);camera.getWorldDirection(V3t);kit.position.copy(camera.position).addScaledVector(V3t,4);kit.lookAt(camera.position);scene.add(kit);
+    scene.updateMatrixWorld();for(const w of inv)if(w.inst.flash)w.inst.flash.visible=true;
+    renderGame();for(const w of inv)if(w.inst.flash)w.inst.flash.visible=false;
+  }catch(e){console.warn('Rozgrzewka:',e)}
+  scene.remove(kit);
+  try{lobby.update(0)}catch(e){}                              // pierwsza klatka lobby jeszcze pod ekranem wczytywania
+  lap('total');WARM.programs=renderer.info.programs.length;
+}
+if(!window.__mobileGate)await warmUp().catch(e=>console.warn('Rozgrzewka:',e));   // błąd rozgrzewki nie zatrzymuje gry (najwyżej przytnie jak dawniej)
+loader.hide();window.__ready=true;if(!window.__mobileGate)frame();   // na telefonie gra nie rusza (ekran „coming soon”)
 </script>
 
 
