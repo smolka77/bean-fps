@@ -35,8 +35,45 @@ const START_DELAY = 6.8;               // od 'go' do „WALCZ!” (wczytanie + i
 const COUNT_DELAY = 2.4;               // pierwsza runda: od 'count' (obaj gracze są już na mapie, po intro) do „WALCZ!”
 const INTRO_MAX = 20;                  // gdy klient nie zgłosi końca intro ('in') tyle sekund po 'go', odliczanie i tak rusza
 const LIVE_GRACE = 2.5;               // po tylu sekundach od planowanego startu gracz jest w grze, nawet bez 'lv'
-const REWIND_MAX = 0.25;               // kompensacja opóźnienia: maksymalne cofnięcie przeciwnika (s) – więcej nie daje sztuczny lag
+const REWIND_MAX = 0.35;               // kompensacja opóźnienia: maksymalne cofnięcie przeciwnika (s) – więcej nie daje sztuczny lag
 const LAG_SHOT = 0.35;                 // bez paczek ruchu dłużej niż tyle (lag switch) strzały nie są przyjmowane
+
+// ---------------- sieć: znaczniki czasu stanów, numerowane korekty (wspólne z Deathmatch – dm.mjs) ----------------
+const CLK_BACK = 0.2;                                      // znacznik czasu stanu gracza: najwyżej tyle s przed chwilą odbioru paczki
+// zegar nadawcy -> czas serwera: najmniejsze (najszybsze) opóźnienie paczek gracza, bardzo powoli w górę (zmiana trasy w sieci).
+// Stan dostaje znacznik chwili, w której gracz naprawdę był w tym miejscu, więc nierówne wysyłanie i jitter łącza gracza
+// nie psują obrazu u innych. Znacznik zawsze w [odbiór − CLK_BACK, odbiór] i rośnie – oszust nim nie przesunie się w czasie dalej.
+export function stampOf(p, c, now) {
+  let ts = now;
+  if (Number.isFinite(c) && c > 0) {
+    const o = now - c / 1000;
+    if (p.cOff == null || o < p.cOff || o - p.cOff > 2) p.cOff = o; else p.cOff += (o - p.cOff) * 0.002;
+    ts = Math.min(now, Math.max(now - CLK_BACK, c / 1000 + p.cOff));
+  }
+  if (p.ts != null && ts <= p.ts) ts = Math.min(now, p.ts + 0.001);
+  return ts;
+}
+// korekta pozycji ('fix') z numerem: klient odsyła numer ostatniej przyjętej korekty (pole f w 'st'), a paczki wysłane przed nią
+// serwer pomija (bez kolejnej korekty) – bez tego paczki będące już w drodze cofały gracza drugi i trzeci raz („gumowanie”)
+export function sendFix(p, now, send) {
+  p.fixN = (p.fixN || 0) + 1; p.fixAt = now; p.lastFix = now;
+  send({ t: 'fix', p: [p.x, p.y, p.z].map((q) => +q.toFixed(3)), n: p.fixN });
+}
+// paczka sprzed ostatniej korekty (klient jeszcze jej nie dostał): pomijamy; true = pominięta
+export function staleAfterFix(p, m, now, send) {
+  if (m.f !== undefined) p.ackFix = true;                 // klient zna numery korekt (starsza gra ich nie wysyła – wtedy jak dawniej)
+  if (!p.ackFix || !p.fixN || (+m.f | 0) >= p.fixN) return false;
+  if (now - p.fixAt > 1) sendFix(p, now, send);            // korekta nie doszła albo klient jej nie przyjął – jeszcze raz
+  p.lastT = now; return true;                              // bez kumulowania budżetu ruchu (jak przy odrzuceniu)
+}
+
+// cofnięcie przeciwnika przy strzale: do chwili obrazu, którą podała gra (rt, czas serwera od startu pokoju), a bez niej –
+// opóźnienie łącza + opóźnienie obrazu zgłoszone w paczkach ruchu; zawsze najwyżej opóźnienie gracza + 0,25 s i REWIND_MAX
+function backOf(room, me, m, now) {
+  const lim = Math.min(REWIND_MAX, me.rtt + 0.25);
+  if (m && typeof m.rt === 'number' && Number.isFinite(m.rt)) return Math.max(0, Math.min(lim, now - room.t0 - m.rt));
+  return Math.min(lim, me.rtt + (me.viewD != null ? me.viewD : 0.07));
+}
 
 // ---------------- mapy: kolizje z plików gry ----------------
 const MAPS = {};
@@ -150,7 +187,7 @@ function newPlayer() {
   return { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, cr: 0, sl: 0, ads: 0, w: 0, run: 0, air: 0, legYaw: 0,
     hp: 100, live: false, inited: false, lastT: 0, lastGroundY: 0, airSince: 0, hist: [], trail: [],
     bloom: 0, bloomT: 0, tokens: 1, tokT: 0, lastQ: 0, ammo: {}, reloadW: -1, reloadAt: 0,
-    rtt: 0.1, viol: [], kicked: false, seen: false, seenT: 0, hiddenSent: false,
+    rtt: 0.1, viol: [], kicked: false, ts: null, cOff: null, fixN: 0, fixAt: 0, ackFix: false, viewD: null, seen: false, seenT: 0, hiddenSent: false,
     aim: [], lastStT: 0, visOpp: false, visSince: 0, reacted: true, spray: null, lastShotT: 0,
     pending: [], preFire: false,
     an: { shots: 0, hits: 0, heads: 0, hitsOpen: 0, headsOpen: 0, reactions: [], flicks: 0, flickHeads: 0, snaps: 0, snapHeads: 0, trigger: [], sprays: [], mismatch: 0, noSamp: 0,
@@ -184,7 +221,7 @@ const spawnOf = (room, seat) => room.map.spawns[seat === 1 && room.map.spawns[1]
 function placeAtSpawn(room, seat, now) {
   const p = room.p[seat], s = spawnOf(room, seat);
   Object.assign(p, { x: s.x, y: s.y || 0, z: s.z, yaw: s.yaw || 0, hp: 100, live: false, inited: true, lastT: now, lastGroundY: s.y || 0, airSince: 0, hist: [], trail: [] });
-  refill(p); pushHist(p, now);
+  refill(p); pushHist(p, now); p.ts = now;
 }
 function pushHist(p, now) { p.hist.push({ t: now, x: p.x, y: p.y, z: p.z, cr: p.cr }); while (p.hist.length && now - p.hist[0].t > 1.2) p.hist.shift(); }
 function stateAt(p, t) {
@@ -277,7 +314,7 @@ function acceptMove(room, p, s, now) {
   p.speed01 = Math.min(1, prevSpeed / 6.8);
   if (ladder || Math.abs(s.y - sup) < 0.15) { p.lastGroundY = ladder ? Math.max(s.y, sup) : s.y; p.airSince = 0; p.ground = true; p.gx = s.x; p.gy = s.y; p.gz = s.z; }
   else { if (!p.airSince) p.airSince = now; p.ground = false; }
-  pushHist(p, now);
+  const ts = s.ts != null ? s.ts : now; pushHist(p, ts); p.ts = ts;   // historia do kompensacji opóźnienia: chwila z zegara gracza (stampOf)
   p.trail.push({ t: now, x: s.x, z: s.z }); while (p.trail.length && now - p.trail[0].t > 2.5) p.trail.shift();
   const seat = room.p.indexOf(p), r2 = (v) => Math.round(v * 100) / 100, r3 = (v) => Math.round(v * 1000) / 1000;
   if (room.rec.st.length < 60000) room.rec.st.push([r2(now - room.t0), seat, r2(s.x), r2(s.y), r2(s.z), r3(s.yaw), r3(s.pitch), r2(s.cr)]);
@@ -330,13 +367,14 @@ function shoot(room, seat, m, now, out) {
   const tWall = rayMap(room.map, o, d, 250);
   // przeciwnik cofnięty o opóźnienie strzelającego (to, co widział na ekranie)
   let hit = null;
-  if (op.live && op.hp > 0) { const back = Math.min(REWIND_MAX, me.rtt + 0.07); hit = rayBean(o, d, stateAt(op, now - back)); }
+  const back = backOf(room, me, m, now);
+  if (op.live && op.hp > 0) hit = rayBean(o, d, stateAt(op, now - back));
   const end = (t) => [o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t].map((x) => +x.toFixed(2));
   const landed = !!(hit && hit.t < tWall);
   // trafienie w głowę zza osłony (murek zasłania tułów) nie liczy się do odsetka trafień w głowę – tam inaczej się nie da
   let open = true;
-  if (landed && hit.head) { const ts = stateAt(op, now - Math.min(REWIND_MAX, me.rtt + 0.07)), dr = CROUCH_DROP * (ts.cr || 0); open = visibleLine(room.map, o, [ts.x, ts.y + 0.95 - dr, ts.z]) || visibleLine(room.map, o, [ts.x, ts.y + 0.6 - dr, ts.z]); }
-  analyzeShot(room, seat, o, aimDir, landed, landed && hit.head, open, W, now, q);
+  if (landed && hit.head) { const ts = stateAt(op, now - back), dr = CROUCH_DROP * (ts.cr || 0); open = visibleLine(room.map, o, [ts.x, ts.y + 0.95 - dr, ts.z]) || visibleLine(room.map, o, [ts.x, ts.y + 0.6 - dr, ts.z]); }
+  analyzeShot(room, seat, o, aimDir, landed, landed && hit.head, open, W, now, q, back);
   room.rec.sh.push([Math.round((now - room.t0) * 100) / 100, seat, o.map((x) => +x.toFixed(2)), end(landed ? hit.t : Math.min(tWall, 120)), landed ? (hit.head ? 2 : 1) : 0]);
   if (hit && hit.t < tWall) {
     const dmg = Math.round(W.dmg * (hit.head ? W.head : 1)), hp0 = op.hp;
@@ -362,13 +400,13 @@ function aimErr(e, dir, s) {
   const dist = Math.hypot(body[0] - e[0], body[1] - e[1], body[2] - e[2]);
   return { head: ang(dir, toH), body: ang(dir, toB), radius: Math.atan2(0.34, Math.max(0.5, dist)), dist };
 }
-function analyzeShot(room, seat, o, aimDir, landed, head, open, W, now, qn) {
+function analyzeShot(room, seat, o, aimDir, landed, head, open, W, now, qn, back) {
   const me = room.p[seat], op = room.p[1 - seat], an = me.an;
   an.shots++; if (landed) { an.hits++; if (head) an.heads++; if (!head || open) { an.hitsOpen++; if (head) an.headsOpen++; } }
-  const back = Math.min(REWIND_MAX, me.rtt + 0.07), tgt = stateAt(op, now - back), err = aimErr(o, aimDir, tgt);
+  const tgt = stateAt(op, now - back), err = aimErr(o, aimDir, tgt);
   // czas reakcji: od chwili, gdy serwer pokazał przeciwnika, do pierwszego trafienia (minus opóźnienie sieci i wygładzanie obrazu);
   // pomijamy „prefire” (strzelanie na ślepo w róg tuż przed wyjściem przeciwnika)
-  if (landed && !me.reacted && me.visSince) { if (!me.preFire) an.reactions.push(+Math.max(0, now - me.visSince - me.rtt - 0.07).toFixed(3)); me.reacted = true; }
+  if (landed && !me.reacted && me.visSince) { if (!me.preFire) an.reactions.push(+Math.max(0, now - me.visSince - back).toFixed(3)); me.reacted = true; }
   const first = now - me.lastShotT > 0.3;                          // pierwszy strzał serii
   // strzały w biegnącego przeciwnika na widoku: jaka część padła z celownikiem na nim (tułów albo głowa). Człowiek strzela też,
   // gdy celownik ucieka; triggerbot i aimbot prawie tylko wtedy, gdy jest na celu
@@ -442,7 +480,7 @@ function processAim(room, seat, now, flush) {
 function trackSample(room, seat, now) {
   const me = room.p[seat], op = room.p[1 - seat];
   if (room.phase !== 'live' || !me.visOpp || !op.live || op.hp <= 0 || me.hp <= 0) return;
-  const back = Math.min(REWIND_MAX, me.rtt + 0.07), st = stateAt(op, now - back), st0 = stateAt(op, now - back - 0.1);
+  const back = backOf(room, me, null, now), st = stateAt(op, now - back), st0 = stateAt(op, now - back - 0.1);
   if (Math.hypot(st.x - st0.x, st.z - st0.z) / 0.1 < 2.5) return;   // przeciwnik stoi – trzymanie celu nic nie mówi
   const e = aimErr([me.x, EYE(me), me.z], dirOf(me.yaw, me.pitch), st);
   if (e.dist < 3 || Math.min(e.body, e.head) > 0.5) return;       // za blisko albo poza polem widzenia
@@ -512,15 +550,19 @@ export function handleMessage(room, seat, m, now, out) {
       me.aim.sort((x, y) => x.t - y.t); while (me.aim.length && now - me.aim[0].t > 2.5) me.aim.shift();
       processAim(room, seat, now, false);
       if (!me.inited) return;
+      if (staleAfterFix(me, m, now, (msg) => out(seat, msg))) return;   // wysłana przed korektą 'fix' (np. przed ustawieniem na starcie rundy)
+      if (Number.isFinite(+m.d)) me.viewD = Math.max(0, Math.min(0.3, +m.d / 1000));   // opóźnienie obrazu przeciwnika u gracza (s)
       const [x, y, z, yaw, pitch, cr, run, air, sl, legYaw, w, ads] = m.s.map(Number);
       const s = { x, y, z, yaw: yaw || 0, pitch: pitch || 0, cr: clamp01(cr), run: clamp01(run), air: clamp01(air), sl: clamp01(sl), legYaw: legYaw || 0, w: okW(me, w | 0) ? w | 0 : 0, ads: ads > 0.5 ? 1 : 0 };
       if (me.allowW && !me.allowW.includes(s.w)) s.w = me.allowW[0];   // Arsenał: broń bez tokenu = pistolet
       if (s.w !== me.w && me.reloadW >= 0) me.reloadW = -1;          // zmiana broni przerywa przeładowanie
+      s.ts = stampOf(me, +m.c, now);
       const why = checkMove(room, me, s, now);
       if (why) {
         // w powietrzu wracamy do ostatniego miejsca na ziemi (inaczej gracz zostałby zawieszony w powietrzu)
         if ((why === 'wisi w powietrzu' || why === 'za wysoko') && me.gx !== undefined) Object.assign(me, { x: me.gx, y: me.gy, z: me.gz, airSince: 0, lastGroundY: me.gy, trail: [] });
-        if (now - (me.lastFix || 0) > 0.25) { me.lastFix = now; out(seat, { t: 'fix', p: [me.x, me.y, me.z].map((v) => +v.toFixed(3)) }); }
+        // korekta: klient z numerami korekt dostaje ją od razu (paczki sprzed niej są pomijane; najwyżej 10/s), starszy – najwyżej co 0,25 s
+        if (now - (me.lastFix || 0) > (me.ackFix ? 0.1 : 0.25)) sendFix(me, now, (msg) => out(seat, msg));
         room.log.push(`${seat}: ${why}`);
         if (violation(me, why, now)) { me.kicked = true; room.log.push(`${seat}: wyrzucony za oszukiwanie ruchu`); }
         me.lastT = now;                                               // nie kumulujemy budżetu ruchu
@@ -554,7 +596,9 @@ function relayState(room, seat, now, out) {
   if (vis) me.seenT = now;
   if (vis || now - me.seenT < 0.35) {                             // chwilę po zniknięciu jeszcze wysyłamy (bez migania na krawędzi)
     me.hiddenSent = false;
-    out(1 - seat, { t: 'st', s: [me.x, me.y, me.z, me.yaw, me.pitch, me.cr, me.run, me.air, me.sl, me.legYaw, me.w].map((v) => +(+v).toFixed(3)) });
+    // T = chwila tego stanu, N = chwila wysłania (czas serwera od startu pokoju) – gra interpoluje po T, zegar serwera bierze z N
+    out(1 - seat, { t: 'st', s: [me.x, me.y, me.z, me.yaw, me.pitch, me.cr, me.run, me.air, me.sl, me.legYaw, me.w].map((v) => +(+v).toFixed(3)),
+      T: +((me.ts != null ? me.ts : now) - room.t0).toFixed(3), N: +(now - room.t0).toFixed(3) });
   } else if (!me.hiddenSent || now - (me.hiddenT || 0) > 1) { me.hiddenSent = true; me.hiddenT = now; out(1 - seat, { t: 'st', s: null }); }
 }
 
@@ -562,7 +606,7 @@ function relayState(room, seat, now, out) {
 export function tick(room, now, out) {
   if (room.over) return;
   if (room.phase === 'intro' && now - room.goAt > INTRO_MAX) startCount(room, now, out);
-  if (room.phase === 'count') room.p.forEach((p, s) => { if (!p.inited && now >= room.liveAt - 0.5) { placeAtSpawn(room, s, now); out(s, { t: 'fix', p: [p.x, p.y, p.z] }); } });
+  if (room.phase === 'count') room.p.forEach((p, s) => { if (!p.inited && now >= room.liveAt - 0.5) { placeAtSpawn(room, s, now); sendFix(p, now, (msg) => out(s, msg)); } });
   if ((room.phase === 'count') && now >= room.liveAt + LIVE_GRACE) { room.p.forEach((p) => { p.live = true; }); room.phase = 'live'; }
   if (room.phase === 'live') room.p.forEach((p, s) => { if (!p.live && now >= room.liveAt + LIVE_GRACE) p.live = true; });
   if (!room.pingT || now - room.pingT > 2) { room.pingT = now; out(-1, { t: 'pi', s: +now.toFixed(3) }); }

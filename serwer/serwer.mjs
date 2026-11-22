@@ -1333,22 +1333,34 @@ function onDmMessage(ws, user, m) {
   if (m.t === 'leave' || m.t === 'dmc') { dmPlayerGone(e, 'wyjście'); return; }
   DM.handleMessage(e.room.game, e.pid, m, nowS(), e.room.out);
 }
-setInterval(() => {
-  const t = nowS();
+// tick Deathmatch: DM.TICK_HZ razy na sekundę, równym rytmem (setTimeout do następnej zaplanowanej chwili – setInterval
+// spóźnia się o czas pracy i rozdzielczość zegara); boty dostają prawdziwy czas od poprzedniego kroku, więc chodzą równo
+const DM_DT = 1 / DM.TICK_HZ;
+let dmNext = nowS() + DM_DT, dmLastT = nowS();
+function dmSchedule() {
+  setTimeout(() => {
+    const t0 = nowS(); dmNext += DM_DT; if (t0 - dmNext > 0.25) dmNext = t0 + DM_DT;   // po długim zatrzymaniu (GC, uśpienie) bez nadrabiania
+    try { dmLoop(); } catch (er) { console.error('[dm] tick', er); }
+    dmSchedule();
+  }, Math.max(0, (dmNext - nowS()) * 1000));
+}
+function dmLoop() {
+  const t = nowS(), dt = Math.min(0.1, Math.max(0.005, t - dmLastT)); dmLastT = t;
   for (const room of dmRooms) {
-    for (const b of room.bots.values()) { try { BOTY.botStep(room.game, b, t, 0.05, (m) => DM.handleMessage(room.game, b.pid, m, t, room.out)); } catch (er) { console.error('[dm] bot', er && er.message); } }
+    for (const b of room.bots.values()) { try { BOTY.botStep(room.game, b, t, dt, (m) => DM.handleMessage(room.game, b.pid, m, t, room.out)); } catch (er) { console.error('[dm] bot', er && er.message); } }
     DM.tick(room.game, t, room.out);
     // wyrzuceni przez serwer trybu (antycheat, za długo na ekranie śmierci)
     for (const r of room.game.removed.splice(0)) { const e = room.entries.get(r.pid); if (e) dmPlayerGone(e, r.why, r.stats); else room.bots.delete(r.pid); }
     if (dmRooms.has(room)) dmBalanceBots(room, t);
     // P90 za grę w Deathmatch: po minucie w lobby konto dostaje go na zawsze (od następnego awansu na drabince zamiast MP5K)
-    if (room.game.tick % 20 === 0) for (const e of room.entries.values()) {
+    if (room.game.tick % DM.TICK_HZ === 0) for (const e of room.entries.values()) {
       if (e.p90 || e.gone || Date.now() - (e.at || Date.now()) < P90_PLAY_MS) continue;
       e.p90 = true;
       try { if (grantP90(e.user.id)) { const p = room.game.p.get(e.pid); if (p) p.p90 = true; wsSend(e.ws, { t: 'unlock', item: 'p90' }); } } catch (er) { console.error('[P90]', er.message); }
     }
   }
-}, 50);
+}
+dmSchedule();
 
 wss.on('connection', (ws, req, user) => {
   ws.alive = true; ws.on('pong', () => { ws.alive = true; });

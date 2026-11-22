@@ -276,6 +276,7 @@ import {przyspieszPromien} from './promien.js';   // strzał: drzewo BVH dla sia
 import {createClimates} from './klimaty.js';   // wygląd map 1v1: Baza = salon luksusowych aut wieczorem, Oaza = bagno
 import {createMatch} from './match.js';
 import {createNet} from './net.js';
+import {createView,DUEL_ROW,SEND_EVERY} from './interp.js';   // obraz zdalnego przeciwnika 1v1: bufor stanów z czasem serwera, interpolacja
 import {createRange} from './range.js';
 import {createDM} from './dm.js';            // tryb Deathmatch (stałe lobby do 20 graczy): HUD, WASTED, broń za zabójstwa
 import {WEAPON_IDS,WEAPON_STATS,PISTOL_ID,weaponAllowed,loadWeaponModels,createWeapon,applyParts,reloadPose,drawPose,magGrabPoint,pouchPoint,createShells,weaponSound,weaponSfx,weaponAudio,cyclePose,EJECT_AT} from './weaponry.js';
@@ -1099,7 +1100,8 @@ function fireShot(){
   }
   // online: do serwera idzie tylko skąd i w którą stronę celowałem (bez rozrzutu) – rozrzut, lot pocisku i trafienie liczy serwer
   if(ON.active){
-    NET.send({t:'sh',o:[_o.x,_o.y,_o.z].map(v=>+v.toFixed(3)),d:[_aim.x,_aim.y,_aim.z].map(v=>+v.toFixed(4)),q:++ON.q});ON.aim.push([performance.now(),player.yaw,player.pitch,ON.q])}
+    const rt=ON.view.renderT;   // chwila obrazu przeciwnika, który gracz widział (serwer cofa go do niej przy sprawdzaniu trafienia)
+    NET.send({t:'sh',o:[_o.x,_o.y,_o.z].map(v=>+v.toFixed(3)),d:[_aim.x,_aim.y,_aim.z].map(v=>+v.toFixed(4)),q:++ON.q,...(rt!=null?{rt:+rt.toFixed(3)}:{})});ON.aim.push([performance.now(),player.yaw,player.pitch,ON.q])}
   if(DMX&&DMX.active)DMX.shot(_o,_aim);
   if(st.pump||st.bolt){inst.cycleT=0;inst.cycleDur=Math.max(.3,60/st.rpm*.7)}   // pompka / zamek po strzale
   // efekty broni: płomień, zamek, łuska, odrzut
@@ -1606,8 +1608,9 @@ function frame(){
   if(playing){if(match.frozen||(DMX&&DMX.frozen)){gun.firing=false;gun.trigger=false}}else{gun.firing=false;gun.trigger=false;adsHeld=false}
   stepPlayer(dt);stepGun(dt);applyRecoil();
   if(ON.active&&match.on){const tn=performance.now();ON.aim.push([tn,player.yaw,player.pitch]);if(ON.aim.length>32)ON.aim.shift();   // kamera z każdej klatki (serwer sprawdza celowanie)
-    ON.sendT-=dt;if(ON.sendT<=0){ON.sendT=.05;const p=player,w=inv[curW],f2=v=>+(+v||0).toFixed(2),f3=v=>+(+v||0).toFixed(3),f4=v=>+(+v||0).toFixed(4);
+    ON.sendT-=dt;if(ON.sendT<=0){ON.sendT=Math.max(0,ON.sendT+SEND_EVERY);const p=player,w=inv[curW],f2=v=>+(+v||0).toFixed(2),f3=v=>+(+v||0).toFixed(3),f4=v=>+(+v||0).toFixed(4);
     NET.send({t:'st',s:[f3(p.pos.x),f3(p.pos.y),f3(p.pos.z),f3(p.yaw),f3(p.pitch),f2(p.crouch),f2(p.run),f2(p.air),f2(p.slideK),f2(p.legYaw),WEAPON_IDS.indexOf(w.id),p.ads>.5?1:0],
+      c:Math.round(tn),f:ON.fixN,d:Math.round(ON.view.delay*1000),   // zegar przeglądarki (serwer liczy z niego chwilę stanu), numer ostatniej korekty, opóźnienie obrazu (ms)
       a:ON.aim.slice(-24).map(a=>a.length>3?[Math.round(tn-a[0]),f4(a[1]),f4(a[2]),a[3]]:[Math.round(tn-a[0]),f4(a[1]),f4(a[2])])});ON.aim.length=0}}
   if(MODE==='dm'&&DMX)DMX.send(dt);                     // Deathmatch: paczka ruchu 20/s (strzały idą od razu z fireShot)
   stepEnemies(dt);
@@ -1727,16 +1730,15 @@ function stepDuelBot(e,dt){
   _gl.copy(e.rifle.gripLTP);e.rifle.group.localToWorld(_gl);ud.torso.worldToLocal(_gl);
   poseArmsTo(ud,_gr,_gl);
 }
-const _ra=V3();
 function stepRemote(e,dt){
   const r=e.root,ud=r.userData,s=ON.st;
   if(e.flash>0){e.flash-=dt;e.mats.skin.emissive.setScalar(.9)}else e.mats.skin.emissive.setScalar(0);
   if(e.dead>0){e.fall=Math.min(1,e.fall+dt*3);r.rotation.z=e.fall*(Math.PI/2);r.position.y=Math.sin(e.fall*Math.PI/2)*.28;return}
   if(ON.active)r.visible=!ON.hidden;
   if(!s||!ON.active)return;
-  const [x,y,z,yaw,pitch,cr,run,air,slide,legYaw,wid]=s,k=Math.min(1,dt*14);
-  _ra.set(x,y,z);if(r.position.distanceToSquared(_ra)>25)r.position.copy(_ra);else r.position.lerp(_ra,k);
-  r.rotation.y+=angDiff(yaw,r.rotation.y)*k;r.rotation.z=0;
+  ON.view.frame(performance.now()/1000);const v=ON.view.sample(0)||s;   // stan z bufora (czas serwera, interpolacja, łagodna ekstrapolacja – interp.js)
+  const [x,y,z,yaw,pitch,cr,run,air,slide,legYaw,wid]=v;
+  r.position.set(x,y,z);r.rotation.y=yaw;r.rotation.z=0;
   if(wid>=0&&WEAPON_IDS[wid]&&(!e.rifle||e.rifle.id!==WEAPON_IDS[wid]))setBotGun(e,WEAPON_IDS[wid]);
   e.phase+=dt*9.7*run;ud.pelvis.rotation.y=-(legYaw||0);
   poseLegs(ud,e.phase,run*(1-slide),air,cr*(1-slide));
@@ -1939,7 +1941,7 @@ const match=createMatch({
     player.dead=false;document.body.classList.remove('mt-dead');deathK=0;
     resetPlayer();duel.inv=0;Object.assign(player,{slide:0,fatigue:0,ads:0});adsHeld=false;gun.firing=false;gun.trigger=false;cancelInspect(true);
     if(duel.bot)duelSpawn(duel.bot);
-    ON.st=null;ON.hidden=true;if(ON.active)NET.send({t:'rs'});
+    ON.st=null;ON.hidden=true;ON.view.reset(0);if(ON.active)NET.send({t:'rs'});
     for(const h of holes){scene.remove(h);holePool.push(h)}holes.length=0;
   },
   live:()=>{if(ON.active)NET.send({t:'lv'})},                // „WALCZ!”: serwer przyjmuje strzały i obrażenia
@@ -1953,7 +1955,7 @@ const match=createMatch({
 window.__match=match;
 // ================= 1v1 online: prawdziwi gracze przez serwer (net.js, WebSocket /ws) =================
 const NET=createNet();
-const ON={active:false,seat:0,opp:null,st:null,sendT:0,q:0,hidden:true,aim:[]};
+const ON={active:false,seat:0,opp:null,st:null,sendT:0,q:0,hidden:true,aim:[],view:createView(DUEL_ROW),fixN:0};
 let remoteSkins=null;
 loadSkinsJson().then(l=>{if(Array.isArray(l))remoteSkins=l}).catch(()=>{});   // to samo zapytanie co w lobby (jedno pobranie)
 const findSkin=id=>id?((remoteSkins||[]).find(k=>k.id===id)||SKINS.find(k=>k.id===id)||null):null;
@@ -1964,17 +1966,17 @@ function netFail(msg){
   dispatchEvent(new CustomEvent('fasolka:cancelled',{detail:{message:msg?srvText(msg,getLang()):i18n('net.offline')}}));
   toLobbyBg();if(document.pointerLockElement)document.exitPointerLock();lobby.show();
 }
-NET.on('matched',m=>{TEAM.guns=Array.isArray(m.guns)&&m.guns.length?m.guns:null;ON.active=true;ON.seat=m.seat===1?1:0;ON.opp=m.opp||{nick:'Gracz'};ON.st=null;ON.hidden=true;ON.q=0;ON.aim=[];match.found(ON.opp.nick,m.map)});
+NET.on('matched',m=>{TEAM.guns=Array.isArray(m.guns)&&m.guns.length?m.guns:null;ON.active=true;ON.seat=m.seat===1?1:0;ON.opp=m.opp||{nick:'Gracz'};ON.st=null;ON.hidden=true;ON.q=0;ON.aim=[];ON.view=createView(DUEL_ROW);ON.fixN=0;ON.sendT=0;match.found(ON.opp.nick,m.map)});
 NET.on('go',()=>match.oppGo());
 NET.on('count',()=>match.serverCount());
-NET.on('st',m=>{if(!ON.active)return;if(Array.isArray(m.s)){ON.st=m.s;ON.hidden=false}else if(m.s===null)ON.hidden=true});
+NET.on('st',m=>{if(!ON.active)return;if(Array.isArray(m.s)){const L=performance.now()/1000,N=typeof m.N==='number'?m.N:L;ON.view.clock(N,L);ON.view.push(0,typeof m.T==='number'?m.T:N,m.s,L);ON.st=m.s;ON.hidden=false}else if(m.s===null)ON.hidden=true});   // T = chwila stanu, N = chwila wysłania (czas serwera)
 NET.on('sh',m=>{if(!ON.active||!Array.isArray(m.a)||!Array.isArray(m.b)||!match.on)return;spawnTracer(V3(...m.a),V3(...m.b));sndFar()});
 // obrażenia i trafienia liczy serwer: tu tylko pokazujemy wynik
 NET.on('dmg',m=>{if(!ON.active)return;const hp=Math.max(0,Math.min(100,+m.hp||0));setHp(hp);
   const el=$('dmg');el.style.boxShadow='inset 0 0 140px rgba(255,0,0,.6)';clearTimeout(el._t);el._t=setTimeout(()=>el.style.boxShadow='',140);
   if(hp<=0&&match.on&&!player.dead){player.dead=true;gun.firing=false;adsHeld=false;document.body.classList.add('mt-dead')}});
 NET.on('hc',m=>{if(!ON.active)return;if(duel.bot)duel.bot.flash=.12;hitFeedback(!!m.h,!!m.k);if(duel.bot&&m.d)showDamage(duel.bot.root.position,m.d,!!m.h,!!m.k,duel.bot)});
-NET.on('fix',m=>{if(!ON.active||!Array.isArray(m.p))return;player.pos.set(+m.p[0],+m.p[1],+m.p[2]);player.vel.set(0,0,0)});   // serwer cofa niedozwolony ruch
+NET.on('fix',m=>{if(!ON.active||!Array.isArray(m.p))return;if(m.n>ON.fixN)ON.fixN=m.n;player.pos.set(+m.p[0],+m.p[1],+m.p[2]);player.vel.set(0,0,0)});   // serwer cofa niedozwolony ruch; numer wraca w paczkach ruchu (f)
 NET.on('pi',m=>NET.send({t:'po',s:m.s}));                    // pomiar opóźnienia (kompensacja przy trafieniach)
 NET.on('round',m=>{if(!ON.active)return;const w=m.winner===ON.seat?'me':'op';if(w==='me'&&duel.bot){duel.bot.dead=99;duel.bot.fall=0}match.kill(w)});
 NET.on('end',m=>{if(!ON.active)return;ON.active=false;if((m.reason==='left'||m.reason==='cheat')&&m.winner===ON.seat)match.oppLeft();NET.close();restoreOppSkin()});
