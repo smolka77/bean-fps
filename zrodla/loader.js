@@ -41,10 +41,17 @@ function nextTip() {
   const list = TIPS[lang()]; tipI = (tipI + 1) % list.length;
   el.classList.remove('in'); void el.offsetWidth; el.textContent = list[tipI]; el.classList.add('in');
 }
+// pasek jedzie przejściem CSS po transform (animacja kompozytora): porusza się płynnie także wtedy, gdy główny wątek
+// jest zajęty wczytywaniem map i kompilacją shaderów (dawniej szerokość ustawiana co klatkę z JS stała w miejscu)
+let barV = -1;
+function bar(v, instant) {
+  const fill = $('ld-fill'); if (!fill || (v === barV && !instant)) return; barV = v;
+  if (instant) { fill.style.transition = 'none'; fill.style.transform = `scaleX(${v})`; void fill.offsetWidth; fill.style.transition = ''; }
+  else fill.style.transform = `scaleX(${v})`;
+}
 function paint() {
-  const fill = $('ld-fill'), pct = $('ld-pct');
-  if (fill) fill.style.width = (cur * 100).toFixed(1) + '%';
-  if (pct) pct.textContent = Math.round(cur * 100) + '%';
+  bar(Math.max(target, cur));                     // przy przejęciu paska z animacji startowej: nie cofa się
+  const pct = $('ld-pct'); if (pct) pct.textContent = Math.round(cur * 100) + '%';
 }
 function loop(ts) {
   raf = 0;
@@ -60,7 +67,7 @@ function takeOverBoot(root) {           // ekran startowy: pasek pełzał animac
   const fill = $('ld-fill');
   if (root.classList.contains('boot') && fill) {
     const w = fill.getBoundingClientRect().width, tw = fill.parentElement.getBoundingClientRect().width;
-    cur = tw ? Math.min(.95, w / tw) : 0; root.classList.remove('boot'); paint();
+    cur = tw ? Math.min(.95, w / tw) : 0; bar(cur, true); root.classList.remove('boot'); paint();
   }
 }
 
@@ -74,7 +81,7 @@ export const loader = {
     const bg = $('ld-bg'); bg.style.background = o.bg ? o.bg + ' center/cover no-repeat' : ''; bg.classList.toggle('on', !!o.bg);
     const lb = $('ld-label'); if (o.label) { lb.textContent = o.label; lb.dataset.custom = '1'; } else delete lb.dataset.custom;
     root.classList.remove('done');
-    cur = 0; target = .05; paint(); words(); tipT = 0; nextTip();
+    cur = 0; target = .05; bar(0, true); paint(); words(); tipT = 0; nextTip();
     shown = true; run();
   },
   set(p, label) {

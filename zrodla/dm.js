@@ -267,8 +267,9 @@ export function createDM(ctx) {
       scene.add(g);
       let i = 0; for (const p of S.players.values()) { saved.push([p.root, p.root.visible, p.root.position.clone()]); p.root.visible = true; p.root.position.copy(g.position).addScaledVector(fwd, 1 + (i++ % 4) * 0.5); }
       scene.updateMatrixWorld(true);
-      const rt = new THREE.WebGLRenderTarget(64, 64), prev = renderer.getRenderTarget();
-      renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.setRenderTarget(prev); rt.dispose();
+      // rysunek na ekran (nie do tekstury: tekstura ma inną przestrzeń barw = osobny komplet shaderów kompilowany w tej chwili),
+      // przycięty nożycami do 1 piksela – te same shadery co w grze (gotowe od ekranu wczytywania), siatki i tekstury idą na kartę
+      const sc = renderer.getScissorTest(); renderer.setScissorTest(true); renderer.setScissor(0, 0, 1, 1); renderer.render(scene, camera); renderer.setScissorTest(sc);
     } catch (e) { console.warn('[dm] rozgrzewka', e); }
     scene.remove(g);
     for (const [r, v, p] of saved) { r.visible = v; r.position.copy(p); }

@@ -17,6 +17,137 @@ const EPS_COPLANAR = 0.0003;   // poniżej tego odstępu płaszczyzny traktujemy
 // ?nakladki=0 w adresie wyłącza naprawę (porównanie przed/po)
 export const NAKLADKI = !/[?&]nakladki=0\b/.test(globalThis.location?.search || '');
 
+// ---------- kroki 2–3 jako samodzielna funkcja: bez odwołań do reszty modułu, więc może działać w Web Workerze ----------
+// (tablice N, D, P, A są liczbami podwójnej precyzji – w Workerze jako Float64Array – więc wynik jest identyczny jak w wątku głównym)
+async function solve(N, D, P, A, FIX, n, gap, minA, maxLevel, EPS, pause) {
+  // ---------- 2. kubełki płaszczyzn i przegląd przedziałami ----------
+  const S = new Int8Array(n), CN = new Float32Array(n * 3), CD = new Float64Array(n), B = new Map(), q = (x) => Math.round(x * 40);
+  for (let i = 0; i < n; i++) {
+    let x = N[i * 3], y = N[i * 3 + 1], z = N[i * 3 + 2], d = D[i], s = 1;
+    if (x < -1e-6 || (Math.abs(x) <= 1e-6 && (y < -1e-6 || (Math.abs(y) <= 1e-6 && z < 0)))) { x = -x; y = -y; z = -z; d = -d; s = -1; }
+    S[i] = s; CN[i * 3] = x; CN[i * 3 + 1] = y; CN[i * 3 + 2] = z; CD[i] = d;
+    const nk = ((q(x) + 40) * 81 + q(y) + 40) * 81 + q(z) + 40, dk = Math.floor(d / 0.05);   // kierunek normalnej jako liczba (szybciej niż napis)
+    let m = B.get(nk); if (!m) B.set(nk, (m = new Map())); let l = m.get(dk); if (!l) m.set(dk, (l = [])); l.push(i);
+  }
+  const PP = new Float64Array(n * 6), BB = new Float64Array(n * 4);
+  const polyArea = (poly) => { let s = 0; for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; s += a[0] * b[1] - a[1] * b[0]; } return Math.abs(s) / 2; };
+  const overlap = (i, j) => {          // pole części wspólnej dwóch trójkątów w płaszczyźnie (obcinanie Sutherland–Hodgman)
+    let out = [[PP[i * 6], PP[i * 6 + 1]], [PP[i * 6 + 2], PP[i * 6 + 3]], [PP[i * 6 + 4], PP[i * 6 + 5]]];
+    const c = [[PP[j * 6], PP[j * 6 + 1]], [PP[j * 6 + 2], PP[j * 6 + 3]], [PP[j * 6 + 4], PP[j * 6 + 5]]];
+    const cw = ((c[1][0] - c[0][0]) * (c[2][1] - c[0][1]) - (c[1][1] - c[0][1]) * (c[2][0] - c[0][0])) < 0;
+    for (let e = 0; e < 3 && out.length; e++) {
+      const ea = c[e], eb = c[(e + 1) % 3], inp = out; out = [];
+      const side = (p) => { const v = (eb[0] - ea[0]) * (p[1] - ea[1]) - (eb[1] - ea[1]) * (p[0] - ea[0]); return cw ? -v : v; };
+      for (let k = 0; k < inp.length; k++) {
+        const pc = inp[k], pp = inp[(k + inp.length - 1) % inp.length], sc = side(pc), sp = side(pp);
+        if (sc >= 0) { if (sp < 0) { const t = sp / (sp - sc); out.push([pp[0] + (pc[0] - pp[0]) * t, pp[1] + (pc[1] - pp[1]) * t]); } out.push(pc); }
+        else if (sp >= 0) { const t = sp / (sp - sc); out.push([pp[0] + (pc[0] - pp[0]) * t, pp[1] + (pc[1] - pp[1]) * t]); }
+      }
+    }
+    return out.length > 2 ? polyArea(out) : 0;
+  };
+  const edges = [], removed = new Uint8Array(n);
+  let steps = 0, pairs = 0;
+  for (const [nk, m] of B) {
+    const x = (Math.floor(nk / 6561) - 40) / 40, y = (Math.floor(nk / 81) % 81 - 40) / 40, z = (nk % 81 - 40) / 40, nl = Math.hypot(x, y, z) || 1, nn = [x / nl, y / nl, z / nl];
+    const u = Math.abs(nn[0]) < 0.9 ? [0, nn[2], -nn[1]] : [-nn[2], 0, nn[0]], ul = Math.hypot(...u); u[0] /= ul; u[1] /= ul; u[2] /= ul;
+    const w = [nn[1] * u[2] - nn[2] * u[1], nn[2] * u[0] - nn[0] * u[2], nn[0] * u[1] - nn[1] * u[0]];
+    const project = (i) => {
+      for (let j = 0; j < 3; j++) {
+        const px = P[i * 9 + j * 3], py = P[i * 9 + j * 3 + 1], pz = P[i * 9 + j * 3 + 2];
+        PP[i * 6 + j * 2] = px * u[0] + py * u[1] + pz * u[2]; PP[i * 6 + j * 2 + 1] = px * w[0] + py * w[1] + pz * w[2];
+      }
+      BB[i * 4] = Math.min(PP[i * 6], PP[i * 6 + 2], PP[i * 6 + 4]); BB[i * 4 + 1] = Math.max(PP[i * 6], PP[i * 6 + 2], PP[i * 6 + 4]);
+      BB[i * 4 + 2] = Math.min(PP[i * 6 + 1], PP[i * 6 + 3], PP[i * 6 + 5]); BB[i * 4 + 3] = Math.max(PP[i * 6 + 1], PP[i * 6 + 3], PP[i * 6 + 5]);
+    };
+    for (const [dk, l] of m) {
+      const all = l.concat(m.get(dk + 1) || []), na = all.length, nl0 = l.length; for (const i of all) project(i);
+      // prostokąty w układzie płaszczyzny w tablicach lokalnych (indeks w all), bez podwójnego odwołania all[k] -> BB
+      const X0 = new Float64Array(na), X1 = new Float64Array(na), Y0 = new Float64Array(na), Y1 = new Float64Array(na);
+      for (let k = 0; k < na; k++) { const b = all[k] * 4; X0[k] = BB[b]; X1[k] = BB[b + 1]; Y0[k] = BB[b + 2]; Y1[k] = BB[b + 3]; }
+      const order = all.map((_, k) => k).sort((a, b) => X0[a] - X0[b]);
+      const active = [];
+      for (const ka of order) {
+        const i = all[ka], xa = X0[ka], ya0 = Y0[ka], ya1 = Y1[ka], nextA = ka >= nl0, si = S[i];
+        // jedno przejście po aktywnych: wygasłe (koniec w X przed początkiem i) wypadają, kolejność pozostałych bez zmian
+        // (te same pary w tej samej kolejności co dawniej, tylko bez splice w pętli)
+        let w = 0;
+        for (let r = 0; r < active.length; r++) {
+          const kb = active[r]; if (X1[kb] < xa) continue;
+          active[w++] = kb;
+          if (nextA && kb >= nl0) continue;                              // ta para zostanie sprawdzona w następnym kubełku
+          const j = all[kb];
+          if (si !== S[j] || Y0[kb] > ya1 || Y1[kb] < ya0) continue;
+          const dd = (CD[i] - CD[j]) * S[i];                             // > 0: i leży przed j (patrząc od strony frontu)
+          if (Math.abs(dd) > gap) continue;
+          if (Math.abs(CN[i * 3] * CN[j * 3] + CN[i * 3 + 1] * CN[j * 3 + 1] + CN[i * 3 + 2] * CN[j * 3 + 2]) < 0.9995) continue;
+          const ov = overlap(i, j); if (ov < minA) continue;
+          pairs++;
+          if (Math.abs(dd) <= EPS && ov > 0.98 * Math.max(A[i], A[j])) {   // ten sam trójkąt dwa razy: zostaje jeden
+            const r = FIX[j] ? j : FIX[i] ? i : -1; if (r >= 0) removed[r] = 1; continue;
+          }
+          let top, bot;
+          if (Math.abs(dd) > EPS) { top = dd > 0 ? i : j; bot = top === i ? j : i; }
+          else { top = A[i] < A[j] || (A[i] === A[j] && i > j) ? i : j; bot = top === i ? j : i; }
+          edges.push(top, bot);
+        }
+        active.length = w; active.push(ka);
+        if (++steps % 25000 === 0 && pause) await pause();
+      }
+    }
+  }
+
+  // ---------- 3. poziomy (warstwa na warstwie: każda wyższa dostaje mocniejsze przesunięcie) ----------
+  const level = new Uint8Array(n);
+  for (let pass = 0; pass < maxLevel; pass++) {
+    let changed = false;
+    for (let e = 0; e < edges.length; e += 2) {
+      const t = edges[e], b = edges[e + 1], want = Math.min(maxLevel, level[b] + 1);
+      if (!removed[b] && level[t] < want) { level[t] = want; changed = true; }
+    }
+    if (!changed) break;
+  }
+  return { removed, level, pairs };
+}
+// Liczenie w tle: pula Web Workerów (kod z funkcji solve, bez osobnego pliku). Główny wątek w tym czasie wczytuje kolejne mapy,
+// a ekran wczytywania się nie zacina. Gdy Workera nie da się uruchomić, liczy się jak dawniej – w wątku głównym z przerwami.
+const POOL = { list: [], free: [], queue: [], url: null, off: false, idleT: 0 };
+function poolRun(job, transfer) {
+  return new Promise((ok, no) => {
+    POOL.queue.push({ job, transfer, ok, no }); clearTimeout(POOL.idleT);
+    const max = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 4) - 1));
+    while (POOL.queue.length) {
+      let w = POOL.free.pop();
+      if (!w && POOL.list.length < max) {
+        POOL.url = POOL.url || URL.createObjectURL(new Blob([`const solve=(${solve.toString()});onmessage=async e=>{const j=e.data;try{const r=await solve(j.N,j.D,j.P,j.A,j.FIX,j.n,j.gap,j.minA,j.maxLevel,j.EPS,null);postMessage({r},[r.removed.buffer,r.level.buffer])}catch(err){postMessage({err:String(err)})}}`], { type: 'text/javascript' }));
+        w = new Worker(POOL.url); POOL.list.push(w);
+      }
+      if (!w) break;                                  // wszystkie zajęte: zadanie czeka w kolejce
+      poolNext(w);
+    }
+  });
+}
+function poolNext(w) {
+  const t = POOL.queue.shift(); if (!t) return false;
+  w.onmessage = (e) => { if (e.data.err) t.no(new Error(e.data.err)); else t.ok(e.data.r); if (!poolNext(w)) { POOL.free.push(w); poolIdle(); } };
+  w.onerror = (e) => { e.preventDefault(); t.no(new Error(e.message || 'Worker')); POOL.list = POOL.list.filter((x) => x !== w); w.terminate();
+    if (!POOL.list.length) for (const q of POOL.queue.splice(0)) q.no(new Error('Worker')); };   // bez Workerów: czekające zadania liczą się w wątku głównym
+  w.postMessage(t.job, t.transfer); return true;
+}
+function poolIdle() {                 // po wczytaniu map Workery nie są już potrzebne
+  clearTimeout(POOL.idleT);
+  POOL.idleT = setTimeout(() => { if (POOL.queue.length || POOL.free.length < POOL.list.length) return; for (const w of POOL.list) w.terminate(); POOL.list = []; POOL.free = []; }, 4000);
+}
+async function solveBg(N, D, P, A, FIX, n, gap, minA, maxLevel) {
+  if (!POOL.off && typeof Worker === 'function' && typeof Blob === 'function') {
+    try {
+      const job = { N: Float64Array.from(N), D: Float64Array.from(D), P: Float64Array.from(P), A: Float64Array.from(A), FIX: Uint8Array.from(FIX), n, gap, minA, maxLevel, EPS: EPS_COPLANAR };
+      return await poolRun(job, [job.N.buffer, job.D.buffer, job.P.buffer, job.A.buffer, job.FIX.buffer]);
+    } catch (e) { POOL.off = true; console.warn('Nakładki: liczę w wątku głównym', e && e.message); }
+  }
+  return solve(N, D, P, A, FIX, n, gap, minA, maxLevel, EPS_COPLANAR, () => new Promise((r) => setTimeout(r, 0)));
+}
+
 // skip: obiekty (np. postać w lobby), których siatek nie ruszamy
 export async function naprawNakladki(THREE, root, { gap = 0.02, minA = 0.0004, minTri = 0.00005, maxLevel = 4, skip = [], merge = true } = {}) {
   const t0 = performance.now();
@@ -60,88 +191,7 @@ export async function naprawNakladki(THREE, root, { gap = 0.02, minA = 0.0004, m
   });
   const n = D.length; if (!n) return { pairs: 0, moved: 0, removed: 0, ms: 0 };
 
-  // ---------- 2. kubełki płaszczyzn i przegląd przedziałami ----------
-  const S = new Int8Array(n), CN = new Float32Array(n * 3), CD = new Float64Array(n), B = new Map(), q = (x) => Math.round(x * 40);
-  for (let i = 0; i < n; i++) {
-    let x = N[i * 3], y = N[i * 3 + 1], z = N[i * 3 + 2], d = D[i], s = 1;
-    if (x < -1e-6 || (Math.abs(x) <= 1e-6 && (y < -1e-6 || (Math.abs(y) <= 1e-6 && z < 0)))) { x = -x; y = -y; z = -z; d = -d; s = -1; }
-    S[i] = s; CN[i * 3] = x; CN[i * 3 + 1] = y; CN[i * 3 + 2] = z; CD[i] = d;
-    const nk = q(x) + ',' + q(y) + ',' + q(z), dk = Math.floor(d / 0.05);
-    let m = B.get(nk); if (!m) B.set(nk, (m = new Map())); let l = m.get(dk); if (!l) m.set(dk, (l = [])); l.push(i);
-  }
-  const PP = new Float64Array(n * 6), BB = new Float64Array(n * 4);
-  const polyArea = (poly) => { let s = 0; for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; s += a[0] * b[1] - a[1] * b[0]; } return Math.abs(s) / 2; };
-  const overlap = (i, j) => {          // pole części wspólnej dwóch trójkątów w płaszczyźnie (obcinanie Sutherland–Hodgman)
-    let out = [[PP[i * 6], PP[i * 6 + 1]], [PP[i * 6 + 2], PP[i * 6 + 3]], [PP[i * 6 + 4], PP[i * 6 + 5]]];
-    const c = [[PP[j * 6], PP[j * 6 + 1]], [PP[j * 6 + 2], PP[j * 6 + 3]], [PP[j * 6 + 4], PP[j * 6 + 5]]];
-    const cw = ((c[1][0] - c[0][0]) * (c[2][1] - c[0][1]) - (c[1][1] - c[0][1]) * (c[2][0] - c[0][0])) < 0;
-    for (let e = 0; e < 3 && out.length; e++) {
-      const ea = c[e], eb = c[(e + 1) % 3], inp = out; out = [];
-      const side = (p) => { const v = (eb[0] - ea[0]) * (p[1] - ea[1]) - (eb[1] - ea[1]) * (p[0] - ea[0]); return cw ? -v : v; };
-      for (let k = 0; k < inp.length; k++) {
-        const pc = inp[k], pp = inp[(k + inp.length - 1) % inp.length], sc = side(pc), sp = side(pp);
-        if (sc >= 0) { if (sp < 0) { const t = sp / (sp - sc); out.push([pp[0] + (pc[0] - pp[0]) * t, pp[1] + (pc[1] - pp[1]) * t]); } out.push(pc); }
-        else if (sp >= 0) { const t = sp / (sp - sc); out.push([pp[0] + (pc[0] - pp[0]) * t, pp[1] + (pc[1] - pp[1]) * t]); }
-      }
-    }
-    return out.length > 2 ? polyArea(out) : 0;
-  };
-  const edges = [], removed = new Uint8Array(n);
-  let steps = 0, pairs = 0;
-  const pause = () => new Promise((r) => setTimeout(r, 0));
-  for (const [nk, m] of B) {
-    const [x, y, z] = nk.split(',').map((v) => v / 40), nl = Math.hypot(x, y, z) || 1, nn = [x / nl, y / nl, z / nl];
-    const u = Math.abs(nn[0]) < 0.9 ? [0, nn[2], -nn[1]] : [-nn[2], 0, nn[0]], ul = Math.hypot(...u); u[0] /= ul; u[1] /= ul; u[2] /= ul;
-    const w = [nn[1] * u[2] - nn[2] * u[1], nn[2] * u[0] - nn[0] * u[2], nn[0] * u[1] - nn[1] * u[0]];
-    const project = (i) => {
-      for (let j = 0; j < 3; j++) {
-        const px = P[i * 9 + j * 3], py = P[i * 9 + j * 3 + 1], pz = P[i * 9 + j * 3 + 2];
-        PP[i * 6 + j * 2] = px * u[0] + py * u[1] + pz * u[2]; PP[i * 6 + j * 2 + 1] = px * w[0] + py * w[1] + pz * w[2];
-      }
-      BB[i * 4] = Math.min(PP[i * 6], PP[i * 6 + 2], PP[i * 6 + 4]); BB[i * 4 + 1] = Math.max(PP[i * 6], PP[i * 6 + 2], PP[i * 6 + 4]);
-      BB[i * 4 + 2] = Math.min(PP[i * 6 + 1], PP[i * 6 + 3], PP[i * 6 + 5]); BB[i * 4 + 3] = Math.max(PP[i * 6 + 1], PP[i * 6 + 3], PP[i * 6 + 5]);
-    };
-    for (const [dk, l] of m) {
-      const all = l.concat(m.get(dk + 1) || []); for (const i of all) project(i);
-      const nextBucket = new Uint8Array(all.length); for (let k = l.length; k < all.length; k++) nextBucket[k] = 1;
-      const order = all.map((_, k) => k).sort((a, b) => BB[all[a] * 4] - BB[all[b] * 4]);
-      const active = [];
-      for (const ka of order) {
-        const i = all[ka];
-        for (let z2 = active.length - 1; z2 >= 0; z2--) if (BB[all[active[z2]] * 4 + 1] < BB[i * 4]) active.splice(z2, 1);
-        for (const kb of active) {
-          if (nextBucket[ka] && nextBucket[kb]) continue;               // ta para zostanie sprawdzona w następnym kubełku
-          const j = all[kb];
-          if (S[i] !== S[j] || BB[j * 4 + 2] > BB[i * 4 + 3] || BB[j * 4 + 3] < BB[i * 4 + 2]) continue;
-          const dd = (CD[i] - CD[j]) * S[i];                             // > 0: i leży przed j (patrząc od strony frontu)
-          if (Math.abs(dd) > gap) continue;
-          if (Math.abs(CN[i * 3] * CN[j * 3] + CN[i * 3 + 1] * CN[j * 3 + 1] + CN[i * 3 + 2] * CN[j * 3 + 2]) < 0.9995) continue;
-          const ov = overlap(i, j); if (ov < minA) continue;
-          pairs++;
-          if (Math.abs(dd) <= EPS_COPLANAR && ov > 0.98 * Math.max(A[i], A[j])) {   // ten sam trójkąt dwa razy: zostaje jeden
-            const r = FIX[j] ? j : FIX[i] ? i : -1; if (r >= 0) removed[r] = 1; continue;
-          }
-          let top, bot;
-          if (Math.abs(dd) > EPS_COPLANAR) { top = dd > 0 ? i : j; bot = top === i ? j : i; }
-          else { top = A[i] < A[j] || (A[i] === A[j] && i > j) ? i : j; bot = top === i ? j : i; }
-          edges.push(top, bot);
-        }
-        active.push(ka);
-        if (++steps % 25000 === 0) await pause();
-      }
-    }
-  }
-
-  // ---------- 3. poziomy (warstwa na warstwie: każda wyższa dostaje mocniejsze przesunięcie) ----------
-  const level = new Uint8Array(n);
-  for (let pass = 0; pass < maxLevel; pass++) {
-    let changed = false;
-    for (let e = 0; e < edges.length; e += 2) {
-      const t = edges[e], b = edges[e + 1], want = Math.min(maxLevel, level[b] + 1);
-      if (!removed[b] && level[t] < want) { level[t] = want; changed = true; }
-    }
-    if (!changed) break;
-  }
+  const { removed, level, pairs } = await solveBg(N, D, P, A, FIX, n, gap, minA, maxLevel);
 
   // ---------- 4. przeniesienie wierzchnich trójkątów do siatek z polygonOffset ----------
   const perMesh = new Map();
