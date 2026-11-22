@@ -536,8 +536,9 @@ function themeYachts(M, root) {
   });
 
   // ---- morze ----
-  const water = makeWater({ y: WL, color: '#1d5a9a', rough: 0.22, metal: 0.35, env: sky, envI: 0.95, amp: 0.13, freq: 0.16, speed: 0.9 });
+  const water = makeWater({ y: WL, seg: 110, color: '#1d5a9a', rough: 0.22, metal: 0.35, env: sky, envI: 0.95, amp: 0.13, freq: 0.16, speed: 0.9 });   // 110 segmentów: fale długie, fasetki prawie te same, ~20 tys. trójkątów mniej
   root.add(water.mesh);
+  water.mesh.renderOrder = 1;                             // morze po jachtach: piksele zasłonięte pokładem i salonem odrzuca test głębi (było rysowane pierwsze)
   const K = new Kit();
   // piana wzdłuż kadłubów (biały postrzępiony pas przy linii wody) i przy motorówce
   const foam = (pts, w) => {
