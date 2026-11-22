@@ -7,7 +7,13 @@ export { weaponAudio };
 
 // kolejność = indeksy w paczkach sieciowych (serwer: serwer/dm.mjs WIDS, pierwsze cztery także serwer/mecz.mjs)
 export const WEAPON_IDS = ['akm', 'm4a1', 'glock17', 'deagle', 'spas12', 'mp5k', 'akmgold', 'p90'];
-export const PISTOL_ID = 'glock17';                  // pistolet startowy (Deathmatch)
+export const PISTOL_ID = 'glock17';
+// Jedno światło błysku wylotu dla całej gry (dodawane do sceny raz, zawsze widoczne, jasność 0 poza strzałem).
+// Wcześniej każda broń z efektami miała własny PointLight: gdy broń z 1. osoby znikała (śmierć, ekran śmierci w Deathmatchu,
+// zmiana broni), liczba świateł w scenie spadała 1 -> 0 i three.js kompilował od nowa shadery WSZYSTKICH materiałów (mapy, postaci,
+// cieni) – zamrożenia gry na 1–2,5 s. Stała liczba świateł = shadery z rozgrzewki zawsze pasują.
+export const MUZZLE_LIGHT = new THREE.PointLight(0xffb45a, 0, 5, 2);
+MUZZLE_LIGHT.layers.enable(0); MUZZLE_LIGHT.layers.enable(1);   // oświetla świat (przebieg 1) i broń z 1. osoby (przebieg 2)                  // pistolet startowy (Deathmatch)
 
 // Statystyki. recoil.pitch/yaw w radianach na strzał, spread w radianach (połowa kąta stożka). snd = klucz próbek w _audio.js.
 export const WEAPON_STATS = {
@@ -112,8 +118,8 @@ export function createWeapon(id, { fx = true } = {}) {
     const side = new THREE.Mesh(new THREE.PlaneGeometry(s * .8, s * 1.9), mat); side.rotation.x = Math.PI / 2; side.position.z = -s * .55; flash.add(side);
     const side2 = side.clone(); side2.rotation.y = Math.PI / 2; flash.add(side2);
     flash.position.copy(A.muzzle).add(new THREE.Vector3(0, 0, -s * .3)); flash.visible = false; m.group.add(flash);
-    const light = new THREE.PointLight(0xffb45a, 0, 5, 2); light.position.copy(A.muzzle).add(new THREE.Vector3(0, 0, -.08)); m.group.add(light);
-    inst.flash = flash; inst.flashLight = light;
+    inst.flash = flash; inst.flashLight = MUZZLE_LIGHT;                                   // wspólne światło (patrz MUZZLE_LIGHT)
+    inst.flashLightPos = A.muzzle.clone().add(new THREE.Vector3(0, 0, -.08));            // gdzie je postawić przy strzale (układ broni)
   }
   group.userData.weapon = inst;
   return inst;

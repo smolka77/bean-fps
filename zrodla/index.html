@@ -282,9 +282,9 @@ import {createView,DUEL_ROW,SEND_EVERY} from './interp.js';   // obraz zdalnego 
 import {createRange} from './range.js';
 import {createDM} from './dm.js';            // tryb Deathmatch (stałe lobby do 20 graczy): HUD, ekran śmierci, broń za zabójstwa
 import {createCombatFx} from './ragdoll.js';   // reakcja na trafienie, upadek po śmierci (fizyka z kolizją mapy), krople
-import {WEAPON_IDS,WEAPON_STATS,PISTOL_ID,weaponAllowed,loadWeaponModels,createWeapon,applyParts,reloadPose,drawPose,magGrabPoint,pouchPoint,createShells,weaponSound,weaponSfx,weaponAudio,cyclePose,EJECT_AT} from './weaponry.js';
+import {MUZZLE_LIGHT,WEAPON_IDS,WEAPON_STATS,PISTOL_ID,weaponAllowed,loadWeaponModels,createWeapon,applyParts,reloadPose,drawPose,magGrabPoint,pouchPoint,createShells,weaponSound,weaponSfx,weaponAudio,cyclePose,EJECT_AT} from './weaponry.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
-import {applyWeaponSkin,mySkin as myWSkin,mySkins,skinFor} from './weapon-skins.js';
+import {applyWeaponSkin,mySkin as myWSkin,mySkins,skinFor,WSKINS} from './weapon-skins.js';
 import {gunEnvironment} from './weapons/_env.js';   // odbicia dla broni w widoku z pierwszej osoby
 import {TIMELINES,ANCHORS,SETTLE,prepareTimeline,newInspectState,evalInspect,evalLeft} from './inspect.js';
 const weaponsLoading=loadWeaponModels();
@@ -684,6 +684,7 @@ const meHolder=new THREE.Group();me.userData.torso.add(meHolder);               
 meHolder.position.copy(HOLDER_PIVOT);
 // widok z pierwszej osoby: viewmodel przypięty do kamery + własne ręce fasolki
 const viewModel=new THREE.Group();camera.add(viewModel);
+scene.add(MUZZLE_LIGHT);   // jedno stałe światło błysku (weaponry.js): liczba świateł w scenie nigdy się nie zmienia
 const fpsSkin=new THREE.MeshStandardMaterial({color:ME_COLOR,roughness:.55});
 const fpsArmR=makeArm(armR,fpsSkin,true),fpsArmL=makeArm(armL,fpsSkin,true);
 viewModel.add(fpsArmR,fpsArmL);
@@ -1117,7 +1118,7 @@ function fireShot(){
   if(DMX&&DMX.active)DMX.shot(_o,_aim);
   if(st.pump||st.bolt){inst.cycleT=0;inst.cycleDur=Math.max(.3,60/st.rpm*.7)}   // pompka / zamek po strzale
   // efekty broni: płomień, zamek, łuska, odrzut
-  if(inst.flash){inst.flash.visible=true;inst.flash.rotation.z=rnd()*6.28;inst.flash.scale.setScalar(.75+rnd()*.5);inst.flashLight.intensity=inst.suppressed?.4:3.4*inst.flashScale;gun.flashT=.042}
+  if(inst.flash){inst.flash.visible=true;inst.flash.rotation.z=rnd()*6.28;inst.flash.scale.setScalar(.75+rnd()*.5);inst.group.updateWorldMatrix(true,false);inst.flashLight.position.copy(inst.flashLightPos);inst.group.localToWorld(inst.flashLight.position);inst.flashLight.intensity=inst.suppressed?.4:3.4*inst.flashScale;gun.flashT=.042}
   gun.slideT=.075;if(w.mag===0&&inst.pistol)inst.slideLocked=true;
   if(!(st.pump||st.bolt))shells.spawn(inst,rnd,0);   // pompka / zamek: łuska wylatuje dopiero w tylnym położeniu (stepGun)
   gun.kick.z+=st.recoil.kick*(ads?.5:1);gun.kick.y+=st.recoil.kick*.25*(ads?.5:1);gun.kickRot+=st.recoil.rot*(ads?.55:1);
@@ -1592,10 +1593,12 @@ function updateCamera(dt){
     }
   }
 }
-function updateFatigue(){const f=player.fatigue;$('fatigue').style.opacity=f>.03?1:0;$('fatbar').style.width=(f*100)+'%';$('fatbar').style.background=f>.7?'#ff5a4d':'#ffb347'}
+// HUD odświeżany co klatkę: zapis do stylu tylko przy zmianie (każdy zapis = przeliczenie stylów strony)
+const HUDV={};const hudSet=(k,v,fn)=>{if(HUDV[k]!==v){HUDV[k]=v;fn(v)}};
+function updateFatigue(){const f=player.fatigue;hudSet('fo',f>.03?1:0,v=>$('fatigue').style.opacity=v);hudSet('fw',Math.round(f*200)/2,v=>$('fatbar').style.width=v+'%');hudSet('fb',f>.7?'#ff5a4d':'#ffb347',v=>$('fatbar').style.background=v)}
 function updateCross(){updateFatigue();
   const g=(6+gun.spread*26+player.speed01*10+(player.onGround?0:10))*(1-player.crouch*.3)*(.55+.45*WEAPON_STATS[inv[curW].id].spread.hip/.0065);
-  $('cross').style.setProperty('--g',g+'px');$('cross').classList.toggle('ads',player.ads>.6&&player.view==='fps');
+  hudSet('cg',Math.round(g*2)/2,v=>$('cross').style.setProperty('--g',v+'px'));hudSet('ca',player.ads>.6&&player.view==='fps',v=>$('cross').classList.toggle('ads',v));
 }
 const OVL=$('overlay');
 const live=()=>playing||(OVL.style.display!=='none'&&!duel.mapBanner&&!document.body.classList.contains('in-lobby'));   // gra trwa (też przy menu pod Esc)
@@ -1646,7 +1649,8 @@ function renderGame(){
     const env=scene.environment,ei=scene.environmentIntensity;_gunER.copy(scene.environmentRotation);
     scene.environment=GUN_ENV;scene.environmentIntensity=Math.min(1.15,Math.max(.4,ei/.38))*.95;scene.environmentRotation.set(0,player.yaw,0);
     renderer.autoClear=false;renderer.clearDepth();const au=renderer.shadowMap.autoUpdate;renderer.shadowMap.autoUpdate=false;
-    renderer.render(scene,vmCam);renderer.shadowMap.autoUpdate=au;renderer.autoClear=true;scene.background=bg;
+    const mwa=scene.matrixWorldAutoUpdate;scene.matrixWorldAutoUpdate=false;   // macierze świata policzył już pierwszy przebieg – drugi raz to czysta strata czasu
+    renderer.render(scene,vmCam);scene.matrixWorldAutoUpdate=mwa;renderer.shadowMap.autoUpdate=au;renderer.autoClear=true;scene.background=bg;
     scene.environment=env;scene.environmentIntensity=ei;scene.environmentRotation.copy(_gunER)}
 }
 setHud();
@@ -2153,8 +2157,8 @@ async function warmUp(){
   for(let i=0;i<24;i++)tracerPool.push(new THREE.Mesh(tracerGeo,tracerMat.clone()));
   for(let i=0;i<56;i++)sparkPool.push({m:new THREE.Mesh(sparkGeo,sparkMat),v:V3(),life:0});
   // zestaw rzeczy, których jeszcze nie ma w scenie: bronie w 3. osobie (bot, gracze Deathmatch), fasolka ze skinem, efekty strzału
-  const kit=new THREE.Group(),flash=new THREE.PointLight(0xffb45a,0,5,2);flash.layers.enable(1);kit.add(flash);
-  for(const id of WEAPON_IDS){const w=createWeapon(id,{fx:false});placeTP(w);kit.add(w.group)}
+  const kit=new THREE.Group(),WS_WARM=(WSKINS.find(s=>s.pat)||{}).id||'';
+  for(const id of WEAPON_IDS)for(const ws of['',WS_WARM]){const w=createWeapon(id,{fx:false});placeTP(w);if(ws)applyWeaponSkin(w,ws);kit.add(w.group)}   // bronie przeciwników: bez skina i ze skinem (jeden program dla wszystkich skinów)
   {const b=makeBean(HUES[0]);const k={id:'bot',c:HUES[0]};applySkin(b.userData.mats.skin,k);applySkin(b.userData.mats.body,k);kit.add(b)}
   kit.add(new THREE.Mesh(tracerGeo,tracerMat),new THREE.Mesh(holeGeo,holeMat));for(const c of[0,0xff8a7a])kit.add(new THREE.Mesh(sparkGeo,sparkMatFor(c)));
   const compile=(root,cam,target)=>{try{return renderer.compileAsync(root,cam,target).catch(e=>console.warn('Shadery:',e))}catch(e){console.warn('Shadery:',e);return Promise.resolve()}};
@@ -2169,7 +2173,8 @@ async function warmUp(){
   function submitGun(){                                         // broń i ręce z 1. osoby: drugi przebieg (vmCam, warstwa 1) z „studiem” odbić; po jednej broni (jedno światło płomienia)
     const env=scene.environment,ck=camera.children,vk=viewModel.children,base=vk.filter(o=>!inv.some(w=>w.inst.group===o)),ps=[];
     scene.environment=GUN_ENV;camera.children=ck.filter(o=>o!==viewModel);
-    try{for(const w of inv){const g=w.inst.group,vis=g.visible;setLayer(g,1);g.visible=true;viewModel.children=base.concat(g);ps.push(compile(viewModel,vmCam,scene));g.visible=vis}}
+    try{for(const w of inv){const g=w.inst.group,vis=g.visible,cur=g.userData.wskin||'';setLayer(g,1);g.visible=true;viewModel.children=base.concat(g);ps.push(compile(viewModel,vmCam,scene));
+      if(WS_WARM&&cur!==WS_WARM){applyWeaponSkin(w.inst,WS_WARM);ps.push(compile(viewModel,vmCam,scene));applyWeaponSkin(w.inst,cur)}g.visible=vis}}
     finally{viewModel.children=vk;camera.children=ck;scene.environment=env;setLayer(rifle.group,1)}
     return Promise.all(ps);
   }
@@ -2190,9 +2195,9 @@ async function warmUp(){
    for(const t of texs)try{renderer.initTexture(t)}catch(e){}WARM.textures=texs.size}
   // jedna klatka gry z fasolką, bronią i efektami przed kamerą: shadery cieni (głębia) i wysłanie siatek na kartę
   try{
-    kit.remove(flash);camera.getWorldDirection(V3t);kit.position.copy(camera.position).addScaledVector(V3t,4);kit.lookAt(camera.position);scene.add(kit);
+    camera.getWorldDirection(V3t);kit.position.copy(camera.position).addScaledVector(V3t,4);kit.lookAt(camera.position);scene.add(kit);
     scene.updateMatrixWorld();for(const w of inv)if(w.inst.flash)w.inst.flash.visible=true;
-    renderGame();for(const w of inv)if(w.inst.flash)w.inst.flash.visible=false;
+    renderer.shadowMap.needsUpdate=true;renderGame();for(const w of inv)if(w.inst.flash)w.inst.flash.visible=false;   // needsUpdate: shadery cieni (głębia) też w tej klatce
   }catch(e){console.warn('Rozgrzewka:',e)}
   scene.remove(kit);
   try{lobby.update(0)}catch(e){}                              // pierwsza klatka lobby jeszcze pod ekranem wczytywania

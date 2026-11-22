@@ -302,11 +302,16 @@ export function createDmUi(opts = {}) {
   const texts = () => document.querySelectorAll('[data-t]').forEach((n) => { n.textContent = tx(n.dataset.t); });
 
   let lastGun = '';
+  // zapis do DOM tylko gdy wartość się zmieniła (HUD jest odświeżany co klatkę – każdy zapis to przeliczenie stylów/układu strony)
+  const LAST = Object.create(null);
+  const txt = (k, el, v) => { if (LAST[k] !== v) { LAST[k] = v; el.textContent = v; } };
+  const cls = (k, el, c, on) => { on = !!on; if (LAST[k] !== on) { LAST[k] = on; el.classList.toggle(c, on); } };
+  const wid = (k, el, v) => { if (LAST[k] !== v) { LAST[k] = v; el.style.width = v + '%'; } };
   function setAmmo(mag, res, id, state, low, reloading) {
-    H.mag.textContent = mag; H.res.textContent = res;
-    H.ammo.classList.toggle('low', !!low); H.ammo.classList.toggle('rl', !!reloading);
+    txt('mag', H.mag, String(mag)); txt('res', H.res, String(res));
+    cls('low', H.ammo, 'low', low); cls('rl', H.ammo, 'rl', reloading);
     if (id !== lastGun) { lastGun = id; H.gun.innerHTML = gunImg(id) || `<span>${esc(opts.gunName ? opts.gunName(id) : id)}</span>`; }
-    H.st.textContent = state || '';
+    txt('st', H.st, state || '');
   }
   // postęp drabinki broni: lk zabójstw z need do następnej broni (top = ma już najlepszą)
   function setNext(lk, need, top, locked) {
@@ -319,20 +324,22 @@ export function createDmUi(opts = {}) {
     H.cash.textContent = money(v); shownMoney = v;
     if (plus > 0) { H.plus.textContent = '+' + money(plus); H.plus.classList.remove('go'); void H.plus.offsetWidth; H.plus.classList.add('go'); }
   }
-  let ghostHp = 100;
+  let ghostHp = -1;   // -1: pierwsze wywołanie zawsze ustawia paski
   function setVitals(hp, energy, armor, armorMax, helmet) {
     const w = Math.max(0, Math.min(100, hp));
-    H.hpB.style.width = w + '%'; if (w > ghostHp) H.hpS.style.width = w + '%'; ghostHp = w; requestAnimationFrame(() => { H.hpS.style.width = w + '%'; });
-    H.hpN.textContent = Math.ceil(w); H.hpRow.classList.toggle('low', w <= 25 && w > 0);
-    H.enB.style.width = Math.round(Math.max(0, Math.min(1, energy)) * 100) + '%';
+    if (w !== ghostHp) {                                   // pasek życia i jego „cień” (opóźnione zejście) tylko przy zmianie HP
+      wid('hp', H.hpB, w); if (w > ghostHp) wid('hpS', H.hpS, w); ghostHp = w; requestAnimationFrame(() => { wid('hpS', H.hpS, w); });
+    }
+    txt('hpN', H.hpN, String(Math.ceil(w))); cls('hpLow', H.hpRow, 'low', w <= 25 && w > 0);
+    wid('en', H.enB, Math.round(Math.max(0, Math.min(1, energy)) * 100));
     const a = armorMax ? Math.max(0, Math.min(1, armor / armorMax)) : 0;
-    H.arB.style.width = Math.round(a * 100) + '%'; H.arRow.classList.toggle('off', !(armor > 0)); H.arN.textContent = armor > 0 ? Math.ceil(armor) : '';
-    H.arIc.innerHTML = helmet ? IC.helmet : IC.vest;
+    wid('ar', H.arB, Math.round(a * 100)); cls('arOff', H.arRow, 'off', !(armor > 0)); txt('arN', H.arN, armor > 0 ? String(Math.ceil(armor)) : '');
+    if (LAST.helm !== !!helmet) { LAST.helm = !!helmet; H.arIc.innerHTML = helmet ? IC.helmet : IC.vest; }
   }
   // stałe lobby: bez zegara – w środku liczba graczy w lobby
   function setTimer(online, max, kills, rank, total) {
-    H.tt.textContent = online + '/' + max;
-    H.kk.textContent = kills; H.rk.textContent = rank ? rank + '/' + total : '-';
+    txt('tt', H.tt, online + '/' + max);
+    txt('kk', H.kk, String(kills)); txt('rk', H.rk, rank ? rank + '/' + total : '-');
   }
   function setWantedMe(on) { H.wme.hidden = !on; }
   // ranking: 5 pierwszych + ja (jeśli dalej)
@@ -360,7 +367,7 @@ export function createDmUi(opts = {}) {
     setTimeout(() => i.remove(), 1200);
     H.vign.style.boxShadow = 'inset 0 0 160px rgba(220,0,0,.55)'; clearTimeout(H.vign._t); H.vign._t = setTimeout(() => { H.vign.style.boxShadow = ''; }, 180);
   }
-  function setProt(sec) { H.prot.hidden = !(sec > 0); if (sec > 0) H.prot.querySelector('span').textContent = tx('protect') + ' ' + sec.toFixed(1); }
+  function setProt(sec) { const on = sec > 0; if (LAST.prot !== on) { LAST.prot = on; H.prot.hidden = !on; } if (on) { if (!H.protT) H.protT = H.prot.querySelector('span'); txt('protT', H.protT, tx('protect') + ' ' + sec.toFixed(1)); } }
 
   // ===== minimapa (obrót z graczem, jak w GTA) =====
   const MM = { base: null, scale: 5, bx: 20, bz: 30 };
@@ -379,6 +386,7 @@ export function createDmUi(opts = {}) {
   }
   const skullP = new Path2D(SKULL_PATH);
   function drawMinimap(me, foes, wanted) {
+    const tNow = performance.now(); if (tNow - (MM.t || 0) < 33) return; MM.t = tNow;   // 30 razy na sekundę wystarczy (rysowanie dużej mapy co klatkę kosztowało)
     const c = H.mm, x = c.getContext('2d'), W = c.width, Hh = c.height, S = MM.scale * 1.15;
     x.fillStyle = '#15151b'; x.fillRect(0, 0, W, Hh);
     if (!MM.base) return;

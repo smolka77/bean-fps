@@ -137,7 +137,7 @@ function skinned(base, sk) {
         totalEmissiveRadiance += wsEmit * wsMask;
         if (uPat > 11.5) { float wsRim = 1. - abs(dot(normalize(normal), normalize(vViewPosition))); totalEmissiveRadiance += wsHsv(fract(wsRim * 1.3 + uTime * .2), .6, 1.) * pow(wsRim, 2.) * uEmit * wsMask; }`);
   };
-  mat.customProgramCacheKey = () => 'wskin-' + sk.pat;
+  mat.customProgramCacheKey = () => 'wskin';   // wzór wybiera uniform uPat – jeden program dla wszystkich skinów (rozgrzany przy wczytywaniu)
   mat.userData.wskin = sk.id;
   m.set(sk.id, mat); return mat;
 }
