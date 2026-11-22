@@ -10,7 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const args = process.argv.slice(2), OFFLINE = args.includes('--offline');
+const args = process.argv.slice(2), OFFLINE = args.includes('--offline'), NOMIN = args.includes('--nominify');   // --nominify: czytelny kod (profilowanie)
 const [srcDir, outFile] = args.filter((a) => !a.startsWith('--'));
 if (!srcDir || !outFile) throw new Error('Użycie: node build_game.mjs <folder_gry> <wynik.html> [--offline]');
 const outDir = path.join(path.dirname(path.resolve(outFile)), 'gra');   // pliki gry obok strony (tylko zwykły build)
@@ -80,7 +80,7 @@ wr('lobby-ui.js', imports + '\n' + ui);
 
 // 5) bundel
 const common = {
-  entryPoints: [path.join(work, 'main.js')], bundle: true, format: 'esm', target: 'es2022', minify: true,
+  entryPoints: [path.join(work, 'main.js')], bundle: true, format: 'esm', target: 'es2022', minify: !NOMIN,
   nodePaths: [path.join(here, 'node_modules')], legalComments: 'none', logLevel: 'warning',
 };
 const bad = (js) => { for (const s of ['import(M.src)', 'cdn.jsdelivr', ...(OFFLINE ? ['import.meta.url'] : [])]) if (js.includes(s)) console.warn('UWAGA: w bundlu zostało', s); };

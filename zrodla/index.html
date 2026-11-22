@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><link rel=icon href="data:,"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>BEANLADEN</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <!-- telefon: wersja mobilna jeszcze niedostępna – ekran „Mobile version coming soon”, gra tylko na PC -->
@@ -117,9 +117,9 @@
   #ld .ld-logo{font-size:clamp(34px,4.6vw,56px);line-height:1;letter-spacing:.04em;transform:skewX(-6deg)}
   #ld .ld-logo b{font-weight:400;color:#ffc629}
   #ld .ld-bar{position:relative;width:min(280px,60vw);height:3px;background:rgba(255,255,255,.1);overflow:hidden}
-  #ld .ld-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:#ffc629}
+  #ld .ld-fill{position:absolute;left:0;top:0;bottom:0;width:100%;background:#ffc629;transform:scaleX(0);transform-origin:0 50%;will-change:transform;transition:transform .45s cubic-bezier(.2,.7,.3,1)}
   #ld.boot .ld-fill{animation:ld-creep 7s cubic-bezier(.2,.7,.3,1) forwards}
-  @keyframes ld-creep{from{width:2%}to{width:86%}}
+  @keyframes ld-creep{from{transform:scaleX(.02)}to{transform:scaleX(.86)}}   /* transform: animacja kompozytora, płynna przy zajętym wątku */
   #ld-bg,#ld .ld-title,#ld .ld-sub,#ld .ld-row,#ld .ld-tipbox{display:none}   /* elementy używane przez loader.js – w tym wyglądzie ukryte */
   @media (prefers-reduced-motion:reduce){#ld .ld-fill{animation:none!important}}
   #vlabel{left:50%;transform:translateX(-50%);top:16px;color:var(--dim);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
@@ -272,12 +272,13 @@ import {payout,t as i18n,getLang,mapName} from './lobby-ui.js';
 import {naprawNakladki,NAKLADKI} from './nakladki.js';
 import {srvText} from './wallet.js';   // komunikaty serwera w języku gry   // i18n: słownik lobby (PL/EN/RU/ES) – menu pauzy
 import {loader} from './loader.js';
+import {przyspieszPromien} from './promien.js';   // strzał: drzewo BVH dla siatek mapy (bez testu każdego trójkąta)
 import {createClimates} from './klimaty.js';   // wygląd map 1v1: Baza = salon luksusowych aut wieczorem, Oaza = bagno
 import {createMatch} from './match.js';
 import {createNet} from './net.js';
 import {createRange} from './range.js';
 import {createDM} from './dm.js';            // tryb Deathmatch (stałe lobby do 20 graczy): HUD, WASTED, broń za zabójstwa
-import {WEAPON_IDS,WEAPON_STATS,PISTOL_ID,weaponAllowed,loadWeaponModels,createWeapon,applyParts,reloadPose,drawPose,magGrabPoint,pouchPoint,createShells,weaponSound,weaponSfx,cyclePose,EJECT_AT} from './weaponry.js';
+import {WEAPON_IDS,WEAPON_STATS,PISTOL_ID,weaponAllowed,loadWeaponModels,createWeapon,applyParts,reloadPose,drawPose,magGrabPoint,pouchPoint,createShells,weaponSound,weaponSfx,weaponAudio,cyclePose,EJECT_AT} from './weaponry.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {applyWeaponSkin,mySkin as myWSkin,mySkins,skinFor} from './weapon-skins.js';
 import {gunEnvironment} from './weapons/_env.js';   // odbicia dla broni w widoku z pierwszej osoby
@@ -345,7 +346,7 @@ addBox(0,-7,3,.6,3,0xe0e0e8);addBox(0,-7,1.6,1.2,1.6,0xe0e0e8);   // schodki prz
 // ================= fasolka: rozbiór siatki na części =================
 const S=1.5/7.17;                 // skala: fasolka ma 1,5 m
 const bytes=Uint8Array.from(atob(glbB64),c=>c.charCodeAt(0));
-const gl=await new Promise((res,rej)=>new GLTFLoader().parse(bytes.buffer,'',res,rej));loader.set(.35);
+const gl=await new Promise((res,rej)=>new GLTFLoader().parse(bytes.buffer,'',res,rej));loader.set(.2);   // pasek: start do 45%, mapy i shadery (rozgrzewka) do 98%
 let srcMesh;gl.scene.updateMatrixWorld(true);gl.scene.traverse(o=>{if(o.isMesh)srcMesh=o});
 const geo=srcMesh.geometry.clone().applyMatrix4(srcMesh.matrixWorld);
 // obrót o 180° wokół Y (przód +Z -> -Z jak kamera), środek ciała w (0,*,0), stopy na y=0
@@ -645,7 +646,7 @@ function makeBean(color,opts={}){
 }
 
 // ================= broń: instancje =================
-await weaponsLoading;loader.set(.65);
+await weaponsLoading;loader.set(.35);
 // chwyt w 3. osobie (układ torsu): gdzie leży dłoń na chwycie, skręt i skala broni
 const TP_HOLD={rifle:{grip:V3(.2,.95,-.4),yaw:.32,pitch:0,scale:.8},pistol:{grip:V3(.04,1.0,-.56),yaw:0,pitch:0,scale:1.1}};
 const HOLDER_PIVOT=V3(0,1.0,-.08);              // obrót trzymacza (np. bot celuje w górę/dół) wokół klatki piersiowej
@@ -819,7 +820,9 @@ let AC=null,master=null;
 let VOL=.8;const FOV_BASE=78;   // głośność z ustawień lobby; pole widzenia stałe dla wszystkich
 let muted=false;try{muted=localStorage.getItem('beanfps-muted')==='1'}catch(e){}
 addEventListener('fasolka:settings',e=>{const d=e.detail||{};if(d.volume!=null){VOL=Math.max(0,Math.min(1,+d.volume));if(master&&!muted)master.gain.setTargetAtTime(VOL,AC.currentTime,.02)}if(+d.sens>0)SENS_K=+d.sens;if(+d.sensAds>0)SENS_ADS=+d.sensAds});   // pole widzenia: stałe (FOV_BASE)
-const initAudio=()=>{if(AC)return;try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=muted?0:VOL;master.connect(AC.destination)}catch(e){}};
+const initAudio=()=>{if(AC)return;try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=muted?0:VOL;master.connect(AC.destination);weaponAudio(AC);noise()}catch(e){}};   // od razu dekodowanie próbek broni (w tle), żeby pierwszy strzał nie grał zastępczym dźwiękiem
+// kontekst dźwięku powstaje przy pierwszym kliknięciu albo klawiszu (też w lobby) – do meczu próbki broni są już zdekodowane; nic przy tym nie gra
+{const first=()=>{removeEventListener('pointerdown',first,true);removeEventListener('keydown',first,true);initAudio()};addEventListener('pointerdown',first,true);addEventListener('keydown',first,true)}
 function setMuted(v){
   muted=v;if(master)master.gain.setTargetAtTime(v?0:VOL,AC.currentTime,.02);
   try{localStorage.setItem('beanfps-muted',v?'1':'0')}catch(e){}
@@ -865,21 +868,29 @@ function damageEnemy(e,dmg,point){
 const tracers=[];const holes=[];const sparks=[];
 const tracerMat=new THREE.MeshBasicMaterial({color:0xffe6a0,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
 const tracerGeo=new THREE.CylinderGeometry(.008,.008,1,5);tracerGeo.rotateX(Math.PI/2);tracerGeo.translate(0,0,.5);   // +Z: Mesh.lookAt kieruje oś +Z na cel – smuga od lufy do celu (było -Z, czyli do tyłu)
+// pula smug: każda ma własny materiał (osobne wygasanie), ale nic nie jest niszczone – dawniej dispose() ostatniej smugi
+// usuwał program shadera i następny strzał po przerwie kompilował go od nowa (przycięcie przy pierwszym strzale w serii)
+const tracerPool=[];
 function spawnTracer(from,to){
-  const m=new THREE.Mesh(tracerGeo,tracerMat.clone());const len=from.distanceTo(to);
+  const m=tracerPool.pop()||new THREE.Mesh(tracerGeo,tracerMat.clone());const len=from.distanceTo(to);m.material.opacity=.9;
   m.position.copy(from);m.lookAt(to);m.scale.set(1,1,Math.max(.1,len));scene.add(m);tracers.push({m,life:.07});
 }
 const holeGeo=new THREE.CircleGeometry(.045,10),holeMat=new THREE.MeshBasicMaterial({color:0x111111,transparent:true,opacity:.75,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2});
+const holePool=[];
 function spawnHole(p,n){
-  const m=new THREE.Mesh(holeGeo,holeMat);m.position.copy(p).addScaledVector(n,.006);m.lookAt(p.clone().add(n));scene.add(m);holes.push(m);
-  if(holes.length>70)scene.remove(holes.shift());
+  const m=holePool.pop()||new THREE.Mesh(holeGeo,holeMat);m.position.copy(p).addScaledVector(n,.006);m.lookAt(V3t3.copy(p).add(n));scene.add(m);holes.push(m);
+  if(holes.length>70){const o=holes.shift();scene.remove(o);holePool.push(o)}
 }
 const sparkGeo=new THREE.SphereGeometry(.012,5,4),sparkMat=new THREE.MeshBasicMaterial({color:0xffd27a,fog:false});
+// iskry: wspólny materiał na kolor (dawniej nowy materiał na każdą iskrę trafienia) i pula siatek – bez śmieci przy strzelaniu
+const sparkMats=new Map([[0,sparkMat]]),sparkPool=[];
+const sparkMatFor=c=>{let m=sparkMats.get(c||0);if(!m)sparkMats.set(c,m=new THREE.MeshBasicMaterial({color:c,fog:false}));return m};
 function spawnSparks(p,n,color){
+  const mat=sparkMatFor(color);
   for(let i=0;i<7;i++){
-    const m=new THREE.Mesh(sparkGeo,color?new THREE.MeshBasicMaterial({color,fog:false}):sparkMat);m.position.copy(p);
-    const v=n.clone().multiplyScalar(1.5+rnd()*2).add(V3(rnd()-.5,rnd()-.2,rnd()-.5).multiplyScalar(2.2));
-    scene.add(m);sparks.push({m,v,life:.35+rnd()*.2});
+    const s=sparkPool.pop()||{m:new THREE.Mesh(sparkGeo,sparkMat),v:V3(),life:0};s.m.material=mat;s.m.position.copy(p);
+    s.v.copy(n).multiplyScalar(1.5+rnd()*2).add(V3t3.set(rnd()-.5,rnd()-.2,rnd()-.5).multiplyScalar(2.2));
+    s.life=.35+rnd()*.2;scene.add(s.m);sparks.push(s);
   }
 }
 
@@ -1517,8 +1528,8 @@ function stepEnemies(dt){
   }
 }
 function updateFx(dt){
-  for(let i=tracers.length-1;i>=0;i--){const t=tracers[i];t.life-=dt;t.m.material.opacity=Math.max(0,t.life/.07)*.9;if(t.life<=0){scene.remove(t.m);t.m.material.dispose();tracers.splice(i,1)}}
-  for(let i=sparks.length-1;i>=0;i--){const s=sparks[i];s.life-=dt;s.v.y-=9*dt;s.m.position.addScaledVector(s.v,dt);if(s.life<=0){scene.remove(s.m);sparks.splice(i,1)}}
+  for(let i=tracers.length-1;i>=0;i--){const t=tracers[i];t.life-=dt;t.m.material.opacity=Math.max(0,t.life/.07)*.9;if(t.life<=0){scene.remove(t.m);tracerPool.push(t.m);tracers.splice(i,1)}}
+  for(let i=sparks.length-1;i>=0;i--){const s=sparks[i];s.life-=dt;s.v.y-=9*dt;s.m.position.addScaledVector(s.v,dt);if(s.life<=0){scene.remove(s.m);sparkPool.push(s);sparks.splice(i,1)}}
   stepDamage(dt);
 }
 const camPos=V3(),_look=V3(),_back=V3();let camInit=false,deathK=0;
@@ -1607,6 +1618,10 @@ function frame(){
   if(window.__frameHook)window.__frameHook(dt);          // testy: odczyt pozy broni po każdej klatce
   updateCamera(dt);updateFx(dt);shells.update(dt,0);updateCross();match.update(dt,!live());
   climates.update(dt);const so=climates.sunOff;sun.position.set(player.pos.x+so.x,so.y,player.pos.z+so.z);sun.target.position.copy(player.pos);
+  renderGame();
+  requestAnimationFrame(frame);
+}
+function renderGame(){
   // świat, a potem broń z pierwszej osoby z wyczyszczoną głębią – broń nigdy nie wchodzi w ściany
   camera.layers.set(0);renderer.render(scene,camera);
   if(player.view==='fps'&&!(DMX&&DMX.scoped)){
@@ -1619,7 +1634,6 @@ function frame(){
     renderer.autoClear=false;renderer.clearDepth();const au=renderer.shadowMap.autoUpdate;renderer.shadowMap.autoUpdate=false;
     renderer.render(scene,vmCam);renderer.shadowMap.autoUpdate=au;renderer.autoClear=true;scene.background=bg;
     scene.environment=env;scene.environmentIntensity=ei;scene.environmentRotation.copy(_gunER)}
-  requestAnimationFrame(frame);
 }
 setHud();
 // ================= tryb 1v1: pojedynek z botem do 5 trafień =================
@@ -1767,7 +1781,7 @@ function useOaza(on,forced){                         // forced: konkretna mapa (
   let m=forced||(on&&mapIdx>=0&&MAPS[mapIdx].ready?MAPS[mapIdx]:null);
   if(on&&!m)m=nextMap();
   on=!!m;oaza.active=on;oaza.map=m;
-  for(const M of ALLMAPS)if(M.group)M.group.visible=M===m;
+  for(const M of ALLMAPS)if(M.group)M.group.visible=M.group.matrixWorldAutoUpdate=M===m;   // ukryte mapy nie są przeliczane w każdej klatce (updateMatrixWorld)
   boxes.length=0;boxes.push(...(on?m.boxes:arenaBoxes));
   boxMeshes.length=0;boxMeshes.push(...(on?m.meshes:arenaMeshes));
   for(const a of arenaMeshes)a.visible=!on;arenaGround.visible=!on;
@@ -1809,14 +1823,16 @@ function stripSpawnDecor(scene,spawns){
 }
 const stripPadColliders=(D,list)=>{const sp=(D.spawns||[]).filter(s=>/^Spawn_[AB]$/.test(s.name));       // niewidoczne kolizje masztów flag też znikają
   return(list||[]).filter(c=>!sp.some(p=>{const cx=(c[0]+c[3])/2,cz=(c[2]+c[5])/2;return Math.abs(Math.abs(cx-p.x)-2.35)<.4&&Math.abs(cz-p.z)<.3&&c[4]>=2.5&&c[4]<=4.2&&c[1]<=.1}))};
-const loadMaps=(async()=>{                         // mapy ładują się w tle, żeby nie opóźniać startu gry
+let onMapReady=null,mapSteps=0;                     // mapSteps: ukończone etapy wczytywania map (pasek postępu ekranu wczytywania)
+const loadMaps=(async()=>{                         // mapy wczytują się od startu; ekran wczytywania czeka na nie (rozgrzewka na końcu pliku)
   const {MeshoptDecoder}=await import('three/addons/libs/meshopt_decoder.module.js');
   const ld=new GLTFLoader();ld.setMeshoptDecoder(MeshoptDecoder);
   await Promise.all(ALLMAPS.map(async M=>{
     try{
-      const mod=await import(M.src),D=mod.MAP||mod.OAZA,B=mod.GLB||mod.OAZA_GLB;
+      const mod=await import(M.src),D=mod.MAP||mod.OAZA,B=mod.GLB||mod.OAZA_GLB;mapSteps++;
       const buf=mod.build?null:B.length<4096?await(await fetch(B)).arrayBuffer():Uint8Array.from(atob(B),c=>c.charCodeAt(0)).buffer;   // GLB: adres pliku (zwykły build) albo base64 (źródła, offline)
       const g=mod.build?{scene:await mod.build(THREE)}:await new Promise((res,rej)=>ld.parse(buf,'',res,rej));   // mapa z kodu (Jachty, bunkier) albo z GLB
+      mapSteps++;
       if(!M.range&&!mod.build)try{stripSpawnDecor(g.scene,D.spawns)}catch(e){console.warn('Podesty:',e)}   // tylko mapy z GLB (podesty startowe z eksportu)
       M.meshes=[];let roof=null;g.scene.traverse(o=>{if(o.name==='Dach')roof=o});M.roof=roof;
       g.scene.traverse(o=>{if(!o.isMesh||o.userData.deco)return;const c=o.material&&o.material.color;   // ozdoby z map budowanych w kodzie (trawa, liście, kable) nie zatrzymują kul
@@ -1827,13 +1843,16 @@ const loadMaps=(async()=>{                         // mapy ładują się w tle, 
       M.ground=M.meshes.find(o=>/floor|ground|teren/i.test(o.name))||M.meshes[0];
       if(!M.range)try{climates.decorate(M,g.scene)}catch(e){console.warn('Klimat mapy '+M.name+':',e)}   // tylko grafika: kolizje bez zmian
       if(NAKLADKI)try{const nk=await naprawNakladki(THREE,g.scene);for(const a of nk.added)if(M.meshes.includes(a.src))M.meshes.push(a.mesh)}catch(e){console.warn('Nakładki mapy '+M.name+':',e)}   // migotanie nakładających się powierzchni (nakladki.js)
-      g.scene.visible=false;scene.add(g.scene);M.group=g.scene;M.spawns=D.spawns;
+      mapSteps++;
+      g.scene.visible=false;scene.add(g.scene);g.scene.updateMatrixWorld(true);g.scene.matrixWorldAutoUpdate=false;M.group=g.scene;M.spawns=D.spawns;   // ukryta mapa: macierze policzone raz
       const cols=stripPadColliders(D,D.colliders),clips=stripPadColliders(D,D.clips);
       M.boxes=cols.concat(clips).map(([x0,y0,z0,x1,y1,z1])=>({minX:x0,maxX:x1,minZ:z0,maxZ:z1,top:y1,bottom:y0}));   // clips: blokady ruchu gracza (kule i tak lecą po siatce mapy)
       M.targets=D.targets||[];M.panel=D.panel||null;M.view=D.view||null;
       M.ladders=(D.ladders||[]).map(([x0,y0,z0,x1,y1,z1,nx,nz])=>({x0,y0,z0,x1,y1,z1,nx,nz}));
       M.bx=Math.max(...D.colliders.map(c=>Math.max(-c[0],c[3])))-.6;M.bz=Math.max(...D.colliders.map(c=>Math.max(-c[2],c[5])))-.6;   // granice areny z pełnej listy kolizji
+      for(const o of M.meshes)przyspieszPromien(o);   // trafienia w mapę bez sprawdzania każdego trójkąta (geometria już ostateczna)
       M.ready=true;if(!M.range)thumbQ.push(M);          // miniatury tylko dla map z rotacji 1v1
+      if(onMapReady)onMapReady(M);                       // rozgrzewka: shadery tej mapy od razu, w trakcie wczytywania pozostałych
       if(M.range&&MODE==='range'&&!oaza.active&&!lobby.active&&!match.on&&!match.lobbyPhase)setMode('range',null,true);   // Strzelnica wczytała się już po wejściu w tryb: przenieś grę na jej mapę
       if(MODE==='1v1'&&!oaza.active&&!match.on&&!match.lobbyPhase){if(mapIdx<0)nextMap();useOaza(true);duelSpawn(duel.bot);resetPlayer();banner(i18n('mt.map')+': '+mapName(oaza.map.name).toUpperCase(),'#ffe14a')}
     }catch(e){console.warn('Mapa '+M.name+':',e)}
@@ -1857,7 +1876,7 @@ function lobbyAnimate(b,t,dt,st){
   }
 }
 let mySkin='';   // przed createLobby: lobby od razu wywołuje onSkin z zapisanym skinem
-loader.set(.85);
+loader.set(.45);
 const lobby=createLobby({renderer,bean:lobbyBean,animate:lobbyAnimate,weaponArt:renderWeaponArt,
   onPlay:(m,o)=>{o=o||{};if(m==='dm'){initAudio();if(AC&&AC.state==='suspended')AC.resume();DMX.join(o.tier,o.info);return}   // Deathmatch: wejście do stałego lobby na serwerze
     TEAM.guns=null;                                             // Arsenał: lista broni przychodzi od serwera w 'matched' (tylko 1v1 online)
@@ -1921,7 +1940,7 @@ const match=createMatch({
     resetPlayer();duel.inv=0;Object.assign(player,{slide:0,fatigue:0,ads:0});adsHeld=false;gun.firing=false;gun.trigger=false;cancelInspect(true);
     if(duel.bot)duelSpawn(duel.bot);
     ON.st=null;ON.hidden=true;if(ON.active)NET.send({t:'rs'});
-    for(const h of holes)scene.remove(h);holes.length=0;
+    for(const h of holes){scene.remove(h);holePool.push(h)}holes.length=0;
   },
   live:()=>{if(ON.active)NET.send({t:'lv'})},                // „WALCZ!”: serwer przyjmuje strzały i obrażenia
   release:()=>{playing=false;gun.firing=false;if(document.pointerLockElement)document.exitPointerLock()},
@@ -1973,7 +1992,7 @@ function enterDM(name){                                   // start meczu: tryb '
   Object.assign(player,{dead:false,slide:0,fatigue:0,ads:0});adsHeld=false;gun.firing=false;gun.trigger=false;cancelInspect(true);
   equipNow(inv.findIndex(w=>w.id===PISTOL_ID));prevW=curW;attachRifle('fps');setHud();
   lobby.hide();document.body.classList.remove('in-lobby');$('overlay').style.display='none';
-  for(const h of holes)scene.remove(h);holes.length=0;
+  for(const h of holes){scene.remove(h);holePool.push(h)}holes.length=0;
   setPauseText();
   return{boxes:oaza.boxes,bx:oaza.bx,bz:oaza.bz};
 }
@@ -2036,6 +2055,7 @@ function snapMap(M,ow=480,oh=300){
   const sc=sun.shadow.camera,keep={near:scene.fog.near,far:scene.fog.far,sun:sun.position.clone(),tgt:sun.target.position.clone(),me:me.visible,ground:arenaGround.visible,
     sh:[sc.left,sc.right,sc.top,sc.bottom,sc.far],maps:ALLMAPS.map(X=>X.group?X.group.visible:false),arena:arenaMeshes.map(a=>a.visible),en:enemies.map(e=>e.root.visible),roof:M.roof?M.roof.visible:true};
   for(const X of ALLMAPS)if(X.group)X.group.visible=X===M;
+  const mwa=M.group.matrixWorldAutoUpdate;M.group.matrixWorldAutoUpdate=true;
   for(const a of arenaMeshes)a.visible=false;arenaGround.visible=false;for(const e of enemies)e.root.visible=false;me.visible=false;if(M.roof)M.roof.visible=false;
   const v=M.view||{pos:[M.bx*1.15,Math.max(M.bx,M.bz)*1.05,M.bz*1.05],look:[0,0,0]};
   scene.fog.near=200;scene.fog.far=700;
@@ -2044,7 +2064,7 @@ function snapMap(M,ow=480,oh=300){
   sun.target.position.set(v.look[0],0,v.look[2]);const so=climates.sunOff;sun.position.set(v.look[0]+so.x*2.1,so.y*2.1,v.look[2]+so.z*2.1);sun.target.updateMatrixWorld();sun.updateMatrixWorld();
   const pr=renderer.getPixelRatio(),cw=W/pr,ch=H/pr,vw=Math.min(cw,ch*1.6),vh=vw/1.6;      // kadr 16:10 w lewym dolnym rogu płótna (też na pionowym ekranie)
   renderer.setViewport(0,0,vw,vh);renderer.setScissor(0,0,vw,vh);renderer.setScissorTest(true);
-  renderer.render(scene,thumbCam);
+  renderer.render(scene,thumbCam);M.group.matrixWorldAutoUpdate=mwa;
   renderer.setScissorTest(false);renderer.setViewport(0,0,cw,ch);
   const c=document.createElement('canvas');c.width=ow;c.height=oh;
   c.getContext('2d').drawImage(cv,0,H-vh*pr,vw*pr,vh*pr,0,0,ow,oh);
@@ -2103,7 +2123,68 @@ function inspectProbe(){
   out.shoulderVisible=shVis;out.sl=+rifle.slideBack.toFixed(4);
   return out;
 }
-window.__game={climates,TEAM,slotList,match,MAPS,snapMap,playerHit,armJoints,bodyHit,inv,selectWeapon,get curW(){return curW},get rifle(){return rifle},solveArm,armR,armL,TP_HOLD,VM,me,poseArmsTo,makeBean,scene,keepRifleOut,placeTP,createWeapon,lobby,duel,setMode,player,gun,enemies,camera,setView:attachRifle,startPlay,start:()=>{playing=true;$('overlay').style.display='none'},fire:()=>{if(gun.mag>0&&gun.cd<=0&&gun.reloading<=0)fireShot()},reload:startReload,inspect:startInspect,inspectProbe,INSP,fpsArms:[fpsArmR,fpsArmL],viewModel,vmCam,WRIST,setAds:v=>adsHeld=v,keys};
+window.__game={THREE,renderer,climates,TEAM,slotList,match,MAPS,snapMap,playerHit,armJoints,bodyHit,inv,selectWeapon,get curW(){return curW},get rifle(){return rifle},solveArm,armR,armL,TP_HOLD,VM,me,poseArmsTo,makeBean,scene,keepRifleOut,placeTP,createWeapon,lobby,duel,setMode,player,gun,enemies,camera,setView:attachRifle,startPlay,start:()=>{playing=true;$('overlay').style.display='none'},fire:()=>{if(gun.mag>0&&gun.cd<=0&&gun.reloading<=0)fireShot()},reload:startReload,inspect:startInspect,inspectProbe,INSP,fpsArms:[fpsArmR,fpsArmL],viewModel,vmCam,WRIST,setAds:v=>adsHeld=v,keys};
+// ================= rozgrzewka: ekran wczytywania znika dopiero, gdy gra jest gotowa i nie przytnie =================
+// Pierwsze narysowanie materiału kompiluje jego shader na karcie graficznej – na słabszym komputerze setki ms na raz. Dawniej działo się to
+// już po zniknięciu ekranu wczytywania: w lobby (miniatury map, 10 map wczytywanych w tle), na wejściu do meczu (fasolka, broń z 1. osoby)
+// i przy pierwszych strzałach (smugi, iskry). Teraz: czekamy na mapy, a shadery kompilujemy równolegle w tle (KHR_parallel_shader_compile,
+// renderer.compileAsync) dokładnie w tych ustawieniach, w jakich gra je narysuje (klimat i światła każdej mapy, „studio” broni z 1. osoby),
+// potem jedna klatka każdej mapy (miniatura do losowania) i jedna klatka gry wysyłają tekstury i siatki na kartę.
+// Shadery zależą od liczby świateł w scenie: płomień broni z 1. osoby (PointLight) liczy się do świateł świata – podczas kompilacji
+// świata broń jest odpięta od kamery, a jej światło zastępuje identyczne światło w zestawie rozgrzewkowym.
+const WARM={};window.__warm=WARM;
+async function warmUp(){
+  const T=performance.now(),lap=k=>WARM[k]=Math.round(performance.now()-T);
+  // pule efektów strzału gotowe od razu (bez tworzenia obiektów przy pierwszych strzałach)
+  for(let i=0;i<24;i++)tracerPool.push(new THREE.Mesh(tracerGeo,tracerMat.clone()));
+  for(let i=0;i<56;i++)sparkPool.push({m:new THREE.Mesh(sparkGeo,sparkMat),v:V3(),life:0});
+  // zestaw rzeczy, których jeszcze nie ma w scenie: bronie w 3. osobie (bot, gracze Deathmatch), fasolka ze skinem, efekty strzału
+  const kit=new THREE.Group(),flash=new THREE.PointLight(0xffb45a,0,5,2);flash.layers.enable(1);kit.add(flash);
+  for(const id of WEAPON_IDS){const w=createWeapon(id,{fx:false});placeTP(w);kit.add(w.group)}
+  {const b=makeBean(HUES[0]);const k={id:'bot',c:HUES[0]};applySkin(b.userData.mats.skin,k);applySkin(b.userData.mats.body,k);kit.add(b)}
+  kit.add(new THREE.Mesh(tracerGeo,tracerMat),new THREE.Mesh(holeGeo,holeMat));for(const c of[0,0xff8a7a])kit.add(new THREE.Mesh(sparkGeo,sparkMatFor(c)));
+  const compile=(root,cam,target)=>{try{return renderer.compileAsync(root,cam,target).catch(e=>console.warn('Shadery:',e))}catch(e){console.warn('Shadery:',e);return Promise.resolve()}};
+  const isMap=o=>ALLMAPS.some(X=>X.group===o);
+  // Każde zlecenie podmienia na chwilę (synchronicznie) zawartość sceny i kamery, wysyła shadery do kompilacji i od razu wszystko przywraca;
+  // kompilacja trwa dalej w tle na wątkach sterownika, a w tym czasie wczytują się kolejne mapy.
+  function submitWorld(M){                                      // świat z jedną mapą (albo bez mapy: arena / Strzelnica) w jej klimacie
+    const kids=scene.children,ck=camera.children,saved=climates.save();
+    scene.children=kids.filter(o=>!isMap(o)||(M&&o===M.group)).concat(kit);camera.children=ck.filter(o=>o!==viewModel);climates.use(M?M.name:null);
+    try{return compile(scene,camera)}finally{scene.children=kids;camera.children=ck;climates.restore(saved)}
+  }
+  function submitGun(){                                         // broń i ręce z 1. osoby: drugi przebieg (vmCam, warstwa 1) z „studiem” odbić; po jednej broni (jedno światło płomienia)
+    const env=scene.environment,ck=camera.children,vk=viewModel.children,base=vk.filter(o=>!inv.some(w=>w.inst.group===o)),ps=[];
+    scene.environment=GUN_ENV;camera.children=ck.filter(o=>o!==viewModel);
+    try{for(const w of inv){const g=w.inst.group,vis=g.visible;setLayer(g,1);g.visible=true;viewModel.children=base.concat(g);ps.push(compile(viewModel,vmCam,scene));g.visible=vis}}
+    finally{viewModel.children=vk;camera.children=ck;scene.environment=env;setLayer(rifle.group,1)}
+    return Promise.all(ps);
+  }
+  // pasek: etapy map (moduł, model, nakładki – po 3 na mapę) i zadania kompilacji (arena, broń z 1. osoby, lobby, każda mapa)
+  const jobs=[],seen=new Set(),all=ALLMAPS.length*4+3;let done=0;
+  const prog=()=>loader.set(.45+.53*Math.min(1,(done+mapSteps)/all)),progT=setInterval(prog,120);
+  const job=p=>jobs.push(p.then(()=>{done++;prog()}));
+  job(submitWorld(null));job(submitGun());job(compile(lobby.scene,lobby.camera));
+  // mapy: kompilacja w klimacie mapy zaraz po wczytaniu, potem jej miniatura do losowania (klatka mapy = tekstury i siatki na kartę)
+  const onMap=M=>{if(seen.has(M)||!M.group)return;seen.add(M);
+    job(submitWorld(M).then(()=>{const i=thumbQ.indexOf(M);if(i>=0){thumbQ.splice(i,1);try{snapMap(M)}catch(e){console.warn('Miniatura:',e)}}}))};
+  for(const M of ALLMAPS)if(M.ready)onMap(M);onMapReady=onMap;
+  await Promise.race([loadMaps,new Promise(r=>setTimeout(r,60000))]);onMapReady=null;lap('maps');   // gdyby coś wisiało, reszta doczyta się w tle jak dawniej
+  await Promise.race([Promise.all(jobs),new Promise(r=>setTimeout(r,30000))]);clearInterval(progT);lap('shaders');
+  // tekstury wszystkich broni (nie tylko tej w rękach), fasolek i efektów od razu na kartę – nie przy pierwszym wyjęciu broni
+  {const texs=new Set(),add=o=>o.traverse(x=>{if(!x.material)return;for(const m of[].concat(x.material))for(const k in m){const v=m[k];if(v&&v.isTexture)texs.add(v)}});
+   for(const w of inv)add(w.inst.group);add(kit);for(const e of enemies)add(e.root);
+   for(const t of texs)try{renderer.initTexture(t)}catch(e){}WARM.textures=texs.size}
+  // jedna klatka gry z fasolką, bronią i efektami przed kamerą: shadery cieni (głębia) i wysłanie siatek na kartę
+  try{
+    kit.remove(flash);camera.getWorldDirection(V3t);kit.position.copy(camera.position).addScaledVector(V3t,4);kit.lookAt(camera.position);scene.add(kit);
+    scene.updateMatrixWorld();for(const w of inv)if(w.inst.flash)w.inst.flash.visible=true;
+    renderGame();for(const w of inv)if(w.inst.flash)w.inst.flash.visible=false;
+  }catch(e){console.warn('Rozgrzewka:',e)}
+  scene.remove(kit);
+  try{lobby.update(0)}catch(e){}                              // pierwsza klatka lobby jeszcze pod ekranem wczytywania
+  lap('total');WARM.programs=renderer.info.programs.length;
+}
+if(!window.__mobileGate)await warmUp().catch(e=>console.warn('Rozgrzewka:',e));   // błąd rozgrzewki nie zatrzymuje gry (najwyżej przytnie jak dawniej)
 loader.hide();window.__ready=true;if(!window.__mobileGate)frame();   // na telefonie gra nie rusza (ekran „coming soon”)
 </script>
 
