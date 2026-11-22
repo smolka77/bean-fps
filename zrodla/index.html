@@ -339,6 +339,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import glbB64 from './bean-data.js';
 import {createLobby,applySkin,SKINS,loadSkinsJson} from './lobby.js';
 import {payout,t as i18n,getLang,mapName} from './lobby-ui.js';
+import {naprawNakladki,NAKLADKI} from './nakladki.js';
 import {srvText} from './wallet.js';   // komunikaty serwera w języku gry   // i18n: słownik lobby (PL/EN/RU/ES) – menu pauzy
 import {loader} from './loader.js';
 import {createClimates} from './klimaty.js';   // wygląd map 1v1: Baza = salon luksusowych aut wieczorem, Oaza = bagno
@@ -381,7 +382,7 @@ scene.add(sun,sun.target);
 scene.traverse(o=>{if(o.isLight)o.layers.enable(1)});
 const GUN_ENV=gunEnvironment(renderer),_gunER=new THREE.Euler();   // „studio” odbić tylko dla broni z pierwszej osoby (przebieg vmCam)
 const climates=createClimates({scene,hemi,sun});   // niebo, mgła i światło zależne od mapy (domyślne: lobby, Magazyn, Strzelnica)
-const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.03,300);
+const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,300);   // near 0,1 (było 0,03): 3,3× dokładniejsza głębia, mniej migotania warstw z daleka; oko jest ≥0,3 m od ścian
 scene.add(camera);
 // kamera broni w FPS: ten sam punkt widzenia, ale stały kąt widzenia – broń nie rozciąga się przy zmianach FOV świata
 const vmCam=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,0.01,20);vmCam.layers.set(1);camera.add(vmCam);
@@ -1893,6 +1894,7 @@ const loadMaps=(async()=>{                         // mapy ładują się w tle, 
         o.castShadow=!inRoof;o.receiveShadow=true;M.meshes.push(o)});   // dach nie rzuca cienia – w hali jest jasno
       M.ground=M.meshes.find(o=>/floor|ground|teren/i.test(o.name))||M.meshes[0];
       if(!M.range)try{climates.decorate(M,g.scene)}catch(e){console.warn('Klimat mapy '+M.name+':',e)}   // tylko grafika: kolizje bez zmian
+      if(NAKLADKI)try{const nk=await naprawNakladki(THREE,g.scene);for(const a of nk.added)if(M.meshes.includes(a.src))M.meshes.push(a.mesh)}catch(e){console.warn('Nakładki mapy '+M.name+':',e)}   // migotanie nakładających się powierzchni (nakladki.js)
       g.scene.visible=false;scene.add(g.scene);M.group=g.scene;M.spawns=D.spawns;
       const cols=stripPadColliders(D,D.colliders),clips=stripPadColliders(D,D.clips);
       M.boxes=cols.concat(clips).map(([x0,y0,z0,x1,y1,z1])=>({minX:x0,maxX:x1,minZ:z0,maxZ:z1,top:y1,bottom:y0}));   // clips: blokady ruchu gracza (kule i tak lecą po siatce mapy)
