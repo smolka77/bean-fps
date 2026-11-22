@@ -93,12 +93,14 @@
   canvas{display:block;width:100%;height:100%;outline:none;cursor:none}
   .hud{position:fixed;pointer-events:none;font-variant-numeric:tabular-nums}
   #score{right:max(24px,env(safe-area-inset-right,0px));top:16px;background:var(--panel);border:1px solid var(--line);padding:6px 14px;border-radius:8px;text-align:right}
-  /* dymki z obrażeniami nad trafionym: białe, w głowę żółte, zabójcze czerwone (pozycja liczona co klatkę z miejsca w świecie) */
+  /* liczby obrażeń nad trafionym: małe i czyste; trafienia w ten sam cel sumują się w jednej liczbie (krótkie „pyknięcie” przy każdym),
+     w głowę złote z rombem, zabójcze ciepło-czerwone; pozycja liczona co klatkę z miejsca w świecie */
   #dmgnums{inset:0;overflow:hidden}
-  #dmgnums b{position:absolute;left:0;top:0;font:400 27px/1 Anton,Oswald,Impact,'Arial Narrow Bold',sans-serif;color:#fff;letter-spacing:.02em;white-space:nowrap;
-    -webkit-text-stroke:1.2px rgba(10,14,24,.7);paint-order:stroke fill;text-shadow:0 2px 0 rgba(0,0,0,.5),0 0 10px rgba(0,0,0,.35);will-change:transform,opacity}
-  #dmgnums b.h{color:#ffd23a;font-size:33px}
-  #dmgnums b.k{color:#ff4f4f;font-size:35px}
+  #dmgnums b{position:absolute;left:0;top:0;font:700 15px/1 Rajdhani,Inter,Oswald,'Arial Narrow',sans-serif;color:#f4f7ff;letter-spacing:.04em;white-space:nowrap;
+    text-shadow:0 1px 1px rgba(0,0,0,.9),0 0 6px rgba(4,10,28,.6);will-change:transform,opacity}
+  #dmgnums b.k{color:#ff7a5c}
+  #dmgnums b.h{color:#ffcf4a}
+  #dmgnums b.h::before{content:'';display:inline-block;width:4px;height:4px;margin:0 4px 0 0;vertical-align:.2em;background:currentColor;transform:rotate(45deg);box-shadow:0 0 2px rgba(0,0,0,.9)}
   #score b{font-size:20px;color:var(--accent)}
   #cross{left:50%;top:50%;width:0;height:0}
   #cross i{position:absolute;background:#fff;box-shadow:0 0 2px #000;transition:background .08s}
@@ -278,7 +280,8 @@ import {createMatch} from './match.js';
 import {createNet} from './net.js';
 import {createView,DUEL_ROW,SEND_EVERY} from './interp.js';   // obraz zdalnego przeciwnika 1v1: bufor stanów z czasem serwera, interpolacja
 import {createRange} from './range.js';
-import {createDM} from './dm.js';            // tryb Deathmatch (stałe lobby do 20 graczy): HUD, WASTED, broń za zabójstwa
+import {createDM} from './dm.js';            // tryb Deathmatch (stałe lobby do 20 graczy): HUD, ekran śmierci, broń za zabójstwa
+import {createCombatFx} from './ragdoll.js';   // reakcja na trafienie, upadek po śmierci (fizyka z kolizją mapy), krople
 import {WEAPON_IDS,WEAPON_STATS,PISTOL_ID,weaponAllowed,loadWeaponModels,createWeapon,applyParts,reloadPose,drawPose,magGrabPoint,pouchPoint,createShells,weaponSound,weaponSfx,weaponAudio,cyclePose,EJECT_AT} from './weaponry.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {applyWeaponSkin,mySkin as myWSkin,mySkins,skinFor} from './weapon-skins.js';
@@ -503,11 +506,12 @@ const armDefs=armsC.map(a=>{
  }}
 const armR=armDefs.find(d=>d.side>0),armL=armDefs.find(d=>d.side<0);
 
-function beanMats(color){
-  const skin=new THREE.MeshStandardMaterial({color,roughness:.55,metalness:0});
+function beanMats(color,fade){
+  // fade: materiały od razu „przezroczyste” (przy krycie 1 wyglądają tak samo) – martwe ciało gaśnie płynnie bez kompilacji nowego shadera w trakcie walki
+  const skin=new THREE.MeshStandardMaterial({color,roughness:.55,metalness:0,transparent:!!fade});
   const body=skin.clone();body.emissive=skin.emissive;body.userData.body=true;   // korpus: osobny materiał (rysunek skina z kreatora tylko na nim), ten sam błysk trafienia
   return{skin,body,
-    eyeW:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.3}),eyeB:new THREE.MeshStandardMaterial({color:0x111111,roughness:.3})};
+    eyeW:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.3,transparent:!!fade}),eyeB:new THREE.MeshStandardMaterial({color:0x111111,roughness:.3,transparent:!!fade})};
 }
 // jedna ręka: pivot (bark) -> SkinnedMesh z 3 kośćmi (bark, ramię, przedramię); scale < 1 dla widoku z pierwszej osoby
 function makeArm(def,mat,thin){
@@ -625,7 +629,7 @@ function keepRifleOut(ud,rg){
   }
 }
 function makeBean(color,opts={}){
-  const mats=beanMats(color);const root=new THREE.Group();
+  const mats=beanMats(color,opts.fade!==false);const root=new THREE.Group();
   const body=new THREE.Mesh(bodyGeo,mats.body);body.castShadow=true;root.add(body);
   const upper=new THREE.Group();root.add(upper);       // wszystko poza stopami opada przy kucaniu
   const torso=new THREE.Group();upper.add(torso);      // tułów + oczy + ręce + karabin: pochyla się w biodrach
@@ -643,6 +647,7 @@ function makeBean(color,opts={}){
   }
   if(opts.eyes!==false)torso.add(eyes);
   root.userData={upper,torso,pelvis,body,legs,arms,mats,eyes,air:0,shoulderR:armR.shoulder.clone(),shoulderL:armL.shoulder.clone()};
+  root.traverse(o=>{if(o.isMesh)o.userData.beanPart=true});   // części fasolki (dodatki i broń znikają osobno przy wygaszaniu ciała)
   return root;
 }
 
@@ -674,7 +679,7 @@ const shells=createShells(scene);
 // ================= gracz =================
 const player={slide:0,slideT:0,slideSpd:0,slideDir:V3(0,0,-1),slideK:0,fatigue:0,coyote:0,jumpBuf:0,jumpT:0,stepOff:0,pCrouch:false,pJump:false,pos:V3(0,0,-14),vel:V3(),yaw:Math.PI,pitch:0,onGround:true,view:'fps',speed01:0,walkPhase:0,ads:0,recoilP:0,recoilY:0,bobT:0,crouch:0,air:0,run:0,legYaw:0,legDir:1,moveAng:0,land:0,lean:V3()};
 const ME_COLOR=new THREE.Color(0xf0b440);       // Twoja fasolka: jednolity kolor, bez oczu
-const me=makeBean(ME_COLOR);scene.add(me);   // oczy widać w widoku z 3. osoby (w FPS cała postać jest schowana)
+const me=makeBean(ME_COLOR,{fade:false});scene.add(me);   // oczy widać w widoku z 3. osoby (w FPS cała postać jest schowana)
 const meHolder=new THREE.Group();me.userData.torso.add(meHolder);                    // trzymacz karabinu w 3. osobie (obraca się o pitch)
 meHolder.position.copy(HOLDER_PIVOT);
 // widok z pierwszej osoby: viewmodel przypięty do kamery + własne ręce fasolki
@@ -860,9 +865,14 @@ function makeEnemy(i){
 }
 for(let i=0;i<7;i++)makeEnemy(i);
 let kills=0;
-function damageEnemy(e,dmg,point){
+const CFX=createCombatFx({scene,boxes,leanTorso,solveArm,armR,armL,BODY,legLen:legDefs[0].len});
+window.__cfx=CFX;
+// dir: kierunek lotu kuli (reakcja na trafienie i kierunek upadku), head: strzał w głowę (mocniejsze szarpnięcie, inny upadek)
+function damageEnemy(e,dmg,point,dir,head){
   if(e.dead)return false;e.hp-=dmg;e.flash=.12;
-  if(e.hp<=0){e.dead=2.8;e.fall=0;kills++;$('kills').textContent=kills;return true}return false;
+  if(e.hp<=0){e.dead=range.active?1.3:MODE==='1v1'?4.2:2.8;e.fall=0;kills++;$('kills').textContent=kills;
+    CFX.die(e.root,{dir,head,gun:e.rifle&&e.rifle.group,life:e.dead,force:dmg>=90?1.4:1});return true}
+  CFX.react(e.root,dir,head,point);return false;
 }
 
 // ================= efekty =================
@@ -1032,30 +1042,32 @@ function hitFeedback(head,killed){
   sndHit(killed);const mk=$('marker');mk.style.opacity=1;mk.querySelector('svg').setAttribute('stroke',killed||head?'#ff5a4d':'#ffffff');
   clearTimeout(window.__mk);window.__mk=setTimeout(()=>mk.style.opacity=0,130);
 }
-// ---- dymki z obrażeniami: liczba nad trafionym, unosi się i znika; śruciny jednego strzału sumują się w jednym dymku,
-//      kolejne trafienia w ten sam cel układają się jeden nad drugim (nie zasłaniają się) ----
-const dmgNums=[],_dn=V3(),DMG_LIFE=.95;
-const paintDmg=n=>{n.el.textContent=n.d;n.el.className=n.kill?'k':n.head?'h':''};
+// ---- liczby obrażeń: mała liczba nad trafionym, unosi się powoli i gaśnie; kolejne trafienia w ten sam cel (i śruciny jednego strzału)
+//      w oknie DMG_SUM dopisują się do tej samej liczby zamiast układać stos. Elementy z puli (bez tworzenia DOM w trakcie walki).
+const dmgNums=[],dmgPool=[],_dn=V3(),DMG_LIFE=1.05,DMG_SUM=.8,DMG_MAX=12;
+const paintDmg=n=>{n.el.textContent=n.d;n.el.className=(n.kill?'k':'')+(n.head?' h':'')};
 function showDamage(pos,d,head,killed,key){
   d=Math.round(+d||0);if(d<=0||!pos)return;
-  const last=key!=null?dmgNums.find(n=>n.key===key&&n.t<.04&&!n.kill):null;
-  if(last){last.d+=d;last.head=last.head||!!head;last.kill=!!killed;last.t=0;paintDmg(last);return}
-  const el=document.createElement('b');$('dmgnums').appendChild(el);
-  const live=key!=null?dmgNums.filter(n=>n.key===key&&n.t<.55).length:0,side=live%2?1:-1;
-  const n={el,key,d,head:!!head,kill:!!killed,t:0,dx:side*(6+Math.random()*16),ox:side*(4+Math.random()*12),oy:-Math.min(live,4)*30,   // ox/oy: stałe przesunięcie na ekranie (px)
-    p:V3(pos.x+(Math.random()-.5)*.2,pos.y+1.85,pos.z+(Math.random()-.5)*.2)};
-  paintDmg(n);dmgNums.push(n);while(dmgNums.length>24)dmgNums.shift().el.remove();
+  const last=key!=null?dmgNums.find(n=>n.key===key&&!n.done&&n.t<DMG_SUM):null;
+  if(last){last.d+=d;last.head=last.head||!!head;last.kill=last.kill||!!killed;last.t=0;last.p.copy(pos);paintDmg(last);return}
+  for(const n of dmgNums)if(n.key===key&&key!=null)n.done=true;           // starsza liczba tego celu tylko odpływa
+  if(dmgNums.length>=DMG_MAX)freeDmg(0);
+  let el=dmgPool.pop();if(!el){el=document.createElement('b');$('dmgnums').appendChild(el)}el.style.display='';el.style.opacity=0;
+  const n={el,key,d,head:!!head,kill:!!killed,t:0,ry:0,done:false,ox:(Math.random()-.5)*16,p:(el._p||(el._p=V3())).copy(pos)};
+  paintDmg(n);dmgNums.push(n);
 }
-function clearDamage(){for(const n of dmgNums)n.el.remove();dmgNums.length=0}
+function freeDmg(i){const n=dmgNums[i];n.el.style.display='none';dmgPool.push(n.el);dmgNums.splice(i,1)}
+function clearDamage(){while(dmgNums.length)freeDmg(dmgNums.length-1)}
 function stepDamage(dt){
   if(!dmgNums.length)return;
   camera.updateMatrixWorld();const r=renderer.domElement.getBoundingClientRect();
   for(let i=dmgNums.length-1;i>=0;i--){
-    const n=dmgNums[i];n.t+=dt;if(n.t>=DMG_LIFE){n.el.remove();dmgNums.splice(i,1);continue}
-    _dn.copy(n.p);_dn.y+=n.t*.85;_dn.project(camera);
+    const n=dmgNums[i];n.t+=dt;if(n.t>=DMG_LIFE){freeDmg(i);continue}
+    n.ry+=dt*(n.t<.12?.06:.34);                                              // po trafieniu chwilę stoi, potem powoli w górę
+    _dn.copy(n.p);_dn.y+=1.72+n.ry;_dn.project(camera);
     if(_dn.z>1||_dn.z<-1){n.el.style.opacity=0;continue}                          // za kamerą
-    const pop=n.t<.09?1.4-(n.t/.09)*.4:1,a=n.t<DMG_LIFE-.3?1:(DMG_LIFE-n.t)/.3;
-    n.el.style.opacity=a;n.el.style.transform=`translate(${r.left+(_dn.x*.5+.5)*r.width+n.ox+n.dx*n.t}px,${r.top+(-_dn.y*.5+.5)*r.height+n.oy}px) translate(-50%,-50%) scale(${pop})`;
+    const k=Math.max(0,1-n.t/.13),pop=1+.32*k*k,a=n.t<DMG_LIFE-.35?1:(DMG_LIFE-n.t)/.35;
+    n.el.style.opacity=a;n.el.style.transform=`translate(${(r.left+(_dn.x*.5+.5)*r.width+n.ox).toFixed(1)}px,${(r.top+(-_dn.y*.5+.5)*r.height).toFixed(1)}px) translate(-50%,-50%) scale(${pop.toFixed(3)})`;
   }
 }
 function fireShot(){
@@ -1083,16 +1095,16 @@ function fireShot(){
       const h=hits[0];end=h.point.clone();
       const n=h.face?h.face.normal.clone().transformDirection(h.object.matrixWorld):V3(0,1,0);
       const en=h.object.userData.enemy;
-      if(h.object.userData.dmId)spawnSparks(h.point,n,0xff8a7a);   // Deathmatch: trafienie i obrażenia liczy serwer ('hc')
+      if(h.object.userData.dmId)CFX.hitFx(h.point,n,_dir,false);   // Deathmatch: trafienie i obrażenia liczy serwer ('hc')
       else if(en){
         const head=(h.point.y-en.root.position.y)>1.12;
         let killed=false;
-        if(ON.active&&en===duel.bot)spawnSparks(h.point,n,0xff8a7a);   // 1v1 online: czy trafiło i ile zabrało, liczy SERWER (potwierdzenie: 'hc')
+        if(ON.active&&en===duel.bot)CFX.hitFx(h.point,n,_dir,head);   // 1v1 online: czy trafiło i ile zabrało, liczy SERWER (potwierdzenie: 'hc')
         else{
-          const hp0=en.dead?0:Math.max(0,en.hp),dv=st.dmg*(head?st.head:1);killed=damageEnemy(en,dv,h.point);
+          const hp0=en.dead?0:Math.max(0,en.hp),dv=st.dmg*(head?st.head:1);killed=damageEnemy(en,dv,h.point,_dir,head);
           if(hp0>0)showDamage(en.root.position,Math.min(dv,hp0),head,killed,en);   // dymek: ile naprawdę zabrało
           if(range.active)range.onHit(en,head,killed);
-          spawnSparks(h.point,n,0xff8a7a);hitFeedback(head,killed);
+          CFX.hitFx(h.point,n,_dir,head);hitFeedback(head,killed);
         }
       }else{spawnHole(h.point,n);if(k<3)spawnSparks(h.point,n);}
     }
@@ -1497,7 +1509,7 @@ function poseTarget(e,chodzi,dt){
   keepRifleOut(sh,e.rifle.group);r.updateWorldMatrix(true,true);
   _gr.copy(e.rifle.gripR);e.rifle.group.localToWorld(_gr);sh.torso.worldToLocal(_gr);
   _gl.copy(e.rifle.gripLTP);e.rifle.group.localToWorld(_gl);sh.torso.worldToLocal(_gl);
-  poseArmsTo(sh,_gr,_gl);
+  poseArmsTo(sh,_gr,_gl);CFX.pose(r,dt);
 }
 function stepEnemies(dt){
   if(MODE==='dm'){if(DMX)DMX.update(dt);return}          // Deathmatch: przeciwnicy z serwera (dm.js)
@@ -1506,10 +1518,9 @@ function stepEnemies(dt){
     const r=e.root;
     if(MODE==='1v1'){if(e===duel.bot){if(BOT.on&&!ON.active)stepDuelBot(e,dt);else stepRemote(e,dt)};continue}
     if(e.dead>0){
-      e.dead-=dt;e.fall=Math.min(1,e.fall+dt*3);
-      if(e.flash>0){e.flash-=dt;e.mats.skin.emissive.setScalar(.9)}else e.mats.skin.emissive.setScalar(0);
-      r.rotation.z=e.fall*(Math.PI/2);r.position.y=Math.sin(e.fall*Math.PI/2)*.28;
-      if(e.dead<=0){e.hp=100;e.dead=0;e.fall=0;r.rotation.z=0;r.position.copy(spawnPos())}
+      e.dead-=dt;CFX.stepDeath(r,dt);
+      if(e.flash>0){e.flash-=dt;CFX.flash(e.mats,e.flash/.12)}else CFX.flash(e.mats,0);
+      if(e.dead<=0){e.hp=100;e.dead=0;e.fall=0;CFX.clear(r);r.visible=true;r.position.copy(spawnPos())}
       continue;
     }
     e.t+=dt;e.turn-=dt;
@@ -1525,14 +1536,14 @@ function stepEnemies(dt){
     const sh=r.userData;keepRifleOut(sh,e.rifle.group);r.updateWorldMatrix(true,true);
     _gr.copy(e.rifle.gripR);e.rifle.group.localToWorld(_gr);sh.torso.worldToLocal(_gr);
     _gl.copy(e.rifle.gripLTP);e.rifle.group.localToWorld(_gl);sh.torso.worldToLocal(_gl);
-    poseArmsTo(sh,_gr,_gl);
-    if(e.flash>0){e.flash-=dt;e.mats.skin.emissive.setScalar(.9)}else e.mats.skin.emissive.setScalar(0);
+    poseArmsTo(sh,_gr,_gl);CFX.pose(r,dt);
+    if(e.flash>0){e.flash-=dt;CFX.flash(e.mats,e.flash/.12)}else CFX.flash(e.mats,0);
   }
 }
 function updateFx(dt){
   for(let i=tracers.length-1;i>=0;i--){const t=tracers[i];t.life-=dt;t.m.material.opacity=Math.max(0,t.life/.07)*.9;if(t.life<=0){scene.remove(t.m);tracerPool.push(t.m);tracers.splice(i,1)}}
   for(let i=sparks.length-1;i>=0;i--){const s=sparks[i];s.life-=dt;s.v.y-=9*dt;s.m.position.addScaledVector(s.v,dt);if(s.life<=0){scene.remove(s.m);sparkPool.push(s);sparks.splice(i,1)}}
-  stepDamage(dt);
+  stepDamage(dt);CFX.update(dt);
 }
 const camPos=V3(),_look=V3(),_back=V3();let camInit=false,deathK=0;
 // kolizja kamery 3. osoby z bryłami mapy (AABB): odcinek oko → kamera; trafienie = kamera bliżej postaci (z zapasem). Zwraca true, gdy przycięto.
@@ -1647,14 +1658,14 @@ function setPauseText(){pmI18n()}
 function setHp(v){duel.hp=Math.max(0,v);const w=duel.hp+'%';$('hpbar').style.width=w;$('hpghost').style.width=w;$('hpnum').textContent=Math.ceil(duel.hp);const h=$('hp');h.classList.toggle('low',duel.hp<=20);h.classList.toggle('mid',duel.hp>20&&duel.hp<=50)}
 function banner(t,c){const b=$('banner');b.textContent=t;b.style.color=c||'#fff';b.classList.remove('show');void b.offsetWidth;b.classList.add('show')}
 function resetPlayer(){player.pos.set(0,0,-14);player.vel.set(0,0,0);player.yaw=Math.PI;if(oaza.active){const s=oaza.spawns[TEAM.me===1&&oaza.spawns[1]?1:0];player.pos.set(s.x,s.y||0,s.z);player.yaw=s.yaw}player.pitch=0;refillAll();setHud();setHp(100);duel.inv=1.2}
-function duelSpawn(e){Object.assign(e,{hp:100,dead:0,fall:0,cd:1,react:.8,strafe:rnd()<.5?1:-1,turn:1.5,counted:false});e.root.rotation.z=0;if(oaza.active){const s=oaza.spawns[TEAM.me===1?0:1];e.root.position.set(s.x+(rnd()-.5)*2,s.y||0,s.z-Math.sign(s.z||1)*rnd()*2)}else e.root.position.set((rnd()-.5)*16,0,12+rnd()*8)}
+function duelSpawn(e){CFX.clear(e.root);e.root.visible=true;Object.assign(e,{hp:100,dead:0,fall:0,cd:1,react:.8,strafe:rnd()<.5?1:-1,turn:1.5,counted:false});if(oaza.active){const s=oaza.spawns[TEAM.me===1?0:1];e.root.position.set(s.x+(rnd()-.5)*2,s.y||0,s.z-Math.sign(s.z||1)*rnd()*2)}else e.root.position.set((rnd()-.5)*16,0,12+rnd()*8)}
 function setMode(m,mi,quiet){
   range.leave();
   MODE=m==='1v1'?'1v1':'range';document.body.classList.toggle('duel',MODE==='1v1');
   kills=0;duel.botScore=0;duel.bot=enemies[0];
   const rm=MODE==='range'&&RANGE_MAP.ready?RANGE_MAP:null;      // Strzelnica gra na własnej mapie, gdy się już wczytała (w tle); inaczej stara arena
   $('score').innerHTML=MODE==='1v1'?i18n('g.you')+' <b id="kills">0</b> : <b id="botScore">0</b> '+i18n('g.bot')+' <small>'+i18n('g.to5')+'</small>':i18n('hud.hits')+' <b id="kills">0</b>'+(rm?' <small id="rgAcc"></small>':'');
-  for(const e of enemies){const on=MODE==='range'||e===duel.bot;e.off=!on;e.root.visible=on;e.hp=100;e.dead=0;e.fall=0;e.root.rotation.z=0;e.root.position.y=0;if(on&&MODE==='range')e.root.position.copy(spawnPos())}
+  for(const e of enemies){const on=MODE==='range'||e===duel.bot;e.off=!on;e.root.visible=on;e.hp=100;e.dead=0;e.fall=0;CFX.clear(e.root);e.root.position.y=0;if(on&&MODE==='range')e.root.position.copy(spawnPos())}
   duel.mapBanner=false;
   if(MODE==='1v1'){if(mi!=null&&mi>=0&&MAPS[mi]&&MAPS[mi].ready)mapIdx=mi;else nextMap()}
   useOaza(MODE==='1v1'||!!rm,rm);
@@ -1687,11 +1698,11 @@ function playerHit(d){
 // bot do trybu „Z botem”: chodzi, robi uniki i strzela, gdy widzi gracza. Zabójstwo kończy rundę meczu (match.kill), respawn robi resetRound.
 const _be=V3(),_bp=V3(),_bt=V3(),_bm=V3();
 function stepDuelBot(e,dt){
-  const r=e.root,ud=r.userData;r.visible=true;
-  if(e.flash>0){e.flash-=dt;e.mats.skin.emissive.setScalar(.9)}else e.mats.skin.emissive.setScalar(0);
+  const r=e.root,ud=r.userData;if(!CFX.dying(r))r.visible=true;
+  if(e.flash>0){e.flash-=dt;CFX.flash(e.mats,e.flash/.12)}else CFX.flash(e.mats,0);
   if(e.dead>0){
     if(!e.counted){e.counted=true;if(match.on)match.kill('me');else if(kills>=WIN){endMatch(true);return}else banner(i18n('g.hit'),'#ffe14a')}
-    e.fall=Math.min(1,e.fall+dt*3);r.rotation.z=e.fall*(Math.PI/2);r.position.y=Math.sin(e.fall*Math.PI/2)*.28;
+    if(!CFX.dying(r))CFX.die(r,{from:player.pos,gun:e.rifle&&e.rifle.group,life:4.2});CFX.stepDeath(r,dt);
     if(!match.on){e.dead-=dt;if(e.dead<=0)duelSpawn(e)}          // poza meczem (podgląd map): bot wstaje sam
     return;
   }
@@ -1728,12 +1739,12 @@ function stepDuelBot(e,dt){
   keepRifleOut(ud,e.rifle.group);r.updateWorldMatrix(true,true);
   _gr.copy(e.rifle.gripR);e.rifle.group.localToWorld(_gr);ud.torso.worldToLocal(_gr);
   _gl.copy(e.rifle.gripLTP);e.rifle.group.localToWorld(_gl);ud.torso.worldToLocal(_gl);
-  poseArmsTo(ud,_gr,_gl);
+  poseArmsTo(ud,_gr,_gl);CFX.pose(r,dt);
 }
 function stepRemote(e,dt){
   const r=e.root,ud=r.userData,s=ON.st;
-  if(e.flash>0){e.flash-=dt;e.mats.skin.emissive.setScalar(.9)}else e.mats.skin.emissive.setScalar(0);
-  if(e.dead>0){e.fall=Math.min(1,e.fall+dt*3);r.rotation.z=e.fall*(Math.PI/2);r.position.y=Math.sin(e.fall*Math.PI/2)*.28;return}
+  if(e.flash>0){e.flash-=dt;CFX.flash(e.mats,e.flash/.12)}else CFX.flash(e.mats,0);
+  if(e.dead>0){if(!CFX.dying(r))CFX.die(r,{from:player.pos,gun:e.rifle&&e.rifle.group,life:4.2});CFX.stepDeath(r,dt);return}
   if(ON.active)r.visible=!ON.hidden;
   if(!s||!ON.active)return;
   ON.view.frame(performance.now()/1000);const v=ON.view.sample(0)||s;   // stan z bufora (czas serwera, interpolacja, łagodna ekstrapolacja – interp.js)
@@ -1748,7 +1759,7 @@ function stepRemote(e,dt){
   keepRifleOut(ud,e.rifle.group);r.updateWorldMatrix(true,true);
   _gr.copy(e.rifle.gripR);e.rifle.group.localToWorld(_gr);ud.torso.worldToLocal(_gr);
   _gl.copy(e.rifle.gripLTP);e.rifle.group.localToWorld(_gl);ud.torso.worldToLocal(_gl);
-  poseArmsTo(ud,_gr,_gl);
+  poseArmsTo(ud,_gr,_gl);CFX.pose(r,dt);
 }
 // ================= mapy 1v1 w rotacji (Oaza = Bagno, Magazyn = Jachty, Baza = Salon, Iglo = Igloo, Kaskady = Kaskady, Mars = Mars) =================
 const arenaBoxes=boxes.slice(),arenaMeshes=boxMeshes.slice(),arenaGround=window.__ground;
@@ -1757,7 +1768,7 @@ const MAPS=[{name:'OazaBL',src:'./oazabl-data.js'},{name:'MagazynBL',src:'./maga
 // Strzelnica: mapa treningowa trybu solo (nie wchodzi do rotacji 1v1). Cele, tablica ustawień i statystyki: range.js
 const RANGE_MAP={name:'Strzelnica',src:'./strzelnica-data.js',range:true};   // strzelnica BEANLADEN: plac o zachodzie słońca (GLB)
 const ALLMAPS=[...MAPS,RANGE_MAP];
-const range=createRange({scene,camera,player,enemies,pose:poseTarget,click:()=>sndClick(2400,.03,.12),
+const range=createRange({scene,camera,player,enemies,pose:poseTarget,fall:(e,dt)=>CFX.stepDeath(e.root,dt),unfall:e=>CFX.clear(e.root),flash:(e,k)=>CFX.flash(e.mats,k),click:()=>sndClick(2400,.03,.12),
   isSound:()=>!muted,setSound:on=>{initAudio();setMuted(!on)},resetKills:()=>{kills=0;$('kills').textContent=0},
   addHit:(m,e)=>{m.userData.enemy=e;m.userData.paper=true;enemyMeshes.push(m)}});
 window.__range=range;
@@ -1863,7 +1874,7 @@ const loadMaps=(async()=>{                         // mapy wczytują się od sta
 })();
 
 // ================= lobby =================
-const lobbyBean=makeBean(ME_COLOR);   // fasolka w lobby też ma oczy (chowane dla skinów z eyes:false)
+const lobbyBean=makeBean(ME_COLOR,{fade:false});   // fasolka w lobby też ma oczy (chowane dla skinów z eyes:false)
 const _lt=V3();
 function lobbyAnimate(b,t,dt,st){
   const ud=b.userData,br=Math.sin(t*2.1);
@@ -1975,10 +1986,11 @@ NET.on('sh',m=>{if(!ON.active||!Array.isArray(m.a)||!Array.isArray(m.b)||!match.
 NET.on('dmg',m=>{if(!ON.active)return;const hp=Math.max(0,Math.min(100,+m.hp||0));setHp(hp);
   const el=$('dmg');el.style.boxShadow='inset 0 0 140px rgba(255,0,0,.6)';clearTimeout(el._t);el._t=setTimeout(()=>el.style.boxShadow='',140);
   if(hp<=0&&match.on&&!player.dead){player.dead=true;gun.firing=false;adsHeld=false;document.body.classList.add('mt-dead')}});
-NET.on('hc',m=>{if(!ON.active)return;if(duel.bot)duel.bot.flash=.12;hitFeedback(!!m.h,!!m.k);if(duel.bot&&m.d)showDamage(duel.bot.root.position,m.d,!!m.h,!!m.k,duel.bot)});
+const _hd=V3();
+NET.on('hc',m=>{if(!ON.active)return;if(duel.bot){duel.bot.flash=.12;if(!m.k)CFX.react(duel.bot.root,_hd.copy(duel.bot.root.position).sub(player.pos),!!m.h)}hitFeedback(!!m.h,!!m.k);if(duel.bot&&m.d)showDamage(duel.bot.root.position,m.d,!!m.h,!!m.k,duel.bot)});
 NET.on('fix',m=>{if(!ON.active||!Array.isArray(m.p))return;if(m.n>ON.fixN)ON.fixN=m.n;player.pos.set(+m.p[0],+m.p[1],+m.p[2]);player.vel.set(0,0,0)});   // serwer cofa niedozwolony ruch; numer wraca w paczkach ruchu (f)
 NET.on('pi',m=>NET.send({t:'po',s:m.s}));                    // pomiar opóźnienia (kompensacja przy trafieniach)
-NET.on('round',m=>{if(!ON.active)return;const w=m.winner===ON.seat?'me':'op';if(w==='me'&&duel.bot){duel.bot.dead=99;duel.bot.fall=0}match.kill(w)});
+NET.on('round',m=>{if(!ON.active)return;const w=m.winner===ON.seat?'me':'op';if(w==='me'&&duel.bot){const b=duel.bot;b.dead=99;b.fall=0;CFX.die(b.root,{from:player.pos,gun:b.rifle&&b.rifle.group,life:4.2})}match.kill(w)});
 NET.on('end',m=>{if(!ON.active)return;ON.active=false;if((m.reason==='left'||m.reason==='cheat')&&m.winner===ON.seat)match.oppLeft();NET.close();restoreOppSkin()});
 NET.on('error',m=>netFail(m.message));
 NET.on('close',()=>{if(match.phase==='search'||match.lobbyPhase)netFail(i18n('net.lost'));else if(ON.active&&match.phase!=='final'){ON.active=false;banner(i18n('g.disconnected'),'#ff6a5c')}});
@@ -2009,7 +2021,7 @@ function dmRespawn(p,yaw,owned){
 }
 const DMNET=createNet();
 DMX=createDM({THREE,scene,camera,renderer,player,me,net:DMNET,
-  makeBean,findSkin,createWeapon,placeTP,HOLDER_PIVOT,poseLegs,leanTorso,keepRifleOut,poseArmsTo,solveArm,armR,armL,CROUCH_DROP,profAt,BODY,
+  makeBean,findSkin,createWeapon,placeTP,HOLDER_PIVOT,poseLegs,leanTorso,keepRifleOut,poseArmsTo,solveArm,armR,armL,CROUCH_DROP,profAt,BODY,cfx:CFX,
   WEAPON_IDS,WEAPON_STATS,PISTOL_ID,
   skin:(b,k)=>{if(!b||!k)return;const ud=b.userData;applySkin(ud.mats.skin,k);if(ud.mats.body)applySkin(ud.mats.body,k);if(ud.eyes)ud.eyes.visible=k.eyes!==false},
   mySkin:()=>findSkin(mySkin)||SKINS.find(k=>k.id===mySkin)||null,
@@ -2125,69 +2137,8 @@ function inspectProbe(){
   out.shoulderVisible=shVis;out.sl=+rifle.slideBack.toFixed(4);
   return out;
 }
-window.__game={THREE,renderer,climates,TEAM,slotList,match,MAPS,snapMap,playerHit,armJoints,bodyHit,inv,selectWeapon,get curW(){return curW},get rifle(){return rifle},solveArm,armR,armL,TP_HOLD,VM,me,poseArmsTo,makeBean,scene,keepRifleOut,placeTP,createWeapon,lobby,duel,setMode,player,gun,enemies,camera,setView:attachRifle,startPlay,start:()=>{playing=true;$('overlay').style.display='none'},fire:()=>{if(gun.mag>0&&gun.cd<=0&&gun.reloading<=0)fireShot()},reload:startReload,inspect:startInspect,inspectProbe,INSP,fpsArms:[fpsArmR,fpsArmL],viewModel,vmCam,WRIST,setAds:v=>adsHeld=v,keys};
-// ================= rozgrzewka: ekran wczytywania znika dopiero, gdy gra jest gotowa i nie przytnie =================
-// Pierwsze narysowanie materiału kompiluje jego shader na karcie graficznej – na słabszym komputerze setki ms na raz. Dawniej działo się to
-// już po zniknięciu ekranu wczytywania: w lobby (miniatury map, 10 map wczytywanych w tle), na wejściu do meczu (fasolka, broń z 1. osoby)
-// i przy pierwszych strzałach (smugi, iskry). Teraz: czekamy na mapy, a shadery kompilujemy równolegle w tle (KHR_parallel_shader_compile,
-// renderer.compileAsync) dokładnie w tych ustawieniach, w jakich gra je narysuje (klimat i światła każdej mapy, „studio” broni z 1. osoby),
-// potem jedna klatka każdej mapy (miniatura do losowania) i jedna klatka gry wysyłają tekstury i siatki na kartę.
-// Shadery zależą od liczby świateł w scenie: płomień broni z 1. osoby (PointLight) liczy się do świateł świata – podczas kompilacji
-// świata broń jest odpięta od kamery, a jej światło zastępuje identyczne światło w zestawie rozgrzewkowym.
-const WARM={};window.__warm=WARM;
-async function warmUp(){
-  const T=performance.now(),lap=k=>WARM[k]=Math.round(performance.now()-T);
-  // pule efektów strzału gotowe od razu (bez tworzenia obiektów przy pierwszych strzałach)
-  for(let i=0;i<24;i++)tracerPool.push(new THREE.Mesh(tracerGeo,tracerMat.clone()));
-  for(let i=0;i<56;i++)sparkPool.push({m:new THREE.Mesh(sparkGeo,sparkMat),v:V3(),life:0});
-  // zestaw rzeczy, których jeszcze nie ma w scenie: bronie w 3. osobie (bot, gracze Deathmatch), fasolka ze skinem, efekty strzału
-  const kit=new THREE.Group(),flash=new THREE.PointLight(0xffb45a,0,5,2);flash.layers.enable(1);kit.add(flash);
-  for(const id of WEAPON_IDS){const w=createWeapon(id,{fx:false});placeTP(w);kit.add(w.group)}
-  {const b=makeBean(HUES[0]);const k={id:'bot',c:HUES[0]};applySkin(b.userData.mats.skin,k);applySkin(b.userData.mats.body,k);kit.add(b)}
-  kit.add(new THREE.Mesh(tracerGeo,tracerMat),new THREE.Mesh(holeGeo,holeMat));for(const c of[0,0xff8a7a])kit.add(new THREE.Mesh(sparkGeo,sparkMatFor(c)));
-  const compile=(root,cam,target)=>{try{return renderer.compileAsync(root,cam,target).catch(e=>console.warn('Shadery:',e))}catch(e){console.warn('Shadery:',e);return Promise.resolve()}};
-  const isMap=o=>ALLMAPS.some(X=>X.group===o);
-  // Każde zlecenie podmienia na chwilę (synchronicznie) zawartość sceny i kamery, wysyła shadery do kompilacji i od razu wszystko przywraca;
-  // kompilacja trwa dalej w tle na wątkach sterownika, a w tym czasie wczytują się kolejne mapy.
-  function submitWorld(M){                                      // świat z jedną mapą (albo bez mapy: arena / Strzelnica) w jej klimacie
-    const kids=scene.children,ck=camera.children,saved=climates.save();
-    scene.children=kids.filter(o=>!isMap(o)||(M&&o===M.group)).concat(kit);camera.children=ck.filter(o=>o!==viewModel);climates.use(M?M.name:null);
-    try{return compile(scene,camera)}finally{scene.children=kids;camera.children=ck;climates.restore(saved)}
-  }
-  function submitGun(){                                         // broń i ręce z 1. osoby: drugi przebieg (vmCam, warstwa 1) z „studiem” odbić; po jednej broni (jedno światło płomienia)
-    const env=scene.environment,ck=camera.children,vk=viewModel.children,base=vk.filter(o=>!inv.some(w=>w.inst.group===o)),ps=[];
-    scene.environment=GUN_ENV;camera.children=ck.filter(o=>o!==viewModel);
-    try{for(const w of inv){const g=w.inst.group,vis=g.visible;setLayer(g,1);g.visible=true;viewModel.children=base.concat(g);ps.push(compile(viewModel,vmCam,scene));g.visible=vis}}
-    finally{viewModel.children=vk;camera.children=ck;scene.environment=env;setLayer(rifle.group,1)}
-    return Promise.all(ps);
-  }
-  // pasek: etapy map (moduł, model, nakładki – po 3 na mapę) i zadania kompilacji (arena, broń z 1. osoby, lobby, każda mapa)
-  const jobs=[],seen=new Set(),all=ALLMAPS.length*4+3;let done=0;
-  const prog=()=>loader.set(.45+.53*Math.min(1,(done+mapSteps)/all)),progT=setInterval(prog,120);
-  const job=p=>jobs.push(p.then(()=>{done++;prog()}));
-  job(submitWorld(null));job(submitGun());job(compile(lobby.scene,lobby.camera));
-  // mapy: kompilacja w klimacie mapy zaraz po wczytaniu, potem jej miniatura do losowania (klatka mapy = tekstury i siatki na kartę)
-  const onMap=M=>{if(seen.has(M)||!M.group)return;seen.add(M);
-    job(submitWorld(M).then(()=>{const i=thumbQ.indexOf(M);if(i>=0){thumbQ.splice(i,1);try{snapMap(M)}catch(e){console.warn('Miniatura:',e)}}}))};
-  for(const M of ALLMAPS)if(M.ready)onMap(M);onMapReady=onMap;
-  await Promise.race([loadMaps,new Promise(r=>setTimeout(r,60000))]);onMapReady=null;lap('maps');   // gdyby coś wisiało, reszta doczyta się w tle jak dawniej
-  await Promise.race([Promise.all(jobs),new Promise(r=>setTimeout(r,30000))]);clearInterval(progT);lap('shaders');
-  // tekstury wszystkich broni (nie tylko tej w rękach), fasolek i efektów od razu na kartę – nie przy pierwszym wyjęciu broni
-  {const texs=new Set(),add=o=>o.traverse(x=>{if(!x.material)return;for(const m of[].concat(x.material))for(const k in m){const v=m[k];if(v&&v.isTexture)texs.add(v)}});
-   for(const w of inv)add(w.inst.group);add(kit);for(const e of enemies)add(e.root);
-   for(const t of texs)try{renderer.initTexture(t)}catch(e){}WARM.textures=texs.size}
-  // jedna klatka gry z fasolką, bronią i efektami przed kamerą: shadery cieni (głębia) i wysłanie siatek na kartę
-  try{
-    kit.remove(flash);camera.getWorldDirection(V3t);kit.position.copy(camera.position).addScaledVector(V3t,4);kit.lookAt(camera.position);scene.add(kit);
-    scene.updateMatrixWorld();for(const w of inv)if(w.inst.flash)w.inst.flash.visible=true;
-    renderGame();for(const w of inv)if(w.inst.flash)w.inst.flash.visible=false;
-  }catch(e){console.warn('Rozgrzewka:',e)}
-  scene.remove(kit);
-  try{lobby.update(0)}catch(e){}                              // pierwsza klatka lobby jeszcze pod ekranem wczytywania
-  lap('total');WARM.programs=renderer.info.programs.length;
-}
-if(!window.__mobileGate)await warmUp().catch(e=>console.warn('Rozgrzewka:',e));   // błąd rozgrzewki nie zatrzymuje gry (najwyżej przytnie jak dawniej)
-loader.hide();window.__ready=true;if(!window.__mobileGate)frame();   // na telefonie gra nie rusza (ekran „coming soon”)
+window.__game={setBot:v=>{BOT.on=!!v},THREE,renderer,climates,TEAM,slotList,match,MAPS,snapMap,playerHit,armJoints,bodyHit,inv,selectWeapon,get curW(){return curW},get rifle(){return rifle},solveArm,armR,armL,TP_HOLD,VM,me,poseArmsTo,makeBean,scene,keepRifleOut,placeTP,createWeapon,lobby,duel,setMode,player,gun,enemies,camera,setView:attachRifle,startPlay,start:()=>{playing=true;$('overlay').style.display='none'},fire:()=>{if(gun.mag>0&&gun.cd<=0&&gun.reloading<=0)fireShot()},reload:startReload,inspect:startInspect,inspectProbe,INSP,fpsArms:[fpsArmR,fpsArmL],viewModel,vmCam,WRIST,setAds:v=>adsHeld=v,keys};
+// ================= rozgrzewka: ekran wczytywania znika dopiero, gdy gra jest gotowa i nie przytnie ==========loader.hide();window.__ready=true;if(!window.__mobileGate)frame();   // na telefonie gra nie rusza (ekran „coming soon”)
 </script>
 
 

@@ -20,6 +20,7 @@ const PACE = { slow: 1.6, normal: 1, fast: 0.65 };    // mnożnik czasu, przez j
 // hooki gry:
 //   scene, camera, player, enemies      – scena, kamera, gracz (pos, yaw, pitch) i pula fasolek-wrogów (root, hp, dead, fall, flash, mats…)
 //   pose(e, chodzi, dt)                 – ustawia nogi/ręce/karabin fasolki (poza stojąca albo krok)
+//   fall(e, dt) / unfall(e)             – upadek trafionej fasolki (fizyka w ragdoll.js; false = ciało już zgasło) i powrót do pozy
 //   click()                             – dźwięk kliknięcia w tablicę
 //   isSound() / setSound(on)            – dźwięk gry (to samo co klawisz M)
 //   resetKills()                        – zeruje licznik „Trafione fasolki”
@@ -109,6 +110,7 @@ export function createRange(g) {
   }
   function release(e) {
     e.rg = null; e.off = true; e.dead = 0; e.fall = 0; e.flash = 0;
+    if (g.unfall) g.unfall(e);
     e.root.visible = false; e.root.rotation.z = 0; e.root.position.y = 0; e.root.scale.setScalar(1); e.mats.skin.emissive.setScalar(0);
   }
   function clearActive() { for (const e of enemies) if (e.rg) release(e); }
@@ -125,11 +127,11 @@ export function createRange(g) {
       const a = e.rg;
       if (!a) continue;
       const r = e.root;
-      if (e.flash > 0) { e.flash -= rdt; e.mats.skin.emissive.setScalar(0.9); } else e.mats.skin.emissive.setScalar(0);
-      if (e.dead > 0) {                                  // trafiona: przewraca się i znika
-        e.dead -= rdt; e.fall = Math.min(1, e.fall + rdt * 3);
-        r.rotation.z = e.fall * (Math.PI / 2); r.position.y = a.spot.y + Math.sin(e.fall * Math.PI / 2) * 0.28;
-        if (e.dead < 2.8 - 0.65) release(e);
+      if (e.flash > 0) { e.flash -= rdt; if (g.flash) g.flash(e, e.flash / 0.12); else e.mats.skin.emissive.setScalar(0.9); } else if (g.flash) g.flash(e, 0); else e.mats.skin.emissive.setScalar(0);
+      if (e.dead > 0) {                                  // trafiona: pada (fizyka z kolizją mapy) i gaśnie
+        e.dead -= rdt;
+        if (g.fall) { if (!g.fall(e, rdt) || e.dead <= 0) release(e); }
+        else { e.fall = Math.min(1, e.fall + rdt * 3); r.rotation.z = e.fall * (Math.PI / 2); r.position.y = a.spot.y + Math.sin(e.fall * Math.PI / 2) * 0.28; if (e.dead < 2.8 - 0.65) release(e); }
         continue;
       }
       if (!run) continue;

@@ -73,9 +73,9 @@ export function createDM(ctx) {
     let g = p.guns[id]; if (!g) { g = p.guns[id] = ctx.createWeapon(id, { fx: false }); ctx.placeTP(g); applyWeaponSkin(g, skinFor(p.wsk, id)); }   // skin broni przeciwnika (sprawdzony przez serwer)
     p.holder.add(g.group); p.gun = g; p.gunId = id;
   }
-  function clearRemotes() { for (const p of S.players.values()) { scene.remove(p.root); view.drop(p.id); } S.players.clear(); }
-  function dropRemote(id) { const p = S.players.get(id); if (p) { scene.remove(p.root); S.players.delete(id); view.drop(id); } }
-  const _a = V3(), _b = V3(), _gr = V3(), _gl = V3();
+  function clearRemotes() { for (const p of S.players.values()) { ctx.cfx.clear(p.root); scene.remove(p.root); view.drop(p.id); } S.players.clear(); }   // clear: broń wypadła z rąk (leży w scenie) – wraca do postaci
+  function dropRemote(id) { const p = S.players.get(id); if (p) { ctx.cfx.clear(p.root); scene.remove(p.root); S.players.delete(id); view.drop(id); } }
+  const _a = V3(), _b = V3(), _gr = V3(), _gl = V3(), _hd = V3();
   function poseRemote(p, s, dt) {
     const r = p.root, ud = r.userData;
     const [, , x, y, z, yaw, pitch, cr, run, air, sl, legYaw, w, fl] = s;
@@ -99,17 +99,17 @@ export function createDM(ctx) {
     p.flags = fl;
     // emotka (klawisz G u innego gracza): broń chowa się, postać macha / tańczy / się cieszy
     const em = (fl >> 5) & 3; p.gun.group.visible = !em;
-    if (em) { if (!p.emT) p.emT = now(); ud.baseY = y; EMOTES[EMOTE_IDS[em]](ctx, r, now() - p.emT); } else p.emT = 0;
+    if (em) { if (!p.emT) p.emT = now(); ud.baseY = y; EMOTES[EMOTE_IDS[em]](ctx, r, now() - p.emT); } else { p.emT = 0; ctx.cfx.pose(r, dt); }   // szarpnięcie po trafieniu
   }
   function stepRemotes(dt) {
     const L = now(); view.frame(L);
     for (const p of S.players.values()) {
       const r = p.root, mats = r.userData.mats;
       if (p.left) { r.visible = false; continue; }
-      if (p.dying > 0) {                                    // padanie po śmierci
-        p.dying -= dt; p.fall = Math.min(1, p.fall + dt * 3.2); r.rotation.z = p.fall * (Math.PI / 2); r.position.y = (p.deadY || 0) + Math.sin(p.fall * Math.PI / 2) * 0.28;
-        p.skull.visible = false; mats.skin.emissive.setScalar(0);
-        if (p.dying <= 0) { r.visible = false; r.rotation.z = 0; }
+      if (p.dying > 0) {                                    // upadek po śmierci: fizyka z kolizją mapy (ragdoll.js), na końcu ciało gaśnie
+        p.dying -= dt; ctx.cfx.stepDeath(r, dt);
+        p.skull.visible = false; ctx.cfx.flash(mats, 0);
+        if (p.dying <= 0) { r.visible = false; ctx.cfx.clear(r); }
         continue;
       }
       const vis = p.buf.length && L - p.lastSeen < 0.35;
@@ -118,7 +118,7 @@ export function createDM(ctx) {
       poseRemote(p, s, dt);
       // WANTED nad głową; ochrona po odrodzeniu: niebieska poświata; trafienie: biały błysk
       p.skull.visible = p.id === S.wanted;
-      if (p.flash > 0) { p.flash -= dt; mats.skin.emissive.setRGB(0.9, 0.9, 0.9); }
+      if (p.flash > 0) { p.flash -= dt; ctx.cfx.flash(mats, p.flash / 0.1); }
       else if (p.flags & 8) { const k = 0.25 + 0.2 * Math.sin(L * 10); mats.skin.emissive.setRGB(k * 0.3, k * 0.75, k); }
       else mats.skin.emissive.setScalar(0);
       if (mats.body) mats.body.emissive.copy(mats.skin.emissive);
@@ -148,7 +148,7 @@ export function createDM(ctx) {
     const L = now(); view.clock(m.T, L);
     for (const row of m.p) {
       const p = S.players.get(row[0]); if (!p) continue;
-      if (row[1] !== p.life) { p.life = row[1]; p.buf.length = 0; p.dying = 0; p.fall = 0; p.alive = true; p.root.rotation.z = 0; }
+      if (row[1] !== p.life) { p.life = row[1]; p.buf.length = 0; p.dying = 0; p.fall = 0; p.alive = true; ctx.cfx.clear(p.root); }
       view.push(p.id, row.length > 14 ? row[14] : m.T, row, L);
       p.lastSeen = L;
     }
@@ -170,6 +170,7 @@ export function createDM(ctx) {
   on('hc', (m) => {
     const p = S.players.get(m.id); if (p) p.flash = 0.1;
     if (m.prot) { ui.notify(tx('protect'), 'pink'); return; }
+    if (p && !m.k) ctx.cfx.react(p.root, _hd.copy(p.root.position).sub(player.pos), !!m.h);   // szarpnięcie: kula leci ode mnie
     ctx.hitFeedback(!!m.h, !!m.k);
     if (p && m.d && ctx.damageNumber) ctx.damageNumber(p.root.position, m.d, !!m.h, !!m.k, p);   // dymek z obrażeniami (liczy serwer)
   });
@@ -177,7 +178,11 @@ export function createDM(ctx) {
     const wid = ctx.WEAPON_IDS[m.w] || ctx.PISTOL_ID;
     ui.killFeed(m.k, m.v, wid, m.h, m.wanted, S.pid, nameOf);
     const p = S.players.get(m.v);
-    if (p) { p.alive = false; p.dying = 2.6; p.fall = 0; p.deadY = p.root.position.y; p.buf.length = 0; }
+    if (p) {
+      p.alive = false; p.dying = 2.6; p.fall = 0; p.deadY = p.root.position.y; p.buf.length = 0;
+      const kp = m.k === S.pid ? player.pos : S.players.get(m.k) && S.players.get(m.k).root.visible ? S.players.get(m.k).root.position : null;   // upadek: od strzelca
+      if (p.root.visible) ctx.cfx.die(p.root, { from: kp, head: !!m.h, gun: p.gun && p.gun.group, life: 2.6 });
+    }
     if (m.k === S.pid) { S.me.kills++; if (m.h) ui.notify(tx('head'), 'gold', false, 'head'); else ui.notify(tx('kill') + ' · ' + esc(nameOf(m.v)), ''); ctx.sfx('kill'); }
   });
   // zabójstwo: po 1, potem 2, potem 3… zabójstwach serwer daje następną broń z drabinki (pełny magazynek) – w rękach bez animacji
