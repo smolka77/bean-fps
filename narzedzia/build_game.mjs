@@ -41,7 +41,7 @@ html = html.slice(0, a) + '@@BUNDLE@@' + html.slice(b + '</script>'.length);
 html = html.replace(/<script type="importmap">[\s\S]*?<\/script>\s*/, '');
 
 // 2) mapy: dynamiczny import(M.src) -> mapa importów (w zwykłym buildzie każda mapa to osobny plik, pobierany w tle)
-const maps = ['oazabl', 'magazynbl', 'bazabl', 'oaza', 'magazyn', 'baza', 'iglo', 'strzelnica'];
+const maps = ['oazabl', 'magazynbl', 'bazabl', 'oaza', 'magazyn', 'baza', 'iglo', 'kaskady', 'mars', 'strzelnica'];
 patch('main.js', 'const MAPS=[', 'const MAP_MODS={' + maps.map((m) => `'./${m}-data.js':()=>import('./${m}-data.js')`).join(',') + '};\nconst MAPS=[');
 patch('main.js', 'await import(M.src)', 'await MAP_MODS[M.src]()');
 

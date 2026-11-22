@@ -1734,10 +1734,10 @@ function stepRemote(e,dt){
   _gl.copy(e.rifle.gripLTP);e.rifle.group.localToWorld(_gl);ud.torso.worldToLocal(_gl);
   poseArmsTo(ud,_gr,_gl);
 }
-// ================= mapy 1v1 w rotacji (Oaza = Bagno, Magazyn = Jachty, Baza = Salon, Iglo = Igloo) =================
+// ================= mapy 1v1 w rotacji (Oaza = Bagno, Magazyn = Jachty, Baza = Salon, Iglo = Igloo, Kaskady = Kaskady, Mars = Mars) =================
 const arenaBoxes=boxes.slice(),arenaMeshes=boxMeshes.slice(),arenaGround=window.__ground;
 const MAPS=[{name:'OazaBL',src:'./oazabl-data.js'},{name:'MagazynBL',src:'./magazynbl-data.js'},{name:'BazaBL',src:'./bazabl-data.js'},   // mapy BEANLADEN (GLB)
-  {name:'Oaza',src:'./oaza-data.js'},{name:'Magazyn',src:'./magazyn-data.js'},{name:'Baza',src:'./baza-data.js'},{name:'Iglo',src:'./iglo-data.js'}];   // Bagno, Jachty, Salon, Igloo
+  {name:'Oaza',src:'./oaza-data.js'},{name:'Magazyn',src:'./magazyn-data.js'},{name:'Baza',src:'./baza-data.js'},{name:'Iglo',src:'./iglo-data.js'},{name:'Kaskady',src:'./kaskady-data.js'},{name:'Mars',src:'./mars-data.js'}];   // Bagno, Jachty, Salon, Igloo, Kaskady, Mars
 // Strzelnica: mapa treningowa trybu solo (nie wchodzi do rotacji 1v1). Cele, tablica ustawień i statystyki: range.js
 const RANGE_MAP={name:'Strzelnica',src:'./strzelnica-data.js',range:true};   // strzelnica BEANLADEN: plac o zachodzie słońca (GLB)
 const ALLMAPS=[...MAPS,RANGE_MAP];

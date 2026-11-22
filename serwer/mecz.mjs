@@ -40,7 +40,7 @@ const LAG_SHOT = 0.35;                 // bez paczek ruchu dłużej niż tyle (l
 
 // ---------------- mapy: kolizje z plików gry ----------------
 const MAPS = {};
-export async function loadMaps(gameDir, names = ['OazaBL', 'MagazynBL', 'BazaBL', 'Oaza', 'Magazyn', 'Baza', 'Iglo']) {
+export async function loadMaps(gameDir, names = ['OazaBL', 'MagazynBL', 'BazaBL', 'Oaza', 'Magazyn', 'Baza', 'Iglo', 'Kaskady', 'Mars']) {
   for (const name of names) {
     const file = path.join(gameDir, 'zrodla', name.toLowerCase() + '-data.js');
     const mod = await import(pathToFileURL(file).href);

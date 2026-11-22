@@ -15,11 +15,11 @@ Wersja w jednym pliku do otwarcia dwuklikiem (bez serwera): `npm run build:offli
 - **Tryby:**
   - **Strzelnica:** trening solo na placu o zachodzie słońca (oryginalna mapa BEANLADEN, `zrodla/strzelnica-data.js`), czerwone fasolki-cele i tablica ustawień.
   - **Z botem:** mecz 1v1 z botem do 3 wygranych rund, bez serwera i stawki.
-  - **1v1:** mecz z prawdziwym graczem o stawkę do 3 wygranych rund (serwer meczów), na jednej z siedmiu map.
+  - **1v1:** mecz z prawdziwym graczem o stawkę do 3 wygranych rund (serwer meczów), na jednej z dziewięciu map.
   - **Deathmatch:** za darmo, stałe lobby do 20 graczy (wchodzisz i wychodzisz kiedy chcesz), widok z 3. osoby (wymaga serwera gry – szczegóły niżej).
-- **Mapy:** w rotacji 1v1 i Deathmatch jest siedem map: trzy oryginalne mapy BEANLADEN – Oaza, Magazyn, Baza (modele GLB, id `OazaBL`, `MagazynBL`, `BazaBL`,
+- **Mapy:** w rotacji 1v1 i Deathmatch jest dziewięć map: trzy oryginalne mapy BEANLADEN – Oaza, Magazyn, Baza (modele GLB, id `OazaBL`, `MagazynBL`, `BazaBL`,
   pliki `zrodla/oazabl-data.js`, `magazynbl-data.js`, `bazabl-data.js`; zwykły build zapisuje ich modele jako `gra/*.glb`) oraz mapy z GTASSAULT:
-  Bagno (id `Oaza`), Jachty (id `Magazyn`), Salon (id `Baza`) i Igloo (id `Iglo`). Do tego Strzelnica.
+  Bagno (id `Oaza`), Jachty (id `Magazyn`), Salon (id `Baza`), Igloo (id `Iglo`), Kaskady i Mars. Do tego Strzelnica.
   Bagno to przystań na bagnie budowana w kodzie (`zrodla/oaza-data.js` – kolizje i spawny, `zrodla/bagno-scena.js` – wygląd): sklepik z przynętą na palach,
   pomosty, dwa hydroplany, przyczepy kempingowe, dęby z korzeniami, beczki i rozlewisko, którym się brodzi; niebo i światło ustawia `zrodla/klimaty.js`.
   Po zmianie kolizji mapy serwer meczów trzeba zrestartować (czyta `zrodla/*-data.js` przy starcie).
