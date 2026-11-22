@@ -173,7 +173,8 @@ export function warsztat(THREE) {
   // Każdy klucz (np. 'drewno', 'skora') to zestaw parametrów: szorstkość, metaliczność, faktura (+ jej siła), poświata.
   // Dzięki temu meble z różnych „materiałów” sklejają się w jedną siatkę = jedno wywołanie rysowania (i jedno w cieniu).
   const presets = {};
-  function preset(key, { tex = null, k = 0.4, rough = 0.6, metal = 0, emis = 0 } = {}) { presets[key] = [rough, metal, tex ? FAKTURY[tex][0] + Math.min(0.98, k) : 0, emis]; }
+  // lamps: false = powierzchnia na zewnątrz (pokład, kadłub, dach hali) – shader w ogóle nie liczy lamp (znak vMat.w)
+  function preset(key, { tex = null, k = 0.4, rough = 0.6, metal = 0, emis = 0, lamps = true } = {}) { presets[key] = [rough, metal, tex ? FAKTURY[tex][0] + Math.min(0.98, k) : 0, lamps ? emis : -1 - emis]; }
   let UBER = null;
   function uber() {
     if (UBER) return UBER;
@@ -184,10 +185,11 @@ export function warsztat(THREE) {
       const L = lampSet(), NL = L.list.length, NR = Math.max(1, rooms.length);
       Object.assign(sh.uniforms, { uDetA: { value: TX[0] }, uDetB: { value: TX[1] }, uChP: { value: chP }, uChM: { value: chM } });
       if (NL) {
-        sh.uniforms.uLP = { value: L.list.map((l) => new THREE.Vector4(l.x, l.y, l.z, l.r)) };
+        sh.uniforms.uLP = { value: L.list.map((l) => new THREE.Vector4(l.x, l.y, l.z, 1 / (l.r * l.r))) };   // w = 1/zasięg²
         sh.uniforms.uLC = { value: L.list.map((l) => new THREE.Color(l.c).multiplyScalar(l.i)) };
-        sh.uniforms.uRA = { value: rooms.map((r) => new THREE.Vector3(r[0], r[1], r[2])) };
-        sh.uniforms.uRB = { value: rooms.map((r) => new THREE.Vector3(r[3], r[4], r[5])) };
+        // 2 cm zapasu: ściany i sufity leżące dokładnie na granicy pokoju nie migoczą (raz w środku, raz poza)
+        sh.uniforms.uRA = { value: rooms.map((r) => new THREE.Vector3(r[0] - 0.02, r[1] - 0.02, r[2] - 0.02)) };
+        sh.uniforms.uRB = { value: rooms.map((r) => new THREE.Vector3(r[3] + 0.02, r[4] + 0.02, r[5] + 0.02)) };
         sh.uniforms.uRL = { value: L.range.map(([s0, n]) => new THREE.Vector2(s0, n)) };
       }
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aMat;\nvarying vec4 vMat;\nvarying vec3 vWP;\nvarying vec3 vWN;')
@@ -215,19 +217,20 @@ if (tid > 0.5) {
 }`)
         .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp(vMat.x * (1.0 + (wDet - 0.5) * 2.0 * wRK), 0.03, 1.0);')
         .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = vMat.y;')
-        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * vMat.w;')
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * (vMat.w < 0.0 ? -vMat.w - 1.0 : vMat.w);')
         // lampy: tylko pomieszczenia, w którym leży piksel (lampy są ułożone pokojami: uRL = początek i liczba)
         .replace('#include <opaque_fragment>', `#if NLAMP > 0
 {
   int ri = -1;
-  for (int r = 0; r < NROOM; r++) { vec3 a = step(uRA[r], vWP) * step(vWP, uRB[r]); if (a.x * a.y * a.z > 0.5) ri = r; }
+  for (int r = 0; r < NROOM; r++) { vec3 a = step(uRA[r], vWP) * step(vWP, uRB[r]); if (a.x * a.y * a.z > 0.5) ri = r; }   // pętla o stałej długości (kompilator ją rozwija)
+  if (vMat.w < 0.0) ri = -1;                                                                  // powierzchnia bez lamp
   if (ri >= 0) {
     vec3 nn = normalize(vWN) * (gl_FrontFacing ? 1.0 : -1.0); vec3 acc = vec3(0.0);
     int st = int(uRL[ri].x), cnt = int(uRL[ri].y);
     for (int i = 0; i < MAXL; i++) {
       if (i >= cnt) break;
-      vec4 lp = uLP[st + i]; vec3 dl = lp.xyz - vWP; float dist = length(dl); float f = clamp(1.0 - dist / lp.w, 0.0, 1.0);
-      acc += uLC[st + i] * (f * f) * (0.3 + 0.7 * max(dot(nn, dl / max(dist, 1e-3)), 0.0));
+      vec4 lp = uLP[st + i]; vec3 dl = lp.xyz - vWP; float d2 = dot(dl, dl); float f = clamp(1.0 - d2 * lp.w, 0.0, 1.0);   // bez pierwiastka i dzielenia
+      acc += uLC[st + i] * (f * f) * (0.3 + 0.7 * max(dot(nn, dl) * inversesqrt(d2 + 1e-4), 0.0));
     }
     outgoingLight += diffuseColor.rgb * acc;
   }
@@ -235,7 +238,7 @@ if (tid > 0.5) {
 #endif
 #include <opaque_fragment>`);
     };
-    m.customProgramCacheKey = () => { const L = lampSet(); return 'wnetrze3-' + L.list.length + '-' + L.max + '-' + rooms.length; };
+    m.customProgramCacheKey = () => { const L = lampSet(); return 'wnetrze4-' + L.list.length + '-' + L.max + '-' + rooms.length; };
     return (UBER = m);
   }
 
@@ -248,6 +251,15 @@ if (tid > 0.5) {
     out.setAttribute('position', new THREE.BufferAttribute(P, 3)); out.setAttribute('normal', new THREE.BufferAttribute(N, 3)); out.setAttribute('color', new THREE.BufferAttribute(K, 3));
     out.computeBoundingSphere(); out.computeBoundingBox(); return out;
   }
+  // podział kluczy: geometrie spełniające warunek przechodzą do klucza z przyrostkiem (np. osobna siatka bez cienia)
+  function split(keys, pred, suffix = '_n') {
+    for (const k of keys) { const l = kits[k] || []; kits[k + suffix] = (kits[k + suffix] || []).concat(l.filter(pred)); kits[k] = l.filter((g) => !pred(g)); if (presets[k]) presets[k + suffix] = presets[k]; }
+    return keys.map((k) => k + suffix);
+  }
+  // drobiazg (największy wymiar < lim) albo cienki pręt/listwa (średni wymiar < thin): jego cień i tak ginie, a kosztuje
+  const _sz = new THREE.Vector3();
+  const small = (lim = 0.3, thin = 0.06) => (g) => { g.computeBoundingBox(); const d = g.boundingBox.getSize(_sz).toArray().sort((a, b) => a - b); return d[2] < lim || d[1] < thin; };
+
   // siatka z kilku kluczy naraz; atrybut aMat = parametry powierzchni z preset()
   function mergeKeys(keys) {
     const list = [], pm = [];
@@ -378,7 +390,7 @@ if (tid > 0.5) {
   }
 
   return {
-    THREE, M4, T, add, addKit, kits, box, boxM, cyl, tube, pipe, tris, quad, rbox, rboxM, rboxGeo, crease, preset, uber, mesh, merge, artAtlas, flipWinding,
+    THREE, M4, T, add, addKit, kits, box, boxM, cyl, tube, pipe, tris, quad, rbox, rboxM, rboxGeo, crease, preset, uber, mesh, merge, split, small, artAtlas, flipWinding,
     sofa, stool, table, plant, bottles, sconce, tableLamp,
     // lampy wnętrz: punkt, zasięg (m), kolor, siła; pokoje: pudełka [x0,y0,z0,x1,y1,z1], poza którymi lampy nie świecą
     lamp(x, y, z, r, c = '#ffd9a0', i = 1) { lamps.push({ x, y, z, r, c, i }); },

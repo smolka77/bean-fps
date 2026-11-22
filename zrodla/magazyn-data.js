@@ -146,8 +146,8 @@ export function build(THREE) {
 
   // ---------------- powierzchnie (jeden materiał z parametrami w wierzchołkach – wnetrza.js) ----------------
   const PR = {
-    tek: { tex: 'teak', k: 0.38, rough: 0.72 }, podl: { tex: 'wood', k: 0.42, rough: 0.5 }, lak: { rough: 0.24, metal: 0.05 },
-    kadlub: { rough: 0.16, metal: 0.12 }, drewno: { tex: 'wood', k: 0.5, rough: 0.32, metal: 0.02 }, mah: { tex: 'wood', k: 0.45, rough: 0.2, metal: 0.05 },
+    tek: { tex: 'teak', k: 0.38, rough: 0.72, lamps: false }, podl: { tex: 'wood', k: 0.42, rough: 0.5 }, lak: { rough: 0.24, metal: 0.05 },
+    kadlub: { rough: 0.16, metal: 0.12, lamps: false }, drewno: { tex: 'wood', k: 0.5, rough: 0.32, metal: 0.02 }, mah: { tex: 'wood', k: 0.45, rough: 0.2, metal: 0.05, lamps: false },
     skora: { tex: 'leather', k: 0.22, rough: 0.52 }, tkanina: { tex: 'fabric', k: 0.32, rough: 0.92 }, dywan: { tex: 'carpet', k: 0.4, rough: 1 },
     marmur: { tex: 'marble', k: 0.55, rough: 0.12, metal: 0.05 }, chrom: { tex: 'metal', k: 0.08, rough: 0.16, metal: 0.95 },
     zloto: { tex: 'metal', k: 0.1, rough: 0.3, metal: 0.6, emis: 0.3 },   // ciepłe złoto ze słabą poświatą (pełny metal odbijał niebieskie niebo)
