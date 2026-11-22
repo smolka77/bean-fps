@@ -6,6 +6,8 @@
 //    mapa (iglo, chaty, łódź w lodzie, grań) jest budowana w kodzie: zrodla/iglo-scena.js + dane w zrodla/iglo-data.js
 //  • Kaskady → „Kaskady”: jesienna wyspa-diorama nad morzem chmur w złotym popołudniu (latające wysepki, spadające liście, ptaki);
 //    mapa (tarasy z rudej ziemi, wodospad, staw, warownia, krąg kamieni) jest budowana w kodzie: zrodla/kaskady-scena.js + dane w zrodla/kaskady-data.js
+//  • Mars → „Mars”: zakurzone marsjańskie popołudnie nad lewitującą wyspą (księżyce, dalekie wyspy, pył, wir pyłowy, dron);
+//    mapa (moduł HAB-01, szklarnia, łazik, iglice) jest budowana w kodzie: zrodla/mars-scena.js + dane w zrodla/mars-data.js
 // Styl fasolki: low poly, płaskie kolory, cieniowanie płaskie. Dekoracje leżą poza polem gry (albo płasko na ziemi), kule ich nie widzą.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -785,7 +787,96 @@ function themeCascades(M, root) {
   return T;
 }
 
-const THEMES = { Baza: themeDealer, Oaza: themeBayou, Magazyn: themeYachts, Iglo: themeSnow, Kaskady: themeCascades };
+// ======================================================================================================
+//            MARS (baza badawcza na lewitującej wyspie, zakurzone marsjańskie popołudnie)
+// ======================================================================================================
+// Mapa i kolizje: mars-data.js, grafika: mars-scena.js. Tu otoczenie: maślano-łososiowe niebo z pyłem, małe słońce z niebieską
+// poświatą (tak wygląda na Marsie), dwa księżyce, lewitujące wyspy z iglicami w oddali, pył niesiony wiatrem, wir pyłowy, dron nad bazą
+// i migające światła mapy (siatki 'mars-blink' ze sceny).
+function themeMars(M, root) {
+  const rand = rng(1976);
+  const sunOff = V3(-24, 21, 0);                                // słońce z zachodu: z boku dla obu stron
+  const FOG = '#d6a283';
+  const sky = skyTexture({
+    stops: [[90, '#6e3d33'], [55, '#8f5243'], [30, '#b46e54'], [14, '#cc8a68'], [6, '#dba07e'], [2, '#e4b393'], [0, FOG], [-8, '#b9765a'], [-90, '#5e3226']],
+    sun: { dir: sunOff.clone().normalize(), r: 15, disc: '#fff6e8', glow: [[420, 'rgba(150,190,230,.16)'], [170, 'rgba(170,205,240,.38)'], [60, 'rgba(225,240,255,.9)']] },
+    paint: (x, W, H, px, wrap) => {
+      const r = rng(41);
+      for (let i = 0; i < 46; i++) {                          // pasma pyłu na niebie
+        const el = 3 + r() * 24, cy = elevY(H, el), cx = r() * W, len = (120 + r() * 300) * (1 - el / 50), th = 2 + r() * 6;
+        const col = `rgba(${230 + r() * 25 | 0},${170 + r() * 40 | 0},${130 + r() * 30 | 0},${0.12 + r() * 0.16})`;
+        wrap((o) => { x.fillStyle = col; x.beginPath(); x.ellipse(cx + o, cy, len, th, 0, 0, Math.PI * 2); x.fill(); });
+      }
+      const y0 = elevY(H, 9), y1 = elevY(H, -2), g = x.createLinearGradient(0, y0, 0, y1);   // gęsty pył nad horyzontem
+      g.addColorStop(0, 'rgba(226,170,132,0)'); g.addColorStop(1, 'rgba(226,170,132,.9)'); x.fillStyle = g; x.fillRect(0, y0, W, y1 - y0);
+      x.fillStyle = 'rgba(255,240,230,.55)'; for (let i = 0; i < 40; i++) { const y = elevY(H, 50 + r() * 38); x.fillRect(r() * W, y, 2, 2); }
+    },
+  });
+  // ---- księżyce (Fobos i Dejmos): poszarpane, szare bryły wysoko na niebie ----
+  const moons = new Kit();
+  moons.add(jitter(new THREE.IcosahedronGeometry(9, 1), 2.6, rand), '#8d7e74', M4(-95, 150, -150, 0.3, 0.5, 0, 1.3, 1, 1));
+  moons.add(jitter(new THREE.IcosahedronGeometry(4.5, 0), 1.4, rand), '#a3938a', M4(120, 175, 60, 0.2, 1.2, 0, 1.2, 0.9, 1));
+  moons.meshes(false).forEach((m) => { m.userData.deco = true; m.material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, fog: false }); root.add(m); });
+  // ---- dalekie lewitujące wyspy: płaski wierzch z klocków, iglice, zwisające skały (w mgle pyłu) ----
+  const far = new Kit(), RK = ['#a9472b', '#9a3f26', '#b5532f', '#8d3822', '#7c3220', '#6b2b1d'];
+  for (let i = 0; i < 13; i++) {
+    const a = (i / 13) * Math.PI * 2 + (rand() - 0.5) * 0.3, d = 95 + rand() * 150, x0 = Math.cos(a) * d, z0 = Math.sin(a) * d, y0 = -28 + rand() * 60, R = 6 + rand() * 14;
+    for (let k = 0; k < 9; k++) {
+      const ax = (rand() - 0.5) * R * 1.4, az = (rand() - 0.5) * R * 1.4, w = R * (0.35 + rand() * 0.4), dep = R * (0.5 + rand() * 1.3);
+      far.add(new THREE.BoxGeometry(w, 1.6, w), RK[k % 3], M4(x0 + ax, y0, z0 + az));
+      far.add(new THREE.BoxGeometry(w * 0.7, dep, w * 0.7), RK[3 + (k % 3)], M4(x0 + ax, y0 - 0.8 - dep / 2, z0 + az));
+      if (rand() < 0.35) far.add(new THREE.BoxGeometry(w * 0.3, dep * 0.9, w * 0.3), RK[5], M4(x0 + ax + w * 0.2, y0 - dep - dep * 0.3, z0 + az));
+    }
+    for (let k = 0; k < 2 + Math.floor(rand() * 3); k++) {
+      const h = 4 + rand() * R * 1.1, sx = (rand() - 0.5) * R, sz = (rand() - 0.5) * R;
+      far.add(new THREE.BoxGeometry(2 + rand() * 2, h, 2 + rand() * 2), RK[k % 3], M4(x0 + sx, y0 + 0.8 + h / 2, z0 + sz));
+      far.add(new THREE.BoxGeometry(1.2, h * 0.4, 1.2), RK[(k + 1) % 3], M4(x0 + sx, y0 + 0.8 + h + h * 0.2, z0 + sz));
+    }
+    if (rand() < 0.4) { far.add(new THREE.BoxGeometry(4, 2.6, 3), '#e4e8ec', M4(x0, y0 + 2.1, z0)); far.add(new THREE.BoxGeometry(0.3, 0.3, 0.3), '#5ff2e6', M4(x0 + 2, y0 + 3.6, z0), 'glow'); }
+  }
+  far.meshes(false).forEach((m) => { m.userData.deco = true; root.add(m); });
+  // ---- pył niesiony wiatrem (ruch w shaderze) i wir pyłowy na horyzoncie ----
+  const dust = (N, size, color, opacity, place, move, key) => {
+    const pos = new Float32Array(N * 3), seed = new Float32Array(N);
+    for (let i = 0; i < N; i++) { const p = place(i); pos[i * 3] = p[0]; pos[i * 3 + 1] = p[1]; pos[i * 3 + 2] = p[2]; seed[i] = rand() * 6.283; }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+    geo.boundingSphere = new THREE.Sphere(V3(0, 0, 0), 400);
+    const cv = document.createElement('canvas'); cv.width = cv.height = 32; const c2 = cv.getContext('2d'), rg = c2.createRadialGradient(16, 16, 0, 16, 16, 16);
+    rg.addColorStop(0, 'rgba(255,255,255,1)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); c2.fillStyle = rg; c2.fillRect(0, 0, 32, 32);
+    const tex = new THREE.CanvasTexture(cv), uT = { value: 0 };
+    const mat = new THREE.PointsMaterial({ color, size, map: tex, transparent: true, opacity, depthWrite: false, sizeAttenuation: true });
+    mat.onBeforeCompile = (sh) => { sh.uniforms.uT = uT; sh.vertexShader = 'uniform float uT;\nattribute float aSeed;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + move); };
+    mat.customProgramCacheKey = () => key;
+    const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = 3; root.add(pts);
+    return uT;
+  };
+  const uDust = dust(2600, 0.09, '#f1c09a', 0.7, () => [(rand() * 2 - 1) * 50, rand() * 16, (rand() * 2 - 1) * 55],
+    'transformed.x = mod(position.x + 50.0 + uT * (1.6 + 0.8 * fract(aSeed * 2.1)), 100.0) - 50.0; transformed.y += sin(uT * 0.6 + aSeed) * 0.5;', 'bean-mars-dust');
+  const uDevil = dust(1400, 0.9, '#c98a64', 0.45, (i) => [0, (i / 1400) * 46, 0],
+    'float hh = position.y, rr = 1.5 + hh * 0.22 + sin(hh * 0.4 + uT) * 0.6, aa = aSeed * 3.0 + uT * (2.2 - hh * 0.02);\n' +
+    'transformed = vec3(150.0 + cos(aa) * rr + sin(uT * 0.13) * 6.0, -6.0 + hh, -70.0 + sin(aa) * rr);', 'bean-mars-devil');
+  // ---- dron krążący nad bazą (migające światło) ----
+  const drone = new THREE.Group(), dk = new Kit();
+  dk.box(0.7, 0.18, 0.7, '#e4e8ec', M4(0, 0, 0)); dk.box(0.3, 0.1, 0.3, '#3b4149', M4(0, -0.12, 0));
+  for (const [ax, az] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { dk.box(0.6, 0.05, 0.08, '#3b4149', M4(ax * 0.35, 0.02, az * 0.35, 0, Math.atan2(az, ax))); dk.add(new THREE.CylinderGeometry(0.28, 0.28, 0.02, 10), '#2a2f36', M4(ax * 0.55, 0.08, az * 0.55)); }
+  dk.box(0.1, 0.1, 0.1, '#ff3a2a', M4(0, -0.2, 0.3), 'glow');
+  dk.meshes(false).forEach((m) => { m.userData.deco = true; drone.add(m); }); drone.scale.setScalar(1.5); root.add(drone);
+  // migające światła mapy (maszty, antena, latarnie) – szukane w scenie mapy
+  const blink = []; (root.parent || root).traverse((o) => { if (o.name === 'mars-blink') blink.push(o); });
+  const T = {
+    sky, fog: FOG, near: 30, far: 260,
+    hemi: ['#ffd9c2', '#7a3a26', 1.05], sun: ['#fff0dc', 2.6], sunOff, env: sky, envI: 0.5,
+    update(t) {
+      uDust.value = t; uDevil.value = t;
+      blink.forEach((b, i) => { b.visible = Math.sin(t * 3.2 + i * 1.7) > 0.2; });
+      const a = t * 0.16; drone.position.set(Math.cos(a) * 13, 12 + Math.sin(t * 0.7) * 1.2, Math.sin(a) * 20); drone.rotation.set(Math.sin(t) * 0.06, -a, 0.12);
+    },
+  };
+  T.update(0);
+  return T;
+}
+
+const THEMES = { Baza: themeDealer, Oaza: themeBayou, Magazyn: themeYachts, Iglo: themeSnow, Kaskady: themeCascades, Mars: themeMars };
 
 // klocki low poly wspólne z mapami budowanymi w kodzie (zrodla/bagno-scena.js)
 export { Kit, M4, V3, between, jitter, rng, mats, addPalm, addRushes, addLily, neonSign };

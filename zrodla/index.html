@@ -1804,9 +1804,9 @@ function stepRemote(e,dt){
   _gl.copy(e.rifle.gripLTP);e.rifle.group.localToWorld(_gl);ud.torso.worldToLocal(_gl);
   poseArmsTo(ud,_gr,_gl);
 }
-// ================= mapy 1v1 w rotacji (Oaza = Bagno, Magazyn = Jachty, Baza = Salon, Iglo = Igloo, Kaskady = Kaskady) =================
+// ================= mapy 1v1 w rotacji (Oaza = Bagno, Magazyn = Jachty, Baza = Salon, Iglo = Igloo, Kaskady = Kaskady, Mars = Mars) =================
 const arenaBoxes=boxes.slice(),arenaMeshes=boxMeshes.slice(),arenaGround=window.__ground;
-const MAPS=[{name:'Oaza',src:'./oaza-data.js'},{name:'Magazyn',src:'./magazyn-data.js'},{name:'Baza',src:'./baza-data.js'},{name:'Iglo',src:'./iglo-data.js'},{name:'Kaskady',src:'./kaskady-data.js'}];
+const MAPS=[{name:'Oaza',src:'./oaza-data.js'},{name:'Magazyn',src:'./magazyn-data.js'},{name:'Baza',src:'./baza-data.js'},{name:'Iglo',src:'./iglo-data.js'},{name:'Kaskady',src:'./kaskady-data.js'},{name:'Mars',src:'./mars-data.js'}];
 // Strzelnica: mapa treningowa trybu solo (nie wchodzi do rotacji 1v1). Cele, tablica ustawień i statystyki: range.js
 const RANGE_MAP={name:'Strzelnica',src:'./bunkier-data.js',range:true};   // podziemna strzelnica w bunkrze (budowana w kodzie)
 const ALLMAPS=[...MAPS,RANGE_MAP];
