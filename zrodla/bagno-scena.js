@@ -1,10 +1,11 @@
-// Wygląd mapy BAGNO (1v1): przystań na bagnie w złotym, wilgotnym świetle późnego popołudnia. Budowana w kodzie (low poly, płaskie kolory).
+// Wygląd mapy BAGNO (1v1): przystań na bagnie w złotym, wilgotnym świetle późnego popołudnia. Budowana w kodzie; faktury, wygładzanie brył i cieniowanie – zrodla/plener.js.
 // Układ, kolizje i spawny są w zrodla/oaza-data.js – grafika używa tych samych liczb, więc siedzi dokładnie w bryłach kolizji.
 // Siatki oznaczone userData.deco (trawa, trzciny, liście, kable, szyldy i wszystko poza polem gry) nie biorą udziału w trafieniach.
 // Niebo, mgła, światło, woda, panorama miasta i ptaki: themeBayou w zrodla/klimaty.js.
 import * as THREE from 'three';
 import { Kit, M4, V3, between, jitter, rng, mats, addPalm, addRushes, addLily, neonSign } from './klimaty.js';
 import { HX, HZ, LAND, WL, DECK, PIER, SHACK, WATER, DECK_RECT, GANGWAYS, PIERS, FINGERS, PILES, POSTS, SHACK_WALLS, OBJECTS, baseY, MAP } from './oaza-data.js';
+import { surfaceMaterial, terrainMaterial, finishKit, terrainGrid, rgb, mixRgb, contactAO, autoSurface, lumpy } from './plener.js';
 
 const PI = Math.PI, UP = V3(0, 1, 0);
 const hash = (x, z) => { const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -90,16 +91,34 @@ function terrainMesh(x0, z0, x1, z1, step, hFn, colFn) {
   g.computeVertexNormals(); g.computeBoundingSphere();
   return g;
 }
+// kolor lądu w wierzchołku (płynne przejścia: trawa → wydeptana trawa → ubita ziemia, trawa → błoto przy umocnieniu)
+// w = udział ziemi w fakturze (0 trawa, 1 ziemia)
+const C_GRASS_A = rgb('#559e30'), C_GRASS_B = rgb('#74b843'), C_SUN = rgb('#9cc452'), C_PATH = rgb('#a27a4a'), C_PATH2 = rgb('#8d6a40'), C_TRAMP = rgb('#86844a'), C_MUD = rgb('#5f4c2f'), C_BANK = rgb('#6f8a3a');
+function landInfo(x, z, outer = false) {
+  const n = vnoise(x * 0.35, z * 0.35), n2 = vnoise(x * 1.7 + 9, z * 1.7), n3 = vnoise(x * 0.08 + 3, z * 0.08);
+  const dp = outer ? 9 : distPath(x + (n - 0.5) * 0.8, z), dw = outer ? (outerWetNear(x, z) ? 0.5 : 9) : distWater(x, z);
+  let c = mixRgb(C_GRASS_A, C_GRASS_B, sstep(0.25, 0.8, n * 0.7 + n2 * 0.3));
+  c = mixRgb(c, C_SUN, sstep(0.62, 0.85, n) * 0.85);
+  c = mixRgb(c, C_GRASS_A, sstep(0.4, 0.9, n3) * 0.35);
+  const wb = 1 - sstep(0.9, 1.9, dw); c = mixRgb(c, C_BANK, wb * 0.6);
+  const wt = 1 - sstep(0.9, 1.45, dp); c = mixRgb(c, C_TRAMP, wt);
+  const wp = 1 - sstep(0.55, 0.95, dp); c = mixRgb(c, mixRgb(C_PATH, C_PATH2, n2), wp);
+  const wm = 1 - sstep(0.45, 1.0, dw); c = mixRgb(c, C_MUD, wm);
+  const v = 0.92 + 0.16 * n2; c = [c[0] * v, c[1] * v, c[2] * v];
+  return { c, w: Math.max(wp, wm, wt * 0.45) };
+}
+function sstep(a, b, x) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
 // teren pola gry: ląd równo na LAND (fizyka gracza), dno rozlewiska 0,25 m pod zerem; siatka 0,5 m trafia w krawędzie umocnień
 function innerTerrain() {
-  const S = 0.5, bed = -0.25;
-  const h = (x, z) => {
+  const S = 0.5, bed = -0.25, ao = contactAO(MAP.colliders, LAND, 1.2, 0.6);
+  const g = terrainGrid(-HX, -HZ, HX, HZ, S, (x, z) => {
     let wet = true;                                                              // wierzchołek jest w wodzie, gdy wszystkie sąsiednie komórki pola są w wodzie
     for (const dx of [-S / 2, S / 2]) for (const dz of [-S / 2, S / 2]) { const cx = x + dx, cz = z + dz; if (Math.abs(cx) < HX && Math.abs(cz) < HZ && !wetCell(cx, cz)) wet = false; }
-    return wet ? bed - 0.12 * vnoise(x * 0.8, z * 0.8) : LAND;
-  };
-  const col = (x, z, y) => (y < 0.3 ? (vnoise(x * 0.6, z * 0.6) < 0.5 ? '#3d4a2a' : '#46502c') : landColor(x, z));
-  const m = new THREE.Mesh(terrainMesh(-HX, -HZ, HX, HZ, S, h, col), materials().TERRAIN);
+    if (wet) { const n = vnoise(x * 0.6, z * 0.6); return { y: bed - 0.12 * vnoise(x * 0.8, z * 0.8), c: rgb(n < 0.5 ? '#3d4a2a' : '#4a522c', 0.8 + 0.3 * n), t: 2, k: 0.5 }; }
+    const L = landInfo(x, z), a = ao(x, z, LAND);
+    return { y: LAND, c: [L.c[0] * a, L.c[1] * a, L.c[2] * a], t: 11, k: 0.75, w: L.w };
+  });
+  const m = new THREE.Mesh(g, terrainMaterial());
   m.name = 'teren'; m.receiveShadow = true;
   return m;
 }
@@ -123,15 +142,14 @@ function outerTerrain() {
     const d = Math.max(0, Math.hypot(x, z) - 70);                                 // Floryda: płasko, tylko łagodne fałdy
     return LAND + 0.35 * vnoise(x * 0.12, z * 0.12) + d * 0.012;
   };
-  const col = (x, z, y) => {
-    if (y < 0.2) return '#3d4a2a';
-    if (y < LAND + 0.08 && outerWetNear(x, z)) return '#6a5534';
-    const n = vnoise(x * 0.12, z * 0.12), n2 = vnoise(x * 0.9, z * 0.9);
-    if (y > 3) return n2 < 0.5 ? '#7fae46' : '#8cb84c';
-    if (n > 0.7) return n2 < 0.5 ? '#8fbf4a' : '#9cc452';
-    return GRASS[Math.floor((n * 0.5 + n2 * 0.5) * GRASS.length) % GRASS.length];
-  };
-  const m = new THREE.Mesh(terrainMesh(-112, -122, 112, 122, S, h, col), materials().TERRAIN);
+  const C_BED = rgb('#3d4a2a'), C_HILL = rgb('#7fae46');
+  const g = terrainGrid(-112, -122, 112, 122, S, (x, z) => {
+    const y = h(x, z);
+    if (y < 0.2) return { y, c: mixRgb(C_BED, C_MUD, sstep(-0.3, 0.2, y)), t: 2, k: 0.5 };
+    const L = landInfo(x, z, true);
+    return { y, c: mixRgb(L.c, C_HILL, sstep(1.5, 4, y) * 0.5), t: 11, k: 0.7, w: L.w };
+  }, (a, b, c, P) => !(P[a * 3 + 1] < -1.5 && P[b * 3 + 1] < -1.5 && P[c * 3 + 1] < -1.5));
+  const m = new THREE.Mesh(g, terrainMaterial());
   m.receiveShadow = true; m.userData.deco = true;
   return m;
 }
@@ -353,7 +371,7 @@ function oak(H, D, R, P, rand, big = 1, far = false) {                          
   const G = ['#4f9a2c', '#5daa34', '#3f8526', '#6bb63c', '#468f2a'];
   for (const e of [...ends, P.pt(0, 6.2 * big, 0)]) for (let b = 0, nb = far ? 2 : 3; b < nb; b++) {
     const s = (1.6 + rand() * 1.2) * big * (far ? 1.15 : 1), x = e.x + (rand() - 0.5) * 2.4 * big, z = e.z + (rand() - 0.5) * 2.4 * big, y = Math.max(e.y + 0.6 + rand() * 1.0, 5.4 * big);
-    D.add(jitter(new THREE.IcosahedronGeometry(1, far ? 0 : 1), 0.28, rand), pick(rand, G), M4(x, y, z, 0, rand() * 6, 0, s * 1.15, s * 0.62, s * 1.15));
+    D.add(lumpy(far ? 1 : 2, 0.38, rand() * 100, 0.55), pick(rand, G), M4(x, y, z, 0, rand() * 6, 0, s * 1.15, s * 0.62, s * 1.15));
     if (rand() < 0.6) {                                                              // mech zwisający spod korony (cienkie pasma)
       const mx = x + (rand() - 0.5) * s * 1.4, mz = z + (rand() - 0.5) * s * 1.4, top = y - s * 0.4, len = 0.6 + rand() * 0.9, w = 0.07 + rand() * 0.06, a = rand() * PI;
       const dx = Math.cos(a) * w, dz = Math.sin(a) * w;
@@ -381,7 +399,7 @@ function cypress(H, D, R, P, rand, scale = 1) {
   const G = ['#4f8a2a', '#5f9a32', '#3f7a24', '#6aa83a'];
   for (let b = 0; b < 4; b++) {
     const y = (6.0 + b * 1.05) * scale, s = (2.6 - b * 0.4) * scale, x = (rand() - 0.5) * 1.4, z = (rand() - 0.5) * 1.4, p = P.pt(x, y, z);
-    D.add(jitter(new THREE.IcosahedronGeometry(1, 0), 0.3, rand), pick(rand, G), M4(p.x, p.y, p.z, 0, rand() * 6, 0, s, 0.55 * scale, s));
+    D.add(lumpy(1, 0.32, rand() * 100, 0.6), pick(rand, G), M4(p.x, p.y, p.z, 0, rand() * 6, 0, s, 0.55 * scale, s));
     if (b < 3) rod(D, P.pt(0, y - 0.6, 0), p, 0.12 * scale, 0.06 * scale, '#5e5040', 5);
     for (let m = 0; m < 4; m++) { const mx = p.x + (rand() - 0.5) * s * 1.4, mz = p.z + (rand() - 0.5) * s * 1.4, len = 0.8 + rand() * 1.4, w = 0.16 + rand() * 0.1; R.tris([V3(mx - w, p.y - 0.35, mz), V3(mx + w, p.y - 0.35, mz), V3(mx, p.y - 0.35 - len, mz)], rand() < 0.5 ? '#b5bca0' : '#a3ad8c'); }
   }
@@ -563,7 +581,7 @@ function outerWorld(K, root, rand) {
     const side = Math.floor(rand() * 4), t = rand() * 2 - 1, o = 1.2 + rand() * 3;
     const x = side < 2 ? (side ? 1 : -1) * (HX + o) : t * (HX + o), z = side < 2 ? t * (HZ + o) : (side === 2 ? 1 : -1) * (HZ + o);
     if (outerWet(x, z)) { if (rand() < 0.5) addRushes(R, x, WL - 0.05, z, rand, 22, 2.2 + rand() * 0.8, 1.4); continue; }
-    const s = 0.9 + rand() * 1.1; D.add(jitter(new THREE.IcosahedronGeometry(1, 1), 0.25, rand), pick(rand, ['#3f8526', '#4f9a2c', '#2f7a22', '#5daa34']), M4(x, LAND + s * 0.5, z, 0, rand() * 6, 0, s * 1.3, s, s * 1.3));
+    const s = 0.9 + rand() * 1.1; D.add(lumpy(2, 0.3, rand() * 100, 0.4), pick(rand, ['#3f8526', '#4f9a2c', '#2f7a22', '#5daa34']), M4(x, LAND + s * 0.5, z, 0, rand() * 6, 0, s * 1.3, s, s * 1.3));
   }
   // drzewa: im bliżej pola, tym gęściej
   const PC = { trunk: '#7a5a3a', trunk2: '#6a4c32', leaf: '#4fa02a', leaf2: '#3c8a22', nut: '#4a3a24' };
@@ -593,7 +611,7 @@ function outerWorld(K, root, rand) {
   // droga gruntowa za płotem B ze słupami i kablami
   const road = new Kit(), RZ = 41;
   for (let x = -110; x < 110; x += 4) road.box(4.05, 0.03, 4.2, (x / 4) % 2 ? '#a07a4c' : '#987244', M4(x + 2, LAND + 0.02 + 0.35 * vnoise((x + 2) * 0.12, RZ * 0.12), RZ + Math.sin(x * 0.03) * 1.5));
-  road.meshes(false).forEach((m) => { m.userData.deco = true; root.add(m); });
+  { const m = new THREE.Mesh(finishKit(road, { classify: () => 'soil', ground: () => LAND }), terrainMaterial()); m.receiveShadow = true; m.userData.deco = true; root.add(m); }
   let prev = null;
   for (let x = -100; x <= 100; x += 20) {
     const z = RZ + 3.5 + Math.sin(x * 0.03) * 1.5, P = local(objMatrix(x, LAND, z, 0));
@@ -612,9 +630,48 @@ function outerWorld(K, root, rand) {
 }
 
 // ======================================================================================================
+//                         powierzchnie (plener.js): kolor z mapy -> rodzaj powierzchni
+// ======================================================================================================
+const SURF = {};
+const tag = (key, list) => { for (const c of list) SURF[c.toLowerCase()] = key; };
+tag('bark', ['#5b4634', '#4e3c2c', '#655040', '#6a5a48', '#5e5040', '#7a6a56', '#5a4230', '#7a5a3a', '#6a4c32']);
+tag('oldwood', [...OLD, '#6a563c', '#5a4632', '#6a5238', '#5a4a32', '#7a5636', '#8a6436', '#5a4030']);
+tag('wood', [...WOOD, '#b08850', '#c8a070', '#6a4a2e', '#8a5a32']);
+tag('rust', ['#9a4a26', '#b0582c', '#8a4224', '#a65530', '#6a3218', '#6a3a22', '#7a3a1a']);
+tag('painted', [...SIDING, '#e9dfc8', TRIM, '#2a9d8f', '#d8572a', '#efe3c4']);
+tag('soil', ['#a07a4c', '#987244', '#4f6a2a', '#7a6444']);
+tag('matte', ['#2b3326']);
+tag('steel', ['#a8adb2', '#c8ccd0', '#9aa0a6', '#d8dde2', '#8a9096', '#8a8f94']);
+tag('rubber', ['#1d1d1f', '#1f1f22', '#1d1d1d', '#2b2b2b', '#2a2a2a']);
+tag('glass', [GLASS]);
+tag('flower', ['#ff5a8a', '#ffd23a', '#ff8c3a', '#e84a5f', '#ffffff', '#ff6fb0', '#c58bff', '#ff7ab6', '#fff4f0', '#f4a6c8', '#f6f1e6', '#c04ad8', '#e46ab8', '#ffe680']);
+function surfaceOf(hex, g) {
+  const n = g.attributes.position.count, auto = autoSurface(hex);
+  if (n === 3) return auto === 'leaf' || auto === 'matte' ? 'grass' : 'leaf';           // pojedyncze trójkąty: źdźbła, trzciny, mech
+  if (g.userData.gloss) { const s = SURF[hex]; if (s && s !== 'painted' && s !== 'flower') return s; return auto === 'glass' ? 'glass' : auto === 'rubber' ? 'rubber' : auto === 'metal' ? 'steel' : 'gloss'; }
+  return SURF[hex] || auto;
+}
+const groundAt = (x, z) => {
+  const [dx0, dz0, dx1, dz1] = DECK_RECT;
+  if (x > dx0 && x < dx1 && z > dz0 && z < dz1) return DECK;
+  if (inMap(x, z)) return wetCell(Math.max(-HX + 0.01, Math.min(HX - 0.01, x)), z) ? WL : LAND;
+  return outerWet(x, z) ? WL : LAND;
+};
+
+// ======================================================================================================
 export function buildBayou() {
   const rand = rng(20261119);
   const root = new THREE.Group(); root.name = 'Bagno';
+  // piana na wodzie przy brzegach (themeBayou w klimaty.js robi z tego teksturę wody): 1 tuż przy lądzie, 0 dalej niż ~1,3 m
+  const wetAll = (x, z) => (inMap(x, z, -0.01) ? wetCell(x, z) : outerWet(x, z));
+  root.userData.foam = {
+    rect: [-60, -64, 60, 64],
+    fn: (x, z) => {
+      if (!wetAll(x, z)) return 1;
+      for (const r of [0.25, 0.5, 0.8, 1.2]) for (let k = 0; k < 8; k++) if (!wetAll(x + Math.cos(k * 0.785) * r, z + Math.sin(k * 0.785) * r)) return 1 - r / 1.4;
+      return 0;
+    },
+  };
   BLOCK = MAP.colliders.filter((b) => !(b[3] - b[0] > 20 || b[5] - b[2] > 20));        // kolizje bez lądu i granic (do rozstawiania drobiazgów)
   {
     const K = { H: new Kit(), HG: new Kit(), D: new Kit(), DG: new Kit(), R: new Kit(), G: new Kit() };
@@ -635,15 +692,16 @@ export function buildBayou() {
     for (const o of OBJECTS) buildObject(o, K, root, rand);
     decorate(K, root, rand);
     outerWorld(K, root, rand);
-    // siatki: twarde (trafienia), błyszczące (samoloty, przyczepy, beczki), ozdoby z cieniem, ozdoby bez cienia, świecące
-    const { SOLID, GLOW } = mats(), { GLOSS: GL } = materials();
+    // siatki: twarde (trafienia), ozdoby z cieniem, ozdoby bez cienia, świecące; błyszczące części (samoloty, przyczepy, beczki)
+    // idą do tych samych siatek co reszta – połysk siedzi w wierzchołkach (jeden materiał na całą mapę)
+    const { GLOW } = mats(), U = surfaceMaterial();
     const add = (geo, mat, deco, shadow) => { if (!geo) return; const m = new THREE.Mesh(geo, mat); m.castShadow = shadow; m.receiveShadow = true; m.userData.deco = deco; root.add(m); };
-    add(K.H.geometry('solid'), SOLID, false, true);
-    add(K.HG.geometry('solid'), GL, false, true);
-    add(K.D.geometry('solid'), SOLID, true, true);
-    add(K.DG.geometry('solid'), GL, true, true);
-    add(K.R.geometry('solid'), SOLID, true, false);
     for (const k of ['H', 'HG', 'D', 'DG', 'R', 'G']) add(K[k].geometry('glow'), GLOW, true, false);
+    for (const [a, b] of [['H', 'HG'], ['D', 'DG']]) for (const g of K[b].L.solid) { g.userData.gloss = true; K[a].L.solid.push(g); }
+    const fin = (kit) => finishKit(kit, { classify: surfaceOf, ground: groundAt });
+    add(fin(K.H), U, false, true);
+    add(fin(K.D), U, true, true);
+    add(fin(K.R), U, true, false);
   }
   return root;
 }

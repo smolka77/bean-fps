@@ -1,11 +1,12 @@
-// Wygląd mapy IGLOO (1v1): zimowy obóz nad zamarzniętym jeziorem w mroźne, słoneczne popołudnie. Budowana w kodzie (low poly, płaskie kolory).
+// Wygląd mapy IGLOO (1v1): zimowy obóz nad zamarzniętym jeziorem w mroźne, słoneczne popołudnie. Budowana w kodzie; faktury, wygładzanie brył i cieniowanie – zrodla/plener.js.
 // Układ, kolizje i spawny są w zrodla/iglo-data.js – grafika używa tych samych liczb, więc siedzi dokładnie w bryłach kolizji.
 // Strona A jest budowana raz i odbijana na stronę B (scale z = −1); napisy (tekstury) dostają osobną siatkę dla każdej strony.
 // Siatki oznaczone userData.deco (płoty, flagi, sople, kępki, wszystko poza polem gry) nie biorą udziału w trafieniach.
 // Niebo, mgła, światło, padający śnieg i góry na horyzoncie: themeSnow w zrodla/klimaty.js.
 import * as THREE from 'three';
 import { Kit, M4, V3, between, jitter, rng, mats } from './klimaty.js';
-import { HX, HZ, LAND, LAKE, RIDGE, STEPS, SHORE_STEPS, IGLOO, CABIN, CABIN_WALLS, HUT, BOAT, ICE_BLOCKS, OBJECTS, localBoxes, baseY } from './iglo-data.js';
+import { HX, HZ, LAND, LAKE, RIDGE, STEPS, SHORE_STEPS, IGLOO, CABIN, CABIN_WALLS, HUT, BOAT, ICE_BLOCKS, OBJECTS, localBoxes, baseY, MAP } from './iglo-data.js';
+import { surfaceMaterial, terrainMaterial, finishKit, recolor, withMirrorZ, flipTris, rgb, mixRgb, contactAO, autoSurface, lumpy } from './plener.js';
 
 const PI = Math.PI, UP = V3(0, 1, 0);
 const MZ = new THREE.Matrix4().makeScale(1, 1, -1);                 // odbicie strony A na stronę B
@@ -210,8 +211,8 @@ function fieldLand() {
   const { x0, x1, z0, z1, top } = RIDGE;
   const rg = heightGrid(x0, z0, x1, z1, 0.5, 0.5, (x, z) => (Math.abs(x - x0) < 0.01 || Math.abs(x - x1) < 0.01 || Math.abs(z - z0) < 0.01 || Math.abs(z - z1) < 0.01 ? top : top + (vnoise(x * 1.3, z * 1.3) - 0.5) * 0.04),
     (x, z) => SNOW[Math.floor(vnoise(x * 0.8, z * 0.8) * SNOW.length) % SNOW.length]);
-  const all = mergeTwo(mergeTwo(g, sk), rg);
-  const m = new THREE.Mesh(withMirror(all), materials().TERRAIN); m.name = 'teren'; m.receiveShadow = true;
+  const all = recolor(mergeTwo(mergeTwo(g, sk), rg), snowSurf, 50);
+  const m = new THREE.Mesh(withMirrorZ(all), terrainMaterial()); m.name = 'teren'; m.receiveShadow = true;
   return m;
 }
 // lód w polu gry (twardy – trafienia) i jezioro poza polem (ozdoba)
@@ -221,9 +222,8 @@ function iceColor(x, z) {
   return ICE[Math.floor((n * 0.5 + n2 * 0.5) * ICE.length) % ICE.length];
 }
 function fieldIce() {
-  const g = heightGrid(-HX, -LAKE, HX, LAKE, 1, 1, () => 0.004, iceColor);
-  g.computeVertexNormals(); g.computeBoundingSphere();
-  const m = new THREE.Mesh(g, materials().ICEMAT); m.name = 'lod'; m.receiveShadow = true;
+  const g = recolor(heightGrid(-HX, -LAKE, HX, LAKE, 1, 1, () => 0.004, iceColor), iceSurf, 10);
+  const m = new THREE.Mesh(g, terrainMaterial()); m.name = 'lod'; m.receiveShadow = true;
   return m;
 }
 // teren poza polem: jezioro ciągnie się na wschód i zachód (rozszerza się), dalej ośnieżone pagórki; grań wychodzi za płot jako wzgórze
@@ -256,11 +256,9 @@ function outerTerrain() {
     if (y < 0) return '#c9dcea';
     return n < 0.3 ? '#e8eff6' : n < 0.65 ? '#f1f5fa' : '#f7fafc';
   });
-  g.computeVertexNormals(); g.computeBoundingSphere();
-  const m = new THREE.Mesh(g, materials().TERRAIN); m.userData.deco = true; m.receiveShadow = true; m.name = 'snieg-dookola';
+  const m = new THREE.Mesh(recolor(g, (x, y, z) => (y < -0.1 ? iceSurf(x, y, z) : snowSurf(x, y, z)), 60), terrainMaterial()); m.userData.deco = true; m.receiveShadow = true; m.name = 'snieg-dookola';
   const ice = heightGrid(-180, -182, 180, 182, 4, 7, () => 0, iceColor, (x, z) => Math.abs(x) < HX && Math.abs(z) < LAKE);
-  ice.computeVertexNormals(); ice.computeBoundingSphere();
-  const mi = new THREE.Mesh(ice, materials().ICEMAT); mi.userData.deco = true; mi.receiveShadow = true;
+  const mi = new THREE.Mesh(recolor(ice, iceSurf, 10), terrainMaterial()); mi.userData.deco = true; mi.receiveShadow = true;
   return [m, mi];
 }
 
@@ -716,6 +714,66 @@ function outerWorld(K, rand) {
 }
 
 // ======================================================================================================
+//                         powierzchnie (plener.js): teren, lód i kolor z mapy -> rodzaj powierzchni
+// ======================================================================================================
+const sst = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const C_SNOW = rgb('#f2f6fb'), C_SNOW2 = rgb('#e6eef7'), C_SHADE = rgb('#d4e0ec'), C_TRAMP = rgb('#d3dce7'), C_TRAMP2 = rgb('#c9d3df'), C_COLD = rgb('#dfe9f3');
+let AO_SNOW = null;
+// śnieg w wierzchołku: płynne zaspy, wydeptane ścieżki (szare, ubite), przy brzegu chłodniejszy; cień przy bryłach (kontakt)
+function snowSurf(x, y, z) {
+  const n = vnoise(x * 0.4, z * 0.4), n2 = vnoise(x * 1.9 + 7, z * 1.9), n3 = vnoise(x * 0.09, z * 0.09);
+  let c = mixRgb(C_SNOW, C_SNOW2, sst(0.3, 0.85, n * 0.7 + n3 * 0.3));
+  if (inField(x, z, 0.5)) {
+    const dp = distPath(x + (n - 0.5) * 0.7, z);
+    c = mixRgb(c, C_COLD, (1 - sst(LAKE + 0.3, LAKE + 1.6, Math.abs(z))) * 0.7);
+    c = mixRgb(c, mixRgb(C_TRAMP, C_TRAMP2, n2), 1 - sst(0.5, 1.05, dp));
+    if (!AO_SNOW) AO_SNOW = contactAO(MAP.colliders, LAND, 1.1, 0.72);
+    const a = y > LAND - 0.05 && y < LAND + 0.1 ? AO_SNOW(x, z, LAND) : 1;
+    c = mixRgb(C_SHADE, c, (a - 0.72) / 0.28);
+  }
+  return { c, t: 4, k: 0.5, r: 0.7 };
+}
+const C_ICE = rgb('#bfe2f2'), C_ICE2 = rgb('#9fcfe6'), C_ICEDUST = rgb('#e6f2f9');
+// lód: ciemniejsze, przejrzyste tafle z pęknięciami, jaśniejsze placki przysypane śniegiem
+function iceSurf(x, y, z) {
+  const n = vnoise(x * 0.33, z * 0.33), n2 = vnoise(x * 1.3 + 5, z * 1.3);
+  const dust = sst(0.62, 0.82, n);
+  const c = mixRgb(mixRgb(C_ICE2, C_ICE, n2), C_ICEDUST, dust);
+  return { c, t: 10, k: 0.55, w: 1 - dust, r: 0.08 + dust * 0.5 };
+}
+const SURF = {};
+const tag = (key, list) => { for (const c of list) SURF[c.toLowerCase()] = key; };
+tag('snowblock', [...BLOCK, '#eef4fa', '#e6eef6', '#f3f7fb']);
+tag('snow', [MORTAR, '#f4f8fc', '#f6f9fc', '#f2f6fa', '#eef6fb', '#f7fafc', '#f1f5fa', '#e8eff6', '#d9e5f0', '#cbd8e5', '#e7edf4', '#e2ecf5', '#e9edf2']);
+tag('ice', [...ICE, ICICLE, '#a9dcf0', '#bfe6f6', '#9fd3ec', '#b4e1f4', '#8cc6e2', '#e8f4fa', '#7fb8d8']);
+tag('rock', ROCK);
+tag('needle', PINE);
+tag('painted', [...RED, TRIM, '#c8372d', '#f6f4ee', '#f2efe8', '#e9e0c8', '#f4ecd8']);
+tag('wood', [...WOOD, '#6a4a2e', '#5a4030', '#7a5636', '#c8a070', '#e2c294', '#d8b480', '#ecd0a4', '#c89a64', '#c9b48a', '#8a6a4a']);
+tag('oldwood', ['#5a4632', '#6a5238', '#5c3f2c', '#5f4c3a', '#6a4a32', '#6a4424']);
+tag('bark', [...BARK, '#5a3a22', '#7a5a3a', '#3a2a1a']);
+tag('metal', [SLATE, '#2b2b2e', '#3a3f46', '#3a3a3a', '#8a95a1', '#c8c8c8', '#d8d8d8', '#dddddd', '#e8e8e8', '#f4f4f4', '#f4f6f8', '#f2f4f6']);
+tag('glass', [GLASS, '#1d4f6e', '#1f2a36']);
+tag('rubber', ['#1d1d1f', '#2b2b2b', '#2a2a2a']);
+function surfaceOf(hex, g) {
+  const n = g.attributes.position.count, auto = autoSurface(hex);
+  if (n === 3) return SURF[hex] === 'snow' || SURF[hex] === 'snowblock' ? 'snow' : auto === 'leaf' ? 'needle' : 'grass';
+  const s = SURF[hex];
+  if (g.userData.gloss) return s === 'ice' || s === 'glass' || s === 'metal' || s === 'rubber' ? s : s === 'snowblock' ? 'ice' : 'gloss';
+  if (s) return s;
+  _hc.set(hex).getHSL(_hsl);
+  if (_hsl.l > 0.85 && _hsl.s < 0.5) return 'snow';
+  return auto;
+}
+const _hc = new THREE.Color(), _hsl = {};
+const groundAt = (x, z) => {
+  const az = Math.abs(z);
+  if (inField(x, z) && az < LAKE) return 0;
+  if (x < RIDGE.x1 && az > -RIDGE.z1 && az < -RIDGE.z0) return RIDGE.top;
+  return LAND;
+};
+
+// ======================================================================================================
 export function buildIgloo() {
   const rand = rng(20261120);
   const root = new THREE.Group(); root.name = 'Iglo';
@@ -747,15 +805,16 @@ export function buildIgloo() {
     const m = signMesh(1.05, 0.32, plankTex('IGLOO', 'NO SNOWBALLS INSIDE')); m.position.set(1.85, 1.35, P - s * 0.06); m.rotation.y = s > 0 ? PI : 0; root.add(m);
   }
   // strona A + jej odbicie na stronę B
-  for (const k of Object.keys(A)) for (const kind of ['solid', 'glow']) for (const g of A[k].L[kind]) K[k].L[kind].push(g, g.clone().applyMatrix4(MZ));
+  for (const k of Object.keys(A)) for (const kind of ['solid', 'glow']) for (const g of A[k].L[kind]) K[k].L[kind].push(g, flipTris(g.clone().applyMatrix4(MZ)));
   // siatki: twarde (trafienia), błyszczące (lód), ozdoby z cieniem, ozdoby bez cienia, świecące
-  const { SOLID, GLOW } = mats(), { GLOSS: GL } = materials();
+  // błyszczące części (lód, lakier) idą do tych samych siatek co reszta – połysk siedzi w wierzchołkach (jeden materiał na mapę)
+  const { GLOW } = mats(), U = surfaceMaterial();
   const add = (geo, mat, deco, shadow) => { if (!geo) return; const m = new THREE.Mesh(geo, mat); m.castShadow = shadow; m.receiveShadow = true; m.userData.deco = deco; root.add(m); };
-  add(K.H.geometry('solid'), SOLID, false, true);
-  add(K.HG.geometry('solid'), GL, false, true);
-  add(K.D.geometry('solid'), SOLID, true, true);
-  add(K.DG.geometry('solid'), GL, true, true);
-  add(K.R.geometry('solid'), SOLID, true, false);
   for (const k of ['H', 'HG', 'D', 'DG', 'R', 'G']) add(K[k].geometry('glow'), GLOW, true, false);
+  for (const [a, b] of [['H', 'HG'], ['D', 'DG']]) for (const g of K[b].L.solid) { g.userData.gloss = true; K[a].L.solid.push(g); }
+  const fin = (kit) => finishKit(kit, { classify: surfaceOf, ground: groundAt });
+  add(fin(K.H), U, false, true);
+  add(fin(K.D), U, true, true);
+  add(fin(K.R), U, true, false);
   return root;
 }
