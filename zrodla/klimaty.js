@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { YACHT, halfAt as yachtHalf } from './magazyn-data.js';   // wymiary jachtów (piana przy burtach)
 import { HALL } from './baza-data.js';                              // wymiary hali salonu (ulica i zabudowa wokół)
+import { makeWater2 } from './plener.js';                          // woda z pianą i zmarszczkami (Bagno, Kaskady)
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const UP = V3(0, 1, 0);
@@ -473,8 +474,9 @@ function themeBayou(M, root) {
     },
   });
 
-  // ---- woda rozlewiska: zielonkawa, z odbiciem nieba ----
-  const water = makeWater({ y: WL, color: '#3f6a46', rough: 0.08, metal: 0.3, env: sky, envI: 0.85, amp: 0.03, freq: 0.32, speed: 0.5, opacity: 0.92 });
+  // ---- woda rozlewiska: zielonkawo-brunatna, przy brzegu przejrzysta, z daleka odbija niebo; drobne zmarszczki i piana przy umocnieniach ----
+  const fo = (root.parent || root).userData.foam;
+  const water = makeWater2({ y: WL, color: '#5d7c58', deep: '#2b4430', rough: 0.05, env: sky, envI: 1.0, amp: 0.025, freq: 0.32, speed: 0.5, opacity: 0.86, foam: fo && fo.fn, rect: fo && fo.rect, ripple: 0.45 });
   root.add(water.mesh);
 
   // ---- daleko: pas lasu na horyzoncie i panorama miasta w mgle (północny wschód) ----

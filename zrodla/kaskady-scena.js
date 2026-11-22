@@ -1,4 +1,4 @@
-// Wygląd mapy KASKADY (1v1): jesienna wyspa-diorama w złotym popołudniu. Budowana w kodzie (low poly, płaskie kolory).
+// Wygląd mapy KASKADY (1v1): jesienna wyspa-diorama w złotym popołudniu. Budowana w kodzie; faktury, wygładzanie brył i cieniowanie – zrodla/plener.js.
 // Układ, kolizje i spawny są w zrodla/kaskady-data.js – grafika używa tych samych liczb, więc siedzi dokładnie w bryłach kolizji.
 // Styl: tarasy z rudej ziemi pocięte na bloki, z trawiastym okapem na krawędziach; kamienne schody, drewniane kładki i płoty,
 // świecąca turkusowa woda, krąg kamieni z kryształem, warownia z dwiema wieżami, jesienne drzewa (pomarańcz, czerwień, złoto) i świerki.
@@ -10,6 +10,7 @@ import {
   HX, HZ, LAND, WATER, POND, CLIFF, CIRCLE, FALL, TERRACE, TOWERS, GATE, ISLAND, BRIDGES, BRIDGE_TOP, BRIDGE_Z,
   STAIRS, stairSteps, POND_STEP, PARAPETS, MENHIRS, FENCES, FENCE_H, OBJECTS, localBoxes, baseY, MAP,
 } from './kaskady-data.js';
+import { surfaceMaterial, terrainMaterial, finishKit, recolor, flipTris, rgb, mixRgb, contactAO, autoSurface, lumpy, makeWater2 } from './plener.js';
 
 const PI = Math.PI;
 const MZ = new THREE.Matrix4().makeScale(1, 1, -1);                 // odbicie strony A na stronę B
@@ -207,7 +208,8 @@ function terrain(K, A, rand) {
   meshes.push(flatGrid(TERRACE.x0, TERRACE.z0, OUT.x, TERRACE.z1, TERRACE.top, 1, dirtOr([TOP_PATHS.terrace], 0.85)));
   for (const r of RIMS) for (const s of [1, -1]) meshes.push(flatGrid(r.x0, s > 0 ? r.z0 : -r.z1, r.x1, s > 0 ? r.z1 : -r.z0, r.top, 1, grassCol));
   meshes.push(flatGrid(POND.x0, POND.z0, POND.x1, POND.z1, 0.0, 1, (x, z) => (vnoise(x * 0.8, z * 0.8) > 0.55 ? SAND[1] : '#3f8f86')));   // dno stawu
-  for (const g of meshes) { const m = new THREE.Mesh(g, SOLID); m.receiveShadow = true; m.castShadow = false; K.root.add(m); }
+  void SOLID;
+  for (const g of meshes) { const m = new THREE.Mesh(recolor(g, groundSurf, 10), terrainMaterial()); m.receiveShadow = true; m.castShadow = false; K.root.add(m); }
 
   // ---- ściany z ziemi: płaskowyż, taras, brzegi stawu (wspólne; liczone dla całej mapy) ----
   const H = K.H, D = K.D;
@@ -259,17 +261,13 @@ function streakTex() {
 function waterBits(root, K, A, rand) {
   const ticks = [];
   // ---- lustro stawu: turkusowa, lekko świecąca woda z drobną falą ----
-  const uT = { value: 0 };
-  const wmat = new THREE.MeshStandardMaterial({ color: '#35c2cf', emissive: '#0d7d88', emissiveIntensity: 0.55, roughness: 0.12, metalness: 0.1, transparent: true, opacity: 0.8, flatShading: true, depthWrite: false });
-  wmat.onBeforeCompile = (sh) => {
-    sh.uniforms.uT = uT;
-    sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-      transformed.y += 0.025 * sin(position.x * 1.7 + uT * 1.3) * cos(position.y * 1.3 + uT * 1.1);`);
-  };
-  wmat.customProgramCacheKey = () => 'kaskady-water';
-  const wg = new THREE.PlaneGeometry(POND.x1 - POND.x0, POND.z1 - POND.z0, 30, 20); wg.rotateX(-PI / 2);
-  const water = new THREE.Mesh(wg, wmat); water.position.set((POND.x0 + POND.x1) / 2, WATER, 0); water.userData.deco = true; water.renderOrder = 2; root.add(water);
-  ticks.push((t) => { uT.value = t; });
+  // przejrzysta turkusowa woda (zmarszczki, odbicie nieba, lekka poświata od dna) i piana przy brzegach stawu
+  const wg = new THREE.PlaneGeometry(POND.x1 - POND.x0, POND.z1 - POND.z0, 30, 20); wg.rotateX(-PI / 2); wg.translate((POND.x0 + POND.x1) / 2, 0, 0);
+  const shoreD = (x, z) => Math.min(x - POND.x0, POND.x1 - x, z - POND.z0, POND.z1 - z, Math.max(Math.abs(x) - ISLAND.x1, Math.abs(z) - ISLAND.z1));
+  const W2 = makeWater2({ geo: wg, y: WATER, color: '#46c9cf', deep: '#0f6a74', rough: 0.04, envI: 0.9, amp: 0.02, freq: 1.2, speed: 0.9, opacity: 0.82, ripple: 0.8, emissive: '#0d7d88', emissiveIntensity: 0.3,
+    foam: (x, z) => 1 - Math.max(0, Math.min(1, shoreD(x, z) / 0.7)), rect: [POND.x0, POND.z0, POND.x1, POND.z1] });
+  const wmat = W2.mat, water = W2.mesh; water.userData.deco = true; water.renderOrder = 2; root.add(water);
+  ticks.push(W2.tick);
   // strumień na płaskowyżu (od ołtarza do krawędzi)
   const sg = new THREE.PlaneGeometry(CLIFF.x1 - (CIRCLE.x + 0.7), FALL.z1 - FALL.z0 - 0.4, 10, 3); sg.rotateX(-PI / 2);
   const stream = new THREE.Mesh(sg, wmat); stream.position.set((CLIFF.x1 + CIRCLE.x + 0.7) / 2, CLIFF.top + 0.045, 0); stream.userData.deco = true; stream.renderOrder = 2; root.add(stream);
@@ -327,10 +325,10 @@ function waterBits(root, K, A, rand) {
       earthFace(H, D, rand, { axis: 'z', pos: s * I.z1, out: s, a0: I.x0, a1: I.x1, y0: 0, y1: I.top, rowH: 0.4, cell: 0.9, visY: WATER - 0.1 });
     }
     const top = flatGrid(I.x0, I.z0, I.x1, I.z1, I.top, 0.6, grassCol);
-    const tm = new THREE.Mesh(top, mats().SOLID); tm.receiveShadow = true; K.root.add(tm);
+    const tm = new THREE.Mesh(recolor(top, groundSurf, 10), terrainMaterial()); tm.receiveShadow = true; K.root.add(tm);
     for (let i = 0; i < 9; i++) {                                                       // krzak: kule liści w obrysie kolizji
       const a = (i / 9) * PI * 2, r = i ? 0.38 + rand() * 0.15 : 0, s = i ? 0.6 + rand() * 0.18 : 0.85;
-      H.add(jitter(new THREE.IcosahedronGeometry(s, 1), 0.12, rand), pick(rand, i % 4 ? LEAF.green : LEAF.gold), M4(Math.cos(a) * r, I.top + 0.75 + (i ? rand() * 0.55 : 0.6), Math.sin(a) * r, rand(), rand(), 0, 1, 0.9, 1));
+      H.add(lumpy(2, 0.28, rand() * 100, 0.5).scale(s, s, s), pick(rand, i % 4 ? LEAF.green : LEAF.gold), M4(Math.cos(a) * r, I.top + 0.75 + (i ? rand() * 0.55 : 0.6), Math.sin(a) * r, rand(), rand(), 0, 1, 0.9, 1));
     }
     for (let i = 0; i < 7; i++) mushroom(D, (rand() - 0.5) * 3, I.top, (rand() < 0.5 ? -1 : 1) * (1.3 + rand() * 0.3), rand);
     // kamienie-stopnie z wody (wspólna para A/B)
@@ -351,7 +349,7 @@ function tree(H, D, x, y, z, s, c, rand) {
   H.add(new THREE.CylinderGeometry(0.17 * s, 0.26 * s, h + 0.4, 6), pick(rand, BARK), M4(x, y + (h + 0.4) / 2, z));
   for (let i = 0; i < 3; i++) { const a = rand() * PI * 2; rod(D, V3(x, y + h * 0.75, z), V3(x + Math.cos(a) * 0.8 * s, y + h + 0.5 * s, z + Math.sin(a) * 0.8 * s), 0.1 * s, 0.05 * s, BARK[1], 5); }
   const blobs = [[0, 3.35, 0, 1.15], [0.7, 3.0, 0.3, 0.8], [-0.6, 3.1, -0.4, 0.85], [0.2, 3.9, -0.5, 0.75], [-0.3, 3.7, 0.6, 0.75], [0.55, 3.55, -0.65, 0.65]];
-  for (const [bx, by, bz, br] of blobs) H.add(jitter(new THREE.IcosahedronGeometry(br * s, 1), 0.14 * s, rand), pick(rand, L), M4(x + bx * s, y + by * s, z + bz * s, rand(), rand(), 0));
+  for (const [bx, by, bz, br] of blobs) H.add(lumpy(2, 0.3, rand() * 100, 0.6), pick(rand, L), M4(x + bx * s, y + by * s, z + bz * s, rand(), rand(), 0, br * s * 1.08));
 }
 function pine(H, x, y, z, s, rand) {
   H.add(new THREE.CylinderGeometry(0.12, 0.2, 1.2, 6), pick(rand, BARK), M4(x, y + 0.6, z));
@@ -615,6 +613,54 @@ function outerWorld(K, A, root, rand) {
 }
 
 // ======================================================================================================
+//                         powierzchnie (plener.js): teren i kolor z mapy -> rodzaj powierzchni
+// ======================================================================================================
+const sst = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const C_G1 = rgb('#7cae39'), C_G2 = rgb('#91c246'), C_GW = rgb('#a9bf42'), C_GE = rgb('#6f9f30'), C_DIRT = rgb('#cf8e53'), C_DIRT2 = rgb('#b97a45'), C_SAND = rgb('#d9c08a'), C_BED = rgb('#3f8f86');
+let AO_K = null;
+// wierzch terenu w wierzchołku: trawa (z ciepłymi plamami), wydeptane ścieżki z ziemi, piasek przy strumieniu, dno stawu; cień przy bryłach
+function groundSurf(x, y, z) {
+  const n = vnoise(x * 0.35, z * 0.35), n2 = vnoise(x * 1.3 + 9, z * 1.3), n3 = vnoise(x * 0.11 + 4, z * 0.11);
+  if (y < 0.1 && inRect(x, z, POND)) { const s = sst(0.45, 0.7, vnoise(x * 0.8, z * 0.8)); return { c: mixRgb(C_BED, C_SAND, s * 0.8), t: 2, k: 0.5 }; }
+  let c = mixRgb(C_G1, C_G2, sst(0.2, 0.8, n2 * 0.6 + n3 * 0.4));
+  c = mixRgb(c, C_GW, sst(0.62, 0.85, n) * 0.9);
+  c = mixRgb(c, C_GE, sst(0.7, 0.95, n2) * 0.6);
+  const lines = Math.abs(y - CLIFF.top) < 0.05 ? [TOP_PATHS.cliff] : Math.abs(y - TERRACE.top) < 0.05 ? [TOP_PATHS.terrace] : Math.abs(y - LAND) < 0.05 ? PATHS : [];
+  const d = lines.length ? pathDist(lines, x, z) + (vnoise(x * 1.7, z * 1.7) - 0.5) * 0.5 : 9;
+  const wp = 1 - sst(0.55, 0.95, d);
+  c = mixRgb(c, mixRgb(C_DIRT, C_DIRT2, n2), wp);
+  let ws = 0;
+  if (Math.abs(y - CLIFF.top) < 0.05 && x > -11.6) ws = 1 - sst(0.9, 1.4, Math.abs(z));
+  c = mixRgb(c, C_SAND, ws);
+  if (!AO_K) AO_K = contactAO(MAP.colliders, LAND, 1.0, 0.62);
+  const a = Math.abs(y - LAND) < 0.05 && Math.abs(x) < HX + 0.5 && Math.abs(z) < HZ + 0.5 ? AO_K(x, z, LAND) : 1;
+  c = [c[0] * a, c[1] * a, c[2] * a];
+  return { c, t: 11, k: 0.75, w: Math.max(wp, ws) };
+}
+const SURF = {};
+const tag = (key, list) => { for (const c of list) SURF[c.toLowerCase()] = key; };
+tag('turf', [...GRASS, ...GRASS_WARM, ...GRASS_EDGE, ...MOSS]);
+tag('soil', [...EARTH, ...EARTH_DEEP, GROOVE, ...DIRT, '#3f8f86']);
+tag('stone', [...COBBLE, ...STONE, MORTAR, '#c9bfae']);
+tag('wood', [...WOOD, ...WOOD_DARK, '#d9b27a', '#4b3020', '#6a5a4a', '#3a3028']);
+tag('bark', BARK);
+tag('leaf', [...LEAF.orange, ...LEAF.red, ...LEAF.gold, ...LEAF.green]);
+tag('needle', PINE);
+tag('sand', SAND);
+tag('rock', ROCK);
+tag('metal', [IRON, '#2a2a30']);
+tag('straw', ['#e2c25a', '#b48a3a', '#f0d270']);
+tag('fabric', ['#f3e7cf', '#c9a46a', '#2fa2b0']);
+tag('flower', ['#f3ead8', '#e0402c', '#f0a830', '#f08a2e', '#ff9ec4', '#fff3d6', '#ffd27a', '#f4f1e8', '#ffd447', '#e85a8a', '#9b7fe0', '#ff8a3a', '#2a2026']);
+function surfaceOf(hex, g) {
+  const s = SURF[hex], n = g.attributes.position.count;
+  if (n === 3) return s === 'leaf' || !s ? (s === 'leaf' ? 'leaf' : 'grass') : s === 'turf' ? 'grass' : s;
+  if (s === 'turf') { g.computeBoundingBox(); const b = g.boundingBox; if (Math.max(b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z) < 0.6) return 'grass'; }   // kępki trawy
+  if (s) return s;
+  return autoSurface(hex);
+}
+
+// ======================================================================================================
 export function buildKaskady() {
   const rand = rng(20261122);
   const root = new THREE.Group(); root.name = 'Kaskady';
@@ -630,14 +676,15 @@ export function buildKaskady() {
   details(A, rand);
   ticks.push(...outerWorld(K, A, root, rand));
   // strona A + jej odbicie na stronę B
-  for (const k of Object.keys(A)) for (const kind of ['solid', 'glow']) for (const g of A[k].L[kind]) K[k].L[kind].push(g, g.clone().applyMatrix4(MZ));
-  const { SOLID, GLOW } = mats();
+  for (const k of Object.keys(A)) for (const kind of ['solid', 'glow']) for (const g of A[k].L[kind]) K[k].L[kind].push(g, flipTris(g.clone().applyMatrix4(MZ)));
+  const { GLOW } = mats(), U = surfaceMaterial();
   const add = (geo, mat, deco, shadow) => { if (!geo) return; const m = new THREE.Mesh(geo, mat); m.castShadow = shadow; m.receiveShadow = true; m.userData.deco = deco; root.add(m); };
-  add(K.H.geometry('solid'), SOLID, false, true);
-  add(K.D.geometry('solid'), SOLID, true, true);
-  add(K.R.geometry('solid'), SOLID, true, false);
   for (const k of ['H', 'D', 'R', 'G']) add(K[k].geometry('glow'), GLOW, true, false);
-  add(K.G.geometry('solid'), SOLID, true, false);
+  const fin = (kit) => finishKit(kit, { classify: surfaceOf, ground: topAt });
+  add(fin(K.H), U, false, true);
+  add(fin(K.D), U, true, true);
+  add(fin(K.R), U, true, false);
+  add(fin(K.G), U, true, false);
   root.userData.tick = (t) => { for (const f of ticks) f(t); };   // woda, wodospady (wywołuje klimat mapy co klatkę)
   return root;
 }

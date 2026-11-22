@@ -1,12 +1,14 @@
 // Wygląd mapy MARS (1v1): baza badawcza na lewitującej wyspie z czerwonej skały, w zakurzone marsjańskie popołudnie.
 // Low poly i „klockowe” skały (jak reszta gry), układ i kolizje z zrodla/mars-data.js – grafika siedzi w tych samych bryłach.
+// Wykończenie powierzchni (faktury liczone w kodzie, wygładzanie brył, cieniowanie otoczenia, obłe skały) – zrodla/plener.js.
 // Strona A jest budowana raz i odbijana na stronę B (z → −z); rzeczy z napisami (szyldy, skrzynie, lądowiska) – osobno dla każdej strony.
 // Siatki z userData.deco (drobiazgi, wszystko poza polem gry) nie biorą udziału w trafieniach.
 // Niebo, mgła pyłu, światło, księżyce, dalekie wyspy, pył w powietrzu i dron: themeMars w zrodla/klimaty.js.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Kit, M4, V3, between, rng, mats } from './klimaty.js';
-import { HX, HZ, HAB, VEST, MESA, STEPS, SPIRES, PROBE, GREEN, TANKS, ROVER, SOLAR, TOWER, PIPE, PADS, HAB_WALLS, LADDERS, OBJECTS, localBoxes } from './mars-data.js';
+import { HX, HZ, HAB, VEST, MESA, STEPS, SPIRES, PROBE, GREEN, TANKS, ROVER, SOLAR, TOWER, PIPE, PADS, HAB_WALLS, LADDERS, OBJECTS, localBoxes, MAP } from './mars-data.js';
+import { surfaceMaterial, terrainMaterial, finishKit, recolor, flipTris, rgb, mixRgb, contactAO, autoSurface, rockSlab } from './plener.js';
 
 const PI = Math.PI;
 const MZ = new THREE.Matrix4().makeScale(1, 1, -1);                 // odbicie strony A na stronę B
@@ -214,12 +216,12 @@ function quadGrid(x0, z0, x1, z1, y, cell, col, keep) {
 function ground() {
   const out = [];
   const g = quadGrid(-EX - 1, -EZ - 1, EX + 1, EZ + 1, 0, 0.5, groundColor, (x, z) => edgeDist(x, z) > 0 && !inMesaTop(x, z));
-  const m = new THREE.Mesh(g, materials().TERRAIN); m.name = 'Teren_Mars'; m.receiveShadow = true; out.push(m);
+  const m = new THREE.Mesh(recolor(g, regolith, 60), terrainMaterial()); m.name = 'Teren_Mars'; m.receiveShadow = true; out.push(m);
   // wierzch płaskowyżów (1,5 m) – osobna siatka z kafelków
   const tops = [];
   for (const s of [1, -1]) tops.push(quadGrid(MESA.x0, s > 0 ? MESA.z0 : -MESA.z1, MESA.x1, s > 0 ? MESA.z1 : -MESA.z0, MESA.top, 0.5, groundColor));
   for (const [x0, z0, x1, z1] of STEPS) for (const s of [1, -1]) tops.push(quadGrid(x0, s > 0 ? z0 : -z1, x1, s > 0 ? z1 : -z0, 1.0, 0.5, groundColor));
-  const mt = new THREE.Mesh(mergeGeometries(tops, false), materials().TERRAIN); mt.receiveShadow = true; mt.name = 'Teren_Plaskowyz'; out.push(mt);
+  const mt = new THREE.Mesh(recolor(mergeGeometries(tops, false), regolith, 60), terrainMaterial()); mt.receiveShadow = true; mt.name = 'Teren_Plaskowyz'; out.push(mt);
   return out;
 }
 const inMesaTop = (x, z) => x > MESA.x0 && x < MESA.x1 && Math.abs(z) > -MESA.z1 && Math.abs(z) < -MESA.z0;
@@ -247,22 +249,25 @@ function underside(K, rand) {
   void rand;
 }
 
+// blok skalny (obły, wyłupany) w obrysie pudełka – zamiast gładkiego prostopadłościanu
+let SEED = 1;
+const rb = (K, w, h, d, col, m, kind, round = 0.35, amp = 0.12) => K.add(rockSlab(w, h, d, SEED++, round, amp), col, m, kind);
 // iglica: klockowe piętra z warstwami skał (zawsze w obrysie w × d)
 function spire(K, x, z, w, d, h, y0, rand, kind) {
   let y = y0, k = Math.floor(rand() * 6), sw = w, sd = d;
   while (y < y0 + h - 0.05) {
     const th = Math.min(0.6 + rand() * 1.3, y0 + h - y);
-    K.box(sw, th, sd, STRATA[k % STRATA.length], M4(x + (rand() - 0.5) * (w - sw) * 0.8, y + th / 2, z + (rand() - 0.5) * (d - sd) * 0.8), kind);
+    rb(K, sw, th, sd, STRATA[k % STRATA.length], M4(x + (rand() - 0.5) * (w - sw) * 0.8, y + th / 2, z + (rand() - 0.5) * (d - sd) * 0.8), kind);
     y += th; k++; sw = Math.max(w * 0.42, sw * (0.84 + rand() * 0.12)); sd = Math.max(d * 0.42, sd * (0.84 + rand() * 0.12));
   }
   // drobne półki i odłamki u podstawy
-  for (let i = 0; i < 3; i++) { const s = 0.3 + rand() * 0.35; K.box(s, s * 0.8, s, pick(rand, ROCK), M4(x + (rand() - 0.5) * w * 0.9, y0 + s * 0.4, z + (rand() - 0.5) * d * 0.9, 0, rand() * 2)); }
+  for (let i = 0; i < 3; i++) { const s = 0.3 + rand() * 0.35; rb(K, s, s * 0.8, s, pick(rand, ROCK), M4(x + (rand() - 0.5) * w * 0.9, y0 + s * 0.4, z + (rand() - 0.5) * d * 0.9, 0, rand() * 2)); }
 }
 // głaz z klocków w obrysie kolizji
 function boulder(K, x, z, w, d, h, rand, y0 = 0) {
-  K.box(w, h * 0.62, d, pick(rand, ROCK), M4(x, y0 + h * 0.31, z));
-  K.box(w * 0.72, h * 0.38, d * 0.78, pick(rand, STRATA), M4(x + (rand() - 0.5) * w * 0.2, y0 + h * 0.81, z + (rand() - 0.5) * d * 0.15));
-  K.box(w * 0.4, h * 0.2, d * 0.4, pick(rand, ROCK), M4(x + w * 0.28, y0 + h * 0.1, z - d * 0.28), 'solid');
+  rb(K, w, h * 0.62, d, pick(rand, ROCK), M4(x, y0 + h * 0.31, z));
+  rb(K, w * 0.72, h * 0.38, d * 0.78, pick(rand, STRATA), M4(x + (rand() - 0.5) * w * 0.2, y0 + h * 0.81, z + (rand() - 0.5) * d * 0.15));
+  rb(K, w * 0.4, h * 0.2, d * 0.4, pick(rand, ROCK), M4(x + w * 0.28, y0 + h * 0.1, z - d * 0.28), 'solid');
 }
 
 // ---------------- moduł mieszkalny HAB-01 ----------------
@@ -369,8 +374,8 @@ function westRocks(K, A, rand) {
   const seg = (a, b, f) => { for (let p = a; p < b - 0.01; p += 1) f(p + Math.min(1, b - p) / 2, Math.min(1, b - p)); };
   for (let y = 0, k = 0; y < top - 0.01; y += 0.5, k++) {
     const sc = (u) => STRATA[(k + Math.floor(hash(u * 3, k) * 2)) % STRATA.length], j = (u) => (hash(u, y) - 0.5) * 0.06;
-    seg(z0, z1, (c, l) => { A.H.box(0.6, 0.5, l, sc(c), M4(x1 - 0.3 + j(c), y + 0.25, c)); A.H.box(0.6, 0.5, l, sc(c + 9), M4(x0 + 0.3 + j(c + 3), y + 0.25, c)); });
-    seg(x0 + 0.6, x1 - 0.6, (c, l) => { for (const zz of [z0 + 0.3, z1 - 0.3]) A.H.box(l, 0.5, 0.6, sc(c + zz), M4(c, y + 0.25, zz + j(c + zz))); });
+    seg(z0, z1, (c, l) => { rb(A.H, 0.6, 0.5, l, sc(c), M4(x1 - 0.3 + j(c), y + 0.25, c), 'solid', 0.25, 0.08); rb(A.H, 0.6, 0.5, l, sc(c + 9), M4(x0 + 0.3 + j(c + 3), y + 0.25, c), 'solid', 0.25, 0.08); });
+    seg(x0 + 0.6, x1 - 0.6, (c, l) => { for (const zz of [z0 + 0.3, z1 - 0.3]) rb(A.H, l, 0.5, 0.6, sc(c + zz), M4(c, y + 0.25, zz + j(c + zz)), 'solid', 0.25, 0.08); });
   }
   A.H.box(x1 - x0 - 1.2, top - 0.02, z1 - z0 - 1.2, STRATA[3], M4((x0 + x1) / 2 - 0.3, (top - 0.02) / 2, (z0 + z1) / 2));
   for (const [sx0, sz0, sx1, sz1] of STEPS) {
@@ -381,9 +386,9 @@ function westRocks(K, A, rand) {
   // głaz przy kanionie (strona A) i krater z sondą (środek, bez odbicia)
   boulder(A.H, -14.6, -2.8, 1.2, 1.0, 1.15, rand);
   const { x0: px0, x1: px1, z0: pz0, z1: pz1, h } = PROBE, pcx = (px0 + px1) / 2;
-  K.H.box(px1 - px0, h * 0.45, pz1 - pz0, BASALT[0], M4(pcx, h * 0.225, 0));
-  K.H.box((px1 - px0) * 0.78, h * 0.35, (pz1 - pz0) * 0.8, BASALT[2], M4(pcx + 0.1, h * 0.45 + h * 0.175, 0.05));
-  K.H.box((px1 - px0) * 0.5, h * 0.2, (pz1 - pz0) * 0.55, ROCK[3], M4(pcx + 0.2, h * 0.9, 0));
+  rb(K.H, px1 - px0, h * 0.45, pz1 - pz0, BASALT[0], M4(pcx, h * 0.225, 0));
+  rb(K.H, (px1 - px0) * 0.78, h * 0.35, (pz1 - pz0) * 0.8, BASALT[2], M4(pcx + 0.1, h * 0.45 + h * 0.175, 0.05));
+  rb(K.H, (px1 - px0) * 0.5, h * 0.2, (pz1 - pz0) * 0.55, ROCK[3], M4(pcx + 0.2, h * 0.9, 0));
   for (let i = 0; i < 14; i++) { const a = (i / 14) * PI * 2, r = 3.2 + rand() * 0.6, s = 0.3 + rand() * 0.3; K.D.box(s, s * 0.55, s, pick(rand, BASALT), M4(-11 + Math.cos(a) * r, s * 0.25, Math.sin(a) * r, 0, rand())); }
   // sonda: złota folia, skrzydła z ogniwami, antena – wbita w kamień pod kątem
   const P = M4(-10.45, h + 0.45, 0, 0, 0.4, 0.35);
@@ -608,6 +613,44 @@ function islandDeco(K, A, root, rand) {
 }
 
 // ======================================================================================================
+//                         powierzchnie (plener.js): grunt i kolor z mapy -> rodzaj powierzchni
+// ======================================================================================================
+const sst = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const C_REG = rgb('#b4502f'), C_REG2 = rgb('#c25d36'), C_DUST = rgb('#d48a5c'), C_BAS = rgb('#6a2f21'), C_TRK = rgb('#7f3520');
+let AO_M = null;
+// regolit w wierzchołku: rudy grunt z jasnym pyłem w zagłębieniach, ciemne płaty bazaltu (faktura skały), koleiny łazika, krater z sondą
+function regolith(x, y, z) {
+  const n = vnoise(x * 0.32 + 5, z * 0.32), n2 = vnoise(x * 1.1 + 40, z * 1.1 - 17), n3 = vnoise(x * 0.1, z * 0.1 + 3);
+  let c = mixRgb(C_REG, C_REG2, sst(0.25, 0.8, n2 * 0.5 + n3 * 0.5));
+  const wd = sst(0.6, 0.85, n2) * (inField(x, z) ? 0.75 : 1); c = mixRgb(c, C_DUST, wd);
+  let wb = 1 - sst(0.18, 0.3, n);
+  const cr = Math.hypot(x + 11, z);
+  if (cr < 4.6) { wb = Math.max(wb, sst(2.8, 3.4, cr) * (1 - sst(4.0, 4.6, cr))); c = mixRgb(c, C_DUST, 1 - sst(2.6, 3.2, cr)); }
+  c = mixRgb(c, C_BAS, wb * 0.85);
+  const tr = trackDist(x, z), wt = 1 - sst(0.1, 0.3, Math.abs(tr - 0.75)); c = mixRgb(c, C_TRK, wt * 0.75);
+  if (!AO_M) AO_M = contactAO(MAP.colliders, 0, 1.0, 0.6);
+  const a = y < 0.05 && inField(x, z, 0.5) ? AO_M(x, z, 0) : 1;
+  const v = 0.94 + 0.12 * vnoise(x * 2.3, z * 2.3);
+  return { c: [c[0] * a * v, c[1] * a * v, c[2] * a * v], t: 12, k: 0.8, w: Math.max(wb, wt * 0.3) };
+}
+const SURF = {};
+const tag = (key, list) => { for (const c of list) SURF[c.toLowerCase()] = key; };
+tag('rock', [...ROCK, ...STRATA, ...DEEP, ...BASALT]);
+tag('soil', [...REG, ...DUST, ...TRACK]);
+tag('paint', [...WHITE, '#e8ecef', '#eceff1', '#eef1f3', '#e6eaed', '#f2f4f6', '#eceff2', '#e4e8ec', '#dce1e5', '#d8dde3']);
+tag('steel', [GREY, STEEL, '#c9d0d6', '#8f979e', '#9aa3ab', '#aab2ba', '#a9b1b8', '#8d969e', '#7c858e', '#b4bcc3', '#c3cad0']);
+tag('metal', [DARK, DARKER, '#5d656e', '#2c3138', '#23272d', '#3e444c', '#4a5159', '#353b42', '#5a616a', '#6b737b', '#2b2b2e', '#1d1f23']);
+tag('leaf', PLANT);
+tag('plastic', [ORANGE, GOLD, '#f2b51a', '#d63a2a', '#e8432e', '#3d8fd6']);
+tag('glass', ['#1c2a36', '#1b2a2c', '#062a2c']);
+function surfaceOf(hex, g) {
+  const s = SURF[hex];
+  if (s === 'rock') { g.computeBoundingBox(); const b = g.boundingBox; if (b.max.y - b.min.y < 0.3 && b.max.x - b.min.x < 0.5) return 'boulder'; }
+  return s || autoSurface(hex);
+}
+const groundAt = (x, z) => (inMesaTop(x, z) ? MESA.top : 0);
+
+// ======================================================================================================
 export function buildMars() {
   const rand = rng(20261122);
   const root = new THREE.Group(); root.name = 'Mars';
@@ -628,13 +671,14 @@ export function buildMars() {
   pads(root);
   islandDeco(K, A, root, rand);
   // strona A + jej odbicie na stronę B (Kit ma materiały dwustronne – odbicie nie psuje ścian)
-  for (const k of Object.keys(A)) for (const kind of ['solid', 'glow']) for (const g of A[k].L[kind]) K[k].L[kind].push(g, g.clone().applyMatrix4(MZ));
-  const { SOLID, GLOW } = mats();
+  for (const k of Object.keys(A)) for (const kind of ['solid', 'glow']) for (const g of A[k].L[kind]) K[k].L[kind].push(g, flipTris(g.clone().applyMatrix4(MZ)));
+  const { GLOW } = mats(), U = surfaceMaterial();
   const add = (geo, mat, deco, shadow) => { if (!geo) return; const m = new THREE.Mesh(geo, mat); m.castShadow = shadow; m.receiveShadow = true; m.userData.deco = deco; root.add(m); };
-  add(K.H.geometry('solid'), SOLID, false, true);
-  add(K.D.geometry('solid'), SOLID, true, true);
-  add(K.R.geometry('solid'), SOLID, true, false);
   for (const k of ['H', 'D', 'R']) add(K[k].geometry('glow'), GLOW, true, false);
+  const fin = (kit) => finishKit(kit, { classify: surfaceOf, ground: groundAt });
+  add(fin(K.H), U, false, true);
+  add(fin(K.D), U, true, true);
+  add(fin(K.R), U, true, false);
   for (const m of T.H.meshes(false)) root.add(m);
   for (const m of T.HA.meshes(false)) root.add(m);
   for (const m of T.D.meshes(false)) root.add(m);
