@@ -20,6 +20,13 @@ export const GOLD = 'akmgold', P90 = 'p90';
 export const DM_GUNS = ['glock17', 'deagle', 'spas12', 'mp5k', 'akm', 'm4a1'];   // drabinka broni: start z pierwszą, każde zabójstwo = następna
 export const PISTOL = 'glock17';
 
+// ---------------- sieć ----------------
+// tick serwera (paczki stanu do graczy, kroki botów); serwer.mjs woła tick() TICK_HZ razy na sekundę
+export const TICK_HZ = 30;
+const REWIND = 0.4;                                        // kompensacja opóźnienia: najdalsze cofnięcie przeciwników przy strzale (s)
+// znaczniki czasu stanów i numerowane korekty 'fix' – wspólne z 1v1 (mecz.mjs)
+const { stampOf, sendFix, staleAfterFix } = MECZ;
+
 // ---------------- ustawienia (panel admina może zmienić każdą wartość) ----------------
 export const DEFAULTS = {
   maxPlayers: 20, minPlayers: 2, queueTimeout: 60,     // kolejka: najwyżej tylu graczy; po queueTimeout s start z tyloma, ilu jest (co najmniej minPlayers)
@@ -216,7 +223,7 @@ function newPlayer(pid, info, cfg) {
     money: cfg.startMoney, kills: 0, deaths: 0, damage: 0, heads: 0, shots: 0, hits: 0, streak: 0, best: 0, joinOrder: pid,
     owned: new Set([PISTOL]), ammo: {}, reloadW: -1, reloadAt: 0, bloom: 0, bloomT: 0, tokens: 1, tokT: 0, lastQ: 0,
     lastT: 0, lastGroundY: 0, airSince: 0, ground: true, hist: [], trail: [], viol: [], kicked: false, left: false,
-    rtt: 0.1, lastStT: 0, lastFix: 0, speed01: 0, killer: null, lastSpawnAt: -99, spawnIdx: -1, sent: new Map() };
+    rtt: 0.1, lastStT: 0, lastFix: 0, ts: null, cOff: null, fixN: 0, fixAt: 0, ackFix: false, viewD: null, speed01: 0, killer: null, lastSpawnAt: -99, spawnIdx: -1, sent: new Map() };
 }
 // drabinka: kolejna broń za coraz więcej zabójstw – 1. awans za 1 zabójstwo, 2. za kolejne 2, 3. za kolejne 3 itd. (lk = zabójstwa od ostatniego awansu)
 // Ekwipunek: drabinka pomija bronie, których gracz nie ma odblokowanych (p.guns; null = wszystkie)
@@ -301,7 +308,7 @@ function spawnPlayer(room, p, now, out, initial = false) {
   Object.assign(p, { x: s.x, y: s.y, z: s.z, yaw: s.yaw, pitch: 0, hp: 100, alive: true, dead: false, lastT: now, lastGroundY: s.y, airSince: 0, ground: true, gx: s.x, gy: s.y, gz: s.z,
     hist: [], trail: [], protUntil: now + room.cfg.spawnProtect, lastSpawnAt: now, w: WIDS.indexOf(gunOf(p)), lastStT: now, killer: null });
   refillOwned(p, room.cfg);
-  MECZ.pushHist(p, now);
+  MECZ.pushHist(p, now); p.ts = now;
   room.recentSpawns.push({ x: s.x, z: s.z, t: now }); if (room.recentSpawns.length > 40) room.recentSpawns.shift();
   const msg = { t: 'spawn', life: p.life, p: [s.x, s.y, s.z].map((v) => +v.toFixed(3)), yaw: +s.yaw.toFixed(3), prot: room.cfg.spawnProtect, ...invOf(p) };
   if (out) out(p.pid, msg); else p.pendingSpawn = msg;
@@ -318,7 +325,7 @@ function accept(p, s, now) {
   p.speed01 = Math.min(1, sp / 6.8);
   if (ladder || Math.abs(s.y - sup) < 0.15) { p.lastGroundY = ladder ? Math.max(s.y, sup) : s.y; p.airSince = 0; p.ground = true; p.gx = s.x; p.gy = s.y; p.gz = s.z; }
   else { if (!p.airSince) p.airSince = now; p.ground = false; }
-  MECZ.pushHist(p, now);
+  MECZ.pushHist(p, s.ts); p.ts = s.ts;                         // historia do kompensacji opóźnienia: chwila z zegara gracza (stampOf)
   p.trail.push({ t: now, x: s.x, z: s.z }); while (p.trail.length && now - p.trail[0].t > 2.5) p.trail.shift();
   // ruch kończy ochronę po odrodzeniu dopiero po wyjściu ze strefy (2 m) – gracz nie jest zabijany na spawnie, ale też nie biega nietykalny
 }
@@ -329,16 +336,20 @@ function onState(room, p, m, now, out) {
   p.emote = emote >= 1 && emote <= 3 ? emote | 0 : 0;                // emotka (1–3) widoczna dla innych
   if (life !== p.life) return;                                  // paczka z poprzedniego życia (przed odrodzeniem) – pomijamy
   p.lastStT = now;
+  if (staleAfterFix(p, m, now, (msg) => out(p.pid, msg))) return;   // wysłana przed korektą 'fix'
   let wid = WIDS[w | 0] && p.owned.has(WIDS[w | 0]) ? w | 0 : WIDS.indexOf(PISTOL);
   if (wid !== p.w && p.reloadW >= 0) p.reloadW = -1;            // zmiana broni przerywa przeładowanie
   p.w = wid;
   const clamp01 = (q) => (q > 1 ? 1 : q > 0 ? q : 0);
   const s = { x, y, z, yaw: yaw || 0, pitch: pitch || 0, cr: clamp01(cr), run: clamp01(run), air: clamp01(air), sl: clamp01(sl), legYaw: legYaw || 0, ads: ads > 0.5 ? 1 : 0 };
+  if (Number.isFinite(+m.d)) p.viewD = Math.max(0, Math.min(0.3, +m.d / 1000));   // opóźnienie obrazu u gracza (s) – do kompensacji, gdy strzał nie poda chwili
   p._map = room.map;
+  s.ts = stampOf(p, +m.c, now);
   const why = MECZ.checkMove({ map: room.map }, p, s, now);
   if (why) {
     if ((why === 'wisi w powietrzu' || why === 'za wysoko') && p.gx !== undefined) Object.assign(p, { x: p.gx, y: p.gy, z: p.gz, airSince: 0, lastGroundY: p.gy, trail: [] });
-    if (now - p.lastFix > 0.25) { p.lastFix = now; out(p.pid, { t: 'fix', p: [p.x, p.y, p.z].map((q) => +q.toFixed(3)) }); }
+    // korekta: klient z numerami korekt dostaje ją od razu (paczki sprzed niej i tak są pomijane; najwyżej 10/s), starszy – najwyżej co 0,25 s
+    if (now - p.lastFix > (p.ackFix ? 0.1 : 0.25)) sendFix(p, now, (msg) => out(p.pid, msg));
     if (room.log.length < 400) room.log.push(`${p.nick}: ${why}`);
     if (MECZ.SEVERE.has(why) && why !== 'nan') { p.viol.push(now); while (p.viol.length && now - p.viol[0] > 20) p.viol.shift(); if (p.viol.length >= 25 && MECZ.kickOn()) p.kicked = true; }
     p.lastT = now; return;
@@ -356,6 +367,13 @@ function jitter(d, rad) {
   return norm([d[0] + (u[0] * c + v[0] * s) * k, d[1] + (u[1] * c + v[1] * s) * k, d[2] + (u[2] * c + v[2] * s) * k]);
 }
 function finishReload(p, cfg) { const id = WIDS[p.reloadW], W = cfg.weapons[id], a = p.ammo[id]; if (a && W) { const n = Math.min(W.mag - a.mag, a.res); a.mag += n; a.res -= n; } p.reloadW = -1; }
+// kompensacja opóźnienia: gra podaje chwilę obrazu, w której padł strzał (rt, czas serwera od startu pokoju); bez niej –
+// opóźnienie łącza + opóźnienie obrazu zgłoszone w paczkach ruchu. Zawsze najwyżej o opóźnienie gracza + 0,25 s (i REWIND) wstecz.
+export function rewindOf(room, p, m, now) {
+  const lim = Math.min(REWIND, p.rtt + 0.25), rt = +m.rt;
+  if (typeof m.rt === 'number' && Number.isFinite(rt)) return Math.max(0, Math.min(lim, now - room.t0 - rt));
+  return Math.min(lim, p.rtt + (p.viewD != null ? p.viewD : 0.1));
+}
 const falloff = (W, dist) => { const [a, b, m] = W.falloff; if (dist <= a) return 1; if (dist >= b) return m; return 1 - (1 - m) * (dist - a) / (b - a); };
 
 function shoot(room, p, m, now, out) {
@@ -381,7 +399,7 @@ function shoot(room, p, m, now, out) {
   let d = Array.isArray(m.d) && m.d.length === 3 && m.d.every(Number.isFinite) ? m.d : null; if (!d) return;
   if (Math.hypot(d[0], d[1], d[2]) < 1e-6) return; d = norm(d);
   const aim = jitter(d, spread);
-  const back = Math.min(0.35, p.rtt + 0.1);                        // cofnięcie przeciwników o to, co strzelający widział (opóźnienie + wygładzanie obrazu)
+  const back = rewindOf(room, p, m, now);                          // cofnięcie przeciwników o to, co strzelający widział na ekranie
   const targets = [];
   for (const t of room.p.values()) {
     if (t === p || t.left) continue;
@@ -491,7 +509,7 @@ export function leave(room, pid, now, out, why = 'leave') {
   room.boardDirty = true; updateWanted(room, out);
 }
 
-// ---------------- co tick (20/s): fazy meczu, widoczność, paczki stanu dla każdego gracza ----------------
+// ---------------- co tick (TICK_HZ/s): fazy meczu, widoczność, paczki stanu dla każdego gracza ----------------
 function canSee(room, v, t) {
   const dx = t.x - v.x, dz = t.z - v.z, D = Math.hypot(dx, dz);
   if (D < 5) return true;
@@ -505,9 +523,10 @@ function canSee(room, v, t) {
   return false;
 }
 const r3 = (v) => Math.round(v * 1000) / 1000, r2 = (v) => Math.round(v * 100) / 100;
-function stateRow(p, now) {
+function stateRow(p, now, room) {
   const fl = (p.ads ? 1 : 0) | (p.armor > 0 ? 2 : 0) | (p.helmet && p.armor > 0 ? 4 : 0) | (now < p.protUntil ? 8 : 0) | (p.reloadW >= 0 ? 16 : 0) | ((p.emote || 0) << 5);
-  return [p.pid, p.life, r3(p.x), r3(p.y), r3(p.z), r3(p.yaw), r3(p.pitch), r2(p.cr), r2(p.run), r2(p.air), r2(p.sl), r2(p.legYaw), p.w, fl];
+  // ostatnie pole: chwila tego stanu (czas serwera od startu pokoju) – obraz u graczy interpoluje po niej, a nie po chwili paczki
+  return [p.pid, p.life, r3(p.x), r3(p.y), r3(p.z), r3(p.yaw), r3(p.pitch), r2(p.cr), r2(p.run), r2(p.air), r2(p.sl), r2(p.legYaw), p.w, fl, r3((p.ts != null ? p.ts : now) - room.t0)];
 }
 export function tick(room, now, out) {
   if (room.over) return;
@@ -520,7 +539,7 @@ export function tick(room, now, out) {
     // za długo na ekranie śmierci (bez Spacji i bez Esc): powrót do lobby, żeby nie zajmować miejsca
     if (p.dead && now - p.deadAt > cfg.idleDead) { out(p.pid, { t: 'error', code: 'idle', message: 'Za długo na ekranie śmierci – wróciłeś do lobby.' }); leave(room, p.pid, now, out, 'idle'); }
   }
-  // paczki stanu: każdy dostaje widocznych przeciwników (widoczność liczona co 3. tick dla każdej pary, na zmianę)
+  // paczki stanu: każdy dostaje widocznych przeciwników (widoczność liczona co 3. tick dla każdej pary, na zmianę – przy 30/s co 0,1 s)
   const list = [...room.p.values()].filter((p) => !p.left);
   for (const v of list) {
     const rows = [];
@@ -529,14 +548,14 @@ export function tick(room, now, out) {
       let c = v.sent.get(t.pid); if (!c) { c = { vis: false, seenT: -9, k: (t.pid * 7 + v.pid) % 3 }; v.sent.set(t.pid, c); }
       if ((room.tick + c.k) % 3 === 0 || !v.alive) { c.vis = v.alive ? canSee(room, v, t) : true; }   // martwy (sklep, WASTED) nic nie zyskuje na pozycjach
       if (c.vis) c.seenT = now;
-      if (c.vis || now - c.seenT < 0.4) rows.push(stateRow(t, now));
+      if (c.vis || now - c.seenT < 0.4) rows.push(stateRow(t, now, room));
     }
     out(v.pid, { t: 's', T: +(now - room.t0).toFixed(3), p: rows });
   }
   // WANTED na minimapie widać zawsze (4 razy na sekundę)
-  if (room.wanted && room.tick % 5 === 0) { const w = room.p.get(room.wanted); if (w && w.alive) out(-1, { t: 'wp', id: w.pid, x: r2(w.x), z: r2(w.z) }); }
+  if (room.wanted && room.tick % Math.round(TICK_HZ / 4) === 0) { const w = room.p.get(room.wanted); if (w && w.alive) out(-1, { t: 'wp', id: w.pid, x: r2(w.x), z: r2(w.z) }); }
   if (room.boardDirty && now - room.boardT > 0.4) { room.boardDirty = false; room.boardT = now; out(-1, boardMsg(room)); }
-  if (room.tick % 40 === 0) out(-1, { t: 'pi', s: +now.toFixed(3) });
+  if (room.tick % (TICK_HZ * 2) === 0) out(-1, { t: 'pi', s: +now.toFixed(3) });
 }
 // stan początkowy dla gracza (po wejściu do lobby)
 export function startMessage(room, pid, now) {

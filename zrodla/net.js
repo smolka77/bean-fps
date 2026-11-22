@@ -1,9 +1,11 @@
 // Połączenie gry z serwerem meczów 1v1 (WebSocket /ws na serwerze portfeli).
 // Kolejka: queue({matchId, skin}) -> 'queued' -> 'matched' {seat, map, opp:{nick, skin}} -> obaj 'ready' -> 'go'.
-// W meczu gracz wysyła tylko: 'st' (stan ~20/s + kąty kamery z każdej klatki i z chwili każdego strzału – serwer sprawdza nimi celowanie),
-// 'sh' (skąd i w którą stronę strzelił), 'rl' (przeładowanie), 'rs'/'lv' (start rundy),
+// W meczu gracz wysyła tylko: 'st' (stan 30/s + kąty kamery z każdej klatki i z chwili każdego strzału – serwer sprawdza nimi celowanie;
+// c = zegar przeglądarki w ms, f = numer ostatniej przyjętej korekty 'fix', d = opóźnienie obrazu przeciwnika w ms),
+// 'sh' (skąd i w którą stronę strzelił; rt = chwila obrazu przeciwnika – do kompensacji opóźnienia), 'rl' (przeładowanie), 'rs'/'lv' (start rundy),
 // 'po' (odpowiedź na ping). Trafienia, obrażenia, śmierć, amunicję i ruch sprawdza serwer: odsyła 'dmg', 'hc', 'sh' (smuga),
-// 'fix' (cofnięcie niedozwolonego ruchu), 'st' (przeciwnik; null = nie widać go), 'round' i 'end' {reason: 'score' | 'left' | 'cheat'}.
+// 'fix' (cofnięcie niedozwolonego ruchu, n = numer), 'st' (przeciwnik; T = chwila stanu, N = chwila wysłania; null = nie widać go),
+// 'round' i 'end' {reason: 'score' | 'left' | 'cheat'}. Obraz przeciwników z tych stanów liczy interp.js.
 import { walletApi } from './wallet-config.js';
 import { t as tr } from './lobby-ui.js';
 

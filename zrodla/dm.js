@@ -1,5 +1,5 @@
 // Deathmatch – tryb po stronie przeglądarki: stałe, darmowe lobby do 20 graczy (wchodzisz od razu do trwającej gry),
-// płynne pokazywanie przeciwników (bufor paczek z serwera i interpolacja ~100 ms wstecz), WANTED, broń za zabójstwa,
+// płynne pokazywanie przeciwników (bufor stanów ze znacznikami czasu serwera, interpolacja – interp.js), WANTED, broń za zabójstwa,
 // ekran WASTED (Spacja – odrodzenie, Esc – wyjście do lobby).
 // Wszystko, co ważne (trafienia, obrażenia, śmierć, kolejna broń), liczy serwer (serwer/dm.mjs) – tu tylko obraz i sterowanie.
 import * as THREE from 'three';
@@ -8,12 +8,11 @@ import { srvText } from './wallet.js';
 import { getLang } from './lobby-ui.js';
 import { makeGear, EMOTES } from './dm-scenes.js';
 import { applyWeaponSkin, skinFor, mySkins } from './weapon-skins.js';
+import { createView, DM_ROW, SEND_EVERY } from './interp.js';
 const EMOTE_IDS = ['', 'wave', 'dance', 'cheer'];
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const now = () => performance.now() / 1000;
-const angLerp = (a, b, k) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k;
-const INTERP = 0.1;                                   // opóźnienie obrazu przeciwników (s) – zapas na nierówne paczki z sieci
 
 // tekstura czaszki WANTED (czerwona, z czarnym obrysem) – nad postacią
 function skullTexture() {
@@ -36,8 +35,9 @@ export function createDM(ctx) {
     active: false, phase: 'idle', tier: null, info: null, cfg: null, pid: 0, map: '', mapLabel: '', players: new Map(), names: new Map(),
     board: [], wanted: 0, wantedPos: null, off: null, deadT: 0, deathMsg: null, minDeath: 2.4, deadReady: false,
     me: { life: 0, money: 0, owned: [ctx.PISTOL_ID], armor: 0, armorMax: 100, helmet: false, hp: 100, kills: 0, deaths: 0, damage: 0, protUntil: 0, rank: 0 },
-    q: 0, sendT: 0, statsBackup: null, boardOpen: false, deploying: false, lastAmmoKey: '', tabHeld: false,
+    q: 0, sendT: 0, fixN: 0, statsBackup: null, boardOpen: false, deploying: false, lastAmmoKey: '', tabHeld: false,
   };
+  let view = createView(DM_ROW);                         // obraz przeciwników: zegar serwera, bufor na jitter, interpolacja
   const gunName = (id) => (S.cfg && S.cfg.weapons[id] && S.cfg.weapons[id].name) || (ctx.WEAPON_STATS[id] && ctx.WEAPON_STATS[id].name) || id;
   const nameOf = (id) => id === S.pid ? tx('you') : (S.names.get(id) || '?');
 
@@ -63,6 +63,7 @@ export function createDM(ctx) {
     const skull = new THREE.Sprite(skullMat); skull.scale.setScalar(0.42); skull.position.y = 2.05; skull.visible = false; root.add(skull);
     const p = { id: info.id, nick: info.nick, wsk: info.wsk || null, root, holder, skull, guns: {}, gun: null, gunId: '', buf: [], life: -1, lastSeen: -9, alive: true, dying: 0, fall: 0, phase: 0, left: false, flags: 0, flash: 0, meshes: [] };
     root.traverse((o) => { if (o.isMesh && !o.userData.gear) { o.userData.dmId = info.id; p.meshes.push(o); } });
+    view.bind(info.id, p.buf);
     setGun(p, ctx.PISTOL_ID);
     return p;
   }
@@ -72,8 +73,8 @@ export function createDM(ctx) {
     let g = p.guns[id]; if (!g) { g = p.guns[id] = ctx.createWeapon(id, { fx: false }); ctx.placeTP(g); applyWeaponSkin(g, skinFor(p.wsk, id)); }   // skin broni przeciwnika (sprawdzony przez serwer)
     p.holder.add(g.group); p.gun = g; p.gunId = id;
   }
-  function clearRemotes() { for (const p of S.players.values()) { scene.remove(p.root); } S.players.clear(); }
-  function dropRemote(id) { const p = S.players.get(id); if (p) { scene.remove(p.root); S.players.delete(id); } }
+  function clearRemotes() { for (const p of S.players.values()) { scene.remove(p.root); view.drop(p.id); } S.players.clear(); }
+  function dropRemote(id) { const p = S.players.get(id); if (p) { scene.remove(p.root); S.players.delete(id); view.drop(id); } }
   const _a = V3(), _b = V3(), _gr = V3(), _gl = V3();
   function poseRemote(p, s, dt) {
     const r = p.root, ud = r.userData;
@@ -100,22 +101,8 @@ export function createDM(ctx) {
     const em = (fl >> 5) & 3; p.gun.group.visible = !em;
     if (em) { if (!p.emT) p.emT = now(); ud.baseY = y; EMOTES[EMOTE_IDS[em]](ctx, r, now() - p.emT); } else p.emT = 0;
   }
-  function sample(p, rt) {
-    const b = p.buf; if (!b.length) return null;
-    if (rt <= b[0].T) return b[0].v;
-    for (let i = b.length - 1; i >= 0; i--) {
-      if (b[i].T <= rt) {
-        const A = b[i], B = b[i + 1]; if (!B) return A.v;
-        const k = Math.min(1, (rt - A.T) / Math.max(1e-4, B.T - A.T)), a = A.v, c = B.v, o = a.slice();
-        for (const j of [2, 3, 4, 7, 8, 9, 10]) o[j] = a[j] + (c[j] - a[j]) * k;
-        o[5] = angLerp(a[5], c[5], k); o[6] = a[6] + (c[6] - a[6]) * k; o[11] = angLerp(a[11], c[11], k);
-        return o;
-      }
-    }
-    return b[b.length - 1].v;
-  }
   function stepRemotes(dt) {
-    const L = now(), rt = S.off == null ? 0 : L - S.off - INTERP;
+    const L = now(); view.frame(L);
     for (const p of S.players.values()) {
       const r = p.root, mats = r.userData.mats;
       if (p.left) { r.visible = false; continue; }
@@ -127,7 +114,7 @@ export function createDM(ctx) {
       }
       const vis = p.buf.length && L - p.lastSeen < 0.35;
       r.visible = !!vis; if (!vis) continue;
-      const s = sample(p, rt); if (!s) { r.visible = false; continue; }
+      const s = view.sample(p.id); if (!s) { r.visible = false; continue; }
       poseRemote(p, s, dt);
       // WANTED nad głową; ochrona po odrodzeniu: niebieska poświata; trafienie: biały błysk
       p.skull.visible = p.id === S.wanted;
@@ -156,14 +143,13 @@ export function createDM(ctx) {
     S.names.set(m.id, m.nick); S.players.set(m.id, makeRemote(m));
     ui.notify(esc(m.nick) + ' · ' + esc(tx('joined')), '');
   });
+  // stany przeciwników: m.T = chwila paczki (zegar serwera), row[14] = chwila samego stanu (starszy serwer: brak – czas paczki)
   on('s', (m) => {
-    const L = now(), off = L - m.T;
-    S.off = S.off == null ? off : off < S.off ? off : S.off + (off - S.off) * 0.01;
-    const seen = new Set();
+    const L = now(); view.clock(m.T, L);
     for (const row of m.p) {
-      const p = S.players.get(row[0]); if (!p) continue; seen.add(p.id);
+      const p = S.players.get(row[0]); if (!p) continue;
       if (row[1] !== p.life) { p.life = row[1]; p.buf.length = 0; p.dying = 0; p.fall = 0; p.alive = true; p.root.rotation.z = 0; }
-      p.buf.push({ T: m.T, v: row }); if (p.buf.length > 24) p.buf.shift();
+      view.push(p.id, row.length > 14 ? row[14] : m.T, row, L);
       p.lastSeen = L;
     }
   });
@@ -222,7 +208,8 @@ export function createDM(ctx) {
     if (S.boardOpen) ui.showBoard(true, S.board, S.pid, S.wanted, nameOf, S.mapLabel);
   });
   on('left', (m) => { dropRemote(m.id); S.names.delete(m.id); });
-  on('fix', (m) => { if (Array.isArray(m.p) && !player.dead) { player.pos.set(+m.p[0], +m.p[1], +m.p[2]); player.vel.set(0, 0, 0); } });
+  // korekta ruchu z serwera: numer odsyłamy w paczkach ruchu (serwer pomija paczki wysłane przed nią – bez wielokrotnego cofania)
+  on('fix', (m) => { if (m.n > S.fixN) S.fixN = m.n; if (Array.isArray(m.p) && !player.dead) { player.pos.set(+m.p[0], +m.p[1], +m.p[2]); player.vel.set(0, 0, 0); } });
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // ---------------- przebieg ----------------
@@ -237,7 +224,8 @@ export function createDM(ctx) {
 
   function startMatch(m) {
     S.phase = 'live'; S.pid = m.you; S.cfg = m.cfg; S.map = m.map; S.mapLabel = ctx.mapLabel(m.map);
-    S.names = new Map(m.players.map((p) => [p.id, p.nick])); S.board = []; S.wanted = 0; S.wantedPos = null; S.off = null; S.q = 0;
+    S.names = new Map(m.players.map((p) => [p.id, p.nick])); S.board = []; S.wanted = 0; S.wantedPos = null; S.q = 0; S.fixN = 0; S.sendT = 0;
+    view = createView(DM_ROW);
     Object.assign(S.me, { life: 0, money: m.money, owned: m.owned, armor: 0, armorMax: 100, helmet: false, hp: 100, kills: 0, deaths: 0, damage: 0, rank: 0 });
     S.me.guns = Array.isArray(m.guns) ? m.guns : null;          // Arsenał: bronie do kupienia (poniżej progu – tylko pistolet); null = wszystkie
     S.me.ars = m.ars || null;                                    // progi Arsenału do kłódek w sklepie ({unit, need})
@@ -335,14 +323,22 @@ export function createDM(ctx) {
     let wp = null; if (S.wanted && S.wanted !== S.pid) { const p = S.players.get(S.wanted); wp = p && p.root.visible ? { id: p.id, x: p.root.position.x, z: p.root.position.z } : S.wantedPos && L - S.wantedPos.t < 1.5 ? S.wantedPos : null; }
     ui.drawMinimap({ x: player.pos.x, z: player.pos.z, yaw: player.yaw }, foes, wp);
   }
-  // paczka ruchu do serwera (20/s)
+  // paczka ruchu do serwera (SEND_EVERY = 30/s, równym rytmem): c = zegar przeglądarki (serwer liczy z niego chwilę stanu),
+  // f = numer ostatniej przyjętej korekty, d = opóźnienie obrazu przeciwników (ms)
   function send(dt) {
     if (!S.active || !net.open || player.dead || S.phase !== 'live' || !S.me.life) return;
-    S.sendT -= dt; if (S.sendT > 0) return; S.sendT = 0.05;
+    S.sendT -= dt; if (S.sendT > 0) return; S.sendT = Math.max(0, S.sendT + SEND_EVERY);
     const p = player, f2 = (v) => +(+v || 0).toFixed(2), f3 = (v) => +(+v || 0).toFixed(3);
-    net.send({ t: 'st', s: [f3(p.pos.x), f3(p.pos.y), f3(p.pos.z), f3(p.yaw), f3(p.pitch), f2(p.crouch), f2(p.run), f2(p.air), f2(p.slideK), f2(p.legYaw), ctx.WEAPON_IDS.indexOf(ctx.curWeapon().id), p.ads > 0.5 ? 1 : 0, S.me.life, S.emote ? S.emote.id : 0] });
+    net.send({ t: 'st', s: [f3(p.pos.x), f3(p.pos.y), f3(p.pos.z), f3(p.yaw), f3(p.pitch), f2(p.crouch), f2(p.run), f2(p.air), f2(p.slideK), f2(p.legYaw), ctx.WEAPON_IDS.indexOf(ctx.curWeapon().id), p.ads > 0.5 ? 1 : 0, S.me.life, S.emote ? S.emote.id : 0],
+      c: Math.round(performance.now()), f: S.fixN, d: Math.round(view.delay * 1000) });
   }
-  function shot(o, d) { if (!S.active || S.phase !== 'live') return; net.send({ t: 'sh', o: [o.x, o.y, o.z].map((v) => +v.toFixed(3)), d: [d.x, d.y, d.z].map((v) => +v.toFixed(4)), q: ++S.q }); if (now() < S.me.protUntil) S.me.protUntil = 0; }
+  // strzał: rt = chwila obrazu przeciwników, który gracz widział (serwer cofa ich do niej przy sprawdzaniu trafienia)
+  function shot(o, d) {
+    if (!S.active || S.phase !== 'live') return;
+    const rt = view.renderT;
+    net.send({ t: 'sh', o: [o.x, o.y, o.z].map((v) => +v.toFixed(3)), d: [d.x, d.y, d.z].map((v) => +v.toFixed(4)), q: ++S.q, ...(rt != null ? { rt: +rt.toFixed(3) } : {}) });
+    if (now() < S.me.protUntil) S.me.protUntil = 0;
+  }
   // emotka gracza (widok z 3. osoby): po pozie z gry; ruch, strzał, celowanie albo 4 s przerywają
   function postPose() {
     if (!S.emote) return;
