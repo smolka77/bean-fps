@@ -7,7 +7,7 @@ import GLB from './p90-glb.js';
 let N = null;
 // celownik kolimatorowy: szybka była częścią nieprzezroczystego materiału korpusu (fioletowa płytka zasłaniała cel) –
 // wychodzi do osobnego, przezroczystego szkła; na linii celowania świeci czerwona kropka
-export const ready = loadGlb(GLB).then((n) => { N = n; glassLens(N, [-0.0115, 0.1505, -0.1003, 0.0115, 0.1725, -0.0992]); });
+export const ready = loadGlb(GLB).then((n) => { N = n; glassLens(N, [-0.0115, 0.1505, -0.1003, 0.0115, 0.1725, -0.0992], { color: 0xb6bcff, opacity: 0.1 }); });
 export function build() {
   return assemble(N, {
     id: 'p90', name: 'P90', hands: 'rifle',
@@ -24,6 +24,6 @@ export function build() {
     boreY: 0.061, flashScale: 0.7,
     magDir: V3(0, 1, 0.4),                          // magazynek zdejmowany w górę i do tyłu
     eyeZ: 0.15,                                     // oko przy policzku na kolbie bullpupa – szybka kolimatora wypełnia celownik
-    extra: (g) => g.add(reticle('dot', 0.1615, -0.0985, 0.0175)),
+    extra: (g) => g.add(reticle('dot', 0.1615, -0.0985, 0.0078)),   // kropka ~5 mrad z delikatną poświatą
   });
 }
