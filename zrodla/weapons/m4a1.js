@@ -1,6 +1,6 @@
 // M4A1 z kolimatorem i chwytem przednim – model GLB „Assault rifle M4A1” (bobeer, Sketchfab, CC-BY 4.0).
 // Ustawienie, skala i części: narzedzia/assety/przygotuj-bronie.mjs (oświetlacz z szyny usunięty – zasłaniał kolimator).
-import { V3, loadGlb, assemble } from './_glb.js';
+import { V3, loadGlb, assemble, reticle } from './_glb.js';
 import GLB from './m4a1-glb.js';
 
 let N = null;
@@ -19,5 +19,6 @@ export function build() {
       stockEnd: V3(0, 0.025, 0.284),
     },
     boreY: 0.077, flashScale: 0.9,
+    extra: (g) => g.add(reticle('holo', 0.1495, -0.051, 0.012)),   // świecący znak kolimatora holograficznego (kółko z kropką) – wyraźny przy każdej jakości tekstur
   });
 }
